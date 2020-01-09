@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/nanu-c/textsecure/axolotl"
-	"github.com/nanu-c/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/protobuf"
 
 	log "github.com/sirupsen/logrus"
 )

@@ -6,7 +6,7 @@ package textsecure
 import (
 	"io/ioutil"
 
-	"github.com/nanu-c/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
