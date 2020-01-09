@@ -16,8 +16,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/nanu-c/textsecure/axolotl"
-	"github.com/nanu-c/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/protobuf"
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/crypto/curve25519"
 )

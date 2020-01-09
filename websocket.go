@@ -11,7 +11,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
-	"github.com/nanu-c/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/protobuf"
 
 	log "github.com/sirupsen/logrus"
 )

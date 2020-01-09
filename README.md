@@ -13,7 +13,7 @@ Installation
 
 This command will install both the library and the test client.
 
-    go get github.com/nanu-c/textsecure/cmd/textsecure
+    go get github.com/signal-golang/textsecure/cmd/textsecure
 
 
 Configuration

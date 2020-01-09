@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"strconv"
 
-	textsecure "github.com/nanu-c/textsecure/protobuf"
+	textsecure "github.com/signal-golang/textsecure/protobuf"
 )
 
 // getAttachment downloads an encrypted attachment blob from the given URL

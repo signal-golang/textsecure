@@ -15,7 +15,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/nanu-c/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/protobuf"
 	"gopkg.in/yaml.v2"
 )
 

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nanu-c/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/axolotl"
 	"golang.org/x/crypto/pbkdf2"
 
 	log "github.com/sirupsen/logrus"
