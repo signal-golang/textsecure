@@ -458,12 +458,13 @@ func main() {
 	}
 
 	if gateway {
-		go textsecure.StartListening()
 		http.HandleFunc("/", GatewayHandler)
 		http.HandleFunc("/groups", GroupsHandler)
 		http.HandleFunc("/rekey/", RekeyHandler)
 		http.HandleFunc("/json/", JSONHandler)
-		log.Fatal(http.ListenAndServe(bind, nil))
+		go func() {
+			log.Fatal(http.ListenAndServe(bind, nil))
+		}()
 	}
 
 	if linkdevice != "" {
