@@ -8,8 +8,8 @@ package curve25519sign
 import (
 	"crypto/sha512"
 
-	"github.com/agl/ed25519"
-	"github.com/agl/ed25519/edwards25519"
+	"github.com/signal-golang/ed25519"
+	"github.com/signal-golang/ed25519/edwards25519"
 )
 
 // Sign signs the message with privateKey and returns a signature.
