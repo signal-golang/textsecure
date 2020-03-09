@@ -7,8 +7,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/agl/ed25519"
-	"github.com/agl/ed25519/extra25519"
+	"github.com/signal-golang/ed25519"
+	"github.com/signal-golang/ed25519/extra25519"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/curve25519"
 )
