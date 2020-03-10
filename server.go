@@ -118,7 +118,7 @@ func requestCode(tel, method string) (string, error) {
 
 			return "", errors.New("Rate Limit Exeded")
 		} else {
-			log.Debugln(resp.Status)
+			log.Debugln("[textsecure] request code status", resp.Status)
 			defer resp.Body.Close()
 
 			return "", errors.New("Error, see logs")
@@ -155,8 +155,6 @@ type RegistrationLockFailure struct {
 }
 
 func verifyCode(code string) error {
-	fmt.Println("code1: " + code)
-
 	code = strings.Replace(code, "-", "", -1)
 
 	vd := AccountAttributes{
