@@ -483,7 +483,7 @@ func handleTypingMessage(src string, timestamp uint64, cm *signalservice.TypingM
 		timestamp: timestamp,
 	}
 
-	if client.MessageHandler != nil {
+	if client.TypingMessageHandler != nil {
 		client.TypingMessageHandler(msg)
 	}
 	return nil
@@ -496,7 +496,7 @@ func handleReceiptMessage(src string, timestamp uint64, cm *signalservice.Receip
 		timestamp: timestamp,
 	}
 
-	if client.MessageHandler != nil {
+	if client.ReceiptMessageHandler != nil {
 		client.ReceiptMessageHandler(msg)
 	}
 	return nil
