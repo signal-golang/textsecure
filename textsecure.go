@@ -180,6 +180,7 @@ func EndSession(tel string, msg string) (uint64, error) {
 type Attachment struct {
 	R        io.Reader
 	MimeType string
+	FileName string
 }
 
 // Message represents a message received from the peer.

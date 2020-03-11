@@ -120,7 +120,7 @@ func handleSingleAttachment(a *textsecure.AttachmentPointer) (*Attachment, error
 
 	// TODO: verify digest
 
-	return &Attachment{bytes.NewReader(b), a.GetContentType()}, nil
+	return &Attachment{bytes.NewReader(b), a.GetContentType(), a.GetFileName()}, nil
 }
 
 func handleAttachments(dm *textsecure.DataMessage) ([]*Attachment, error) {
