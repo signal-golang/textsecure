@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,11 +16,13 @@ import (
 	"strings"
 	"time"
 	"gopkg.in/yaml.v2"
-        
+
 	"github.com/go-redis/redis"
 	"github.com/signal-golang/textsecure"
 	"github.com/signal-golang/textsecure/axolotl"
 	"golang.org/x/crypto/ssh/terminal"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Simple command line test app for TextSecure.
@@ -133,7 +134,7 @@ func sendMessageToRedis(rmsg RedisMessage) {
 			Password: redispw,
 			DB: redisdb,
 	})
-//	log.Debugf("Publishing message to redis")
+	log.Debug("Publishing message to redis")
 	client.Publish("messages", b)
 }
 
@@ -179,7 +180,7 @@ func conversationLoop(isGroup bool) {
 		err := sendMessage(isGroup, to, message)
 
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
 	}
 }
@@ -196,20 +197,20 @@ func messageHandler(msg *textsecure.Message) {
 		err := sendMessage(msg.Group() != nil, to, msg.Message())
 
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
 		return
 	}
 
 	if msg.Message() != "" {
-		fmt.Printf("\r                                               %s%s\n>", pretty(msg), blue)
+		fmt.Printf("\r%s\n>", pretty(msg))
 		if hook != "" {
 			hookProcess := exec.Command(hook,pretty(msg))
 			hookProcess.Start()
 			hookProcess.Wait()
 		}
 		if ! raw {
-			fmt.Printf("\r                                               %s%s\n>", pretty(msg), blue)
+			fmt.Printf("\r%s\n>", pretty(msg))
 		}
 	}
 
@@ -230,7 +231,7 @@ func messageHandler(msg *textsecure.Message) {
 		}
 	}
 	if redismode {
-//		log.Debugf("Sending message to redis, To: %s, Msg: %s", to, msg.Message())
+		log.Infof("Publishing to redis, To: %s, Msg: %s", to, msg.Message())
 		rmsg := RedisMessage{to, msg.Message()}
 		sendMessageToRedis(rmsg)
 	}
@@ -239,15 +240,15 @@ func messageHandler(msg *textsecure.Message) {
 func handleAttachment(src string, r io.Reader) {
 	f, err := ioutil.TempFile(".", "TextSecure_Attachment")
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return
 	}
 	l, err := io.Copy(f, r)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return
 	}
-	log.Printf("Saving attachment of length %d from %s to %s", l, src, f.Name())
+	log.Infof("Saving attachment of length %d from %s to %s", l, src, f.Name())
 }
 
 var timeFormat = "Mon 03:04"
@@ -265,7 +266,7 @@ func pretty(msg *textsecure.Message) string {
 	if raw {
 		return fmt.Sprintf("%s %s %s", timestamp(msg), src, msg.Message())
 	}
-	return fmt.Sprintf("%s%s %s%s %s%s", yellow, timestamp(msg), red, src, green, msg.Message())
+	return fmt.Sprintf("%s %s %s", timestamp(msg), src, msg.Message())
 }
 
 // getName returns the local contact name corresponding to a phone number,
@@ -278,7 +279,7 @@ func getName(tel string) string {
 }
 
 func registrationDone() {
-	log.Println("Registration done.")
+	log.Info("Registration done.")
 }
 
 // GroupFile loads group info from file
@@ -388,7 +389,7 @@ func JSONHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Println("Error: ", err.Error())
+		log.Error("Error: ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "{\"success\": false}")
 		return
@@ -396,14 +397,14 @@ func JSONHandler(w http.ResponseWriter, r *http.Request) {
 	var data map[string]interface{}
 	result := json.Unmarshal([]byte(body), &data)
 	if result != nil {
-		log.Println("Error: ", result.Error())
+		log.Error("Error: ", result.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "{\"success\": false}")
 		return
 	}
 	message := data[messageField]
 	if message == nil {
-		log.Println("Error: json request contains empty item ", messageField)
+		log.Error("Error: json request contains empty item ", messageField)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "{\"success\": false, \"error\": \"json request contains empty item %s\"}", messageField)
 		return
@@ -411,7 +412,7 @@ func JSONHandler(w http.ResponseWriter, r *http.Request) {
 	to := r.URL.Path[len("/json/"):]
 	sendError, errormessage := GatewaySend(to, message.(string), "")
 	if sendError == false {
-		log.Println("Error: ", errormessage)
+		log.Error("Error: ", errormessage)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "{\"success\": false, \"error\": \"%s\"}", errormessage)
 		return
@@ -429,7 +430,7 @@ func GatewayHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type","application/json")
 
 	if r.Method != "POST" {
-		log.Println("Error: requires POST request")
+		log.Error("Error: requires POST request")
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "{\"success\": false}")
 		return
@@ -442,7 +443,7 @@ func GatewayHandler(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 		f, err := os.OpenFile("/tmp/" + header.Filename, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
-			log.Println("Error: ", err.Error())
+			log.Error("Error: ", err.Error())
 		} else {
 			filename = "/tmp/" + header.Filename
 		}
@@ -459,7 +460,7 @@ func GatewayHandler(w http.ResponseWriter, r *http.Request) {
 			sendError, errormessage = GatewaySend(to, message, "")
 		}
 		if sendError == false {
-			log.Println("Error: ", errormessage)
+			log.Error("Error: ", errormessage)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "{\"success\": false, \"error\": \"%s\"}", errormessage)
 			return
@@ -468,7 +469,7 @@ func GatewayHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "{\"success\": true}")
 		return
 	}
-	log.Println("Error: form fields message and to are required")
+	log.Error("Error: form fields message and to are required")
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, "{\"success\": false, \"error\": \"form fields message and to are required\"}")
 	return
@@ -478,7 +479,6 @@ var telToName map[string]string
 
 func main() {
 	flag.Parse()
-	log.SetFlags(0)
 	client := &textsecure.Client{
 		GetConfig:             getConfig,
 		GetLocalContacts:      getLocalContacts,
@@ -504,7 +504,7 @@ func main() {
 	}
 
 	if linkdevice != "" {
-		log.Printf("Linking new device with url: %s", linkdevice)
+		log.Infof("Linking new device with url: %s", linkdevice)
 		url, err := url.Parse(linkdevice)
 		if err != nil {
 			log.Fatal(err)
@@ -539,11 +539,11 @@ func main() {
 		}
 
 		for _, d := range devs {
-			log.Printf("ID: %d\n", d.ID)
-			log.Printf("Name: %s\n", d.Name)
-			log.Printf("Created: %d\n", d.Created)
-			log.Printf("LastSeen: %d\n", d.LastSeen)
-			log.Println("============")
+			log.Infof("ID: %d\n", d.ID)
+			log.Infof("Name: %s\n", d.Name)
+			log.Infof("Created: %d\n", d.Created)
+			log.Infof("LastSeen: %d\n", d.LastSeen)
+			log.Info("============")
 		}
 		return
 	}
@@ -551,7 +551,7 @@ func main() {
 	if !echo {
 		contacts, err := textsecure.GetRegisteredContacts()
 		if err != nil {
-			log.Printf("Could not get contacts: %s\n", err)
+			log.Infof("Could not get contacts: %s", err)
 		}
 
 		telToName = make(map[string]string)
@@ -632,6 +632,6 @@ func main() {
 
 	err = textsecure.StartListening()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 }
