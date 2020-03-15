@@ -17,7 +17,8 @@ import (
 	"strings"
 	"time"
 	"gopkg.in/yaml.v2"
-
+        
+	"github.com/go-redis/redis"
 	"github.com/signal-golang/textsecure"
 	"github.com/signal-golang/textsecure/axolotl"
 	"golang.org/x/crypto/ssh/terminal"
@@ -25,7 +26,8 @@ import (
 
 // Simple command line test app for TextSecure.
 // It can act as an echo service, send one-off messages and attachments,
-// or carry on a conversation with another client
+// or carry on a conversation with another client,
+// or send all messages received to redis
 
 var (
 	echo         bool
@@ -46,6 +48,10 @@ var (
 	raw          bool
 	gateway      bool
 	bind         string
+	redismode    bool
+	redisbind    string
+	redispw      string
+	redisdb      int
 )
 
 func init() {
@@ -67,6 +73,10 @@ func init() {
 	flag.BoolVar(&raw, "raw", false, "raw mode, disable ansi colors")
 	flag.BoolVar(&gateway, "gateway", false, "http gateway mode")
 	flag.StringVar(&bind, "bind", "localhost:5000", "bind address and port when in gateway-mode")
+	flag.BoolVar(&redismode, "redismode", false, "redis mode")
+	flag.StringVar(&redisbind, "redisbind", "redis:6379", "bind address and port for redis")
+	flag.StringVar(&redispw, "redispw", "", "redis password")
+	flag.IntVar(&redisdb, "redisdb", 0, "redis database")
 }
 
 var (
@@ -75,6 +85,11 @@ var (
 	yellow = "\x1b[33m"
 	blue   = "\x1b[34m"
 )
+
+type RedisMessage struct {
+	To string
+	Body string
+}
 
 func readLine(prompt string) string {
 	reader := bufio.NewReader(os.Stdin)
@@ -106,6 +121,20 @@ func getConfig() (*textsecure.Config, error) {
 
 func getLocalContacts() ([]textsecure.Contact, error) {
 	return textsecure.ReadContacts(configDir + "/contacts.yml")
+}
+
+func sendMessageToRedis(rmsg RedisMessage) {
+	b, err := json.Marshal(rmsg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	client := redis.NewClient(&redis.Options{
+			Addr: redisbind,
+			Password: redispw,
+			DB: redisdb,
+	})
+//	log.Debugf("Publishing message to redis")
+	client.Publish("messages", b)
 }
 
 func sendMessage(isGroup bool, to, message string) error {
@@ -196,7 +225,14 @@ func messageHandler(msg *textsecure.Message) {
 			isGroup = true
 			to = msg.Group().Hexid
 		}
-		go conversationLoop(isGroup)
+		if !redismode {
+			go conversationLoop(isGroup)
+		}
+	}
+	if redismode {
+//		log.Debugf("Sending message to redis, To: %s, Msg: %s", to, msg.Message())
+		rmsg := RedisMessage{to, msg.Message()}
+		sendMessageToRedis(rmsg)
 	}
 }
 
