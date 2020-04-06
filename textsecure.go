@@ -344,6 +344,9 @@ func Setup(c *Client) error {
 func registerDevice() error {
 	if config.Tel == "" {
 		config.Tel = client.GetPhoneNumber()
+		if config.Tel == "" {
+			return errors.New("empty phone number")
+		}
 	}
 	setupTransporter()
 	code, err := requestCode(config.Tel, config.VerificationType)
