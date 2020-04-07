@@ -265,19 +265,18 @@ func setupLogging() {
 		loglevel = os.Getenv("TEXTSECURE_LOGLEVEL")
 	}
 
-	log.SetLevel(log.DebugLevel)
-	// switch strings.ToUpper(loglevel) {
-	// case "DEBUG":
-	// 	log.SetLevel(log.DebugLevel)
-	// case "INFO":
-	// 	log.SetLevel(log.InfoLevel)
-	// case "WARN":
-	// 	log.SetLevel(log.WarnLevel)
-	// case "ERROR":
-	// 	log.SetLevel(log.ErrorLevel)
-	// default:
-	// 	log.SetLevel(log.ErrorLevel)
-	// }
+	switch strings.ToUpper(loglevel) {
+	case "DEBUG":
+		log.SetLevel(log.DebugLevel)
+	case "INFO":
+		log.SetLevel(log.InfoLevel)
+	case "WARN":
+		log.SetLevel(log.WarnLevel)
+	case "ERROR":
+		log.SetLevel(log.ErrorLevel)
+	default:
+		log.SetLevel(log.ErrorLevel)
+	}
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
@@ -359,6 +358,7 @@ func registerDevice() error {
 	}
 	err = verifyCode(code)
 	if err != nil {
+		log.Warnln("[textsecure] verfication failed", err.Error())
 		return err
 	}
 	err = generatePreKeys()
