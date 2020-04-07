@@ -153,7 +153,7 @@ func RequestContactInfo() error {
 			Type: &t,
 		},
 	}
-	_, err := sendSyncMessage(omsg)
+	_, err := sendSyncMessage(omsg, nil)
 	if err != nil {
 		return err
 	}

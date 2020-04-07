@@ -532,6 +532,8 @@ type jsonMessage struct {
 
 func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	dm := &signalservice.DataMessage{}
+	now := uint64(time.Now().UnixNano() / 1000000)
+	dm.Timestamp = &now
 	if msg.msg != "" {
 		dm.Body = &msg.msg
 	}
@@ -694,15 +696,18 @@ var ErrRemoteGone = errors.New("the remote device is gone (probably reinstalled)
 
 var deviceLists = map[string][]uint32{}
 
-func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool) (*sendMessageResponse, error) {
+func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestamp *uint64) (*sendMessageResponse, error) {
 	bm, err := buildMessage(tel, paddedMessage, deviceLists[tel], isSync)
 	if err != nil {
 		return nil, err
 	}
 	m := make(map[string]interface{})
 	m["messages"] = bm
-	now := uint64(time.Now().UnixNano() / 1000000)
-	m["timestamp"] = now
+	if timestamp == nil {
+		now := uint64(time.Now().UnixNano() / 1000000)
+		timestamp = &now
+	}
+	m["timestamp"] = timestamp
 	m["destination"] = tel
 	body, err := json.Marshal(m)
 	if err != nil {
@@ -732,7 +737,7 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool) (*sendMe
 			}
 		}
 		deviceLists[tel] = append(devs, j.MissingDevices...)
-		return buildAndSendMessage(tel, paddedMessage, isSync)
+		return buildAndSendMessage(tel, paddedMessage, isSync, timestamp)
 	}
 	if resp.Status == staleDevicesStatus {
 		dec := json.NewDecoder(resp.Body)
@@ -742,7 +747,7 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool) (*sendMe
 		for _, id := range j.StaleDevices {
 			textSecureStore.DeleteSession(recID(tel), id)
 		}
-		return buildAndSendMessage(tel, paddedMessage, isSync)
+		return buildAndSendMessage(tel, paddedMessage, isSync, timestamp)
 	}
 	if resp.isError() {
 		return nil, resp
@@ -751,7 +756,7 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool) (*sendMe
 	var smRes sendMessageResponse
 	dec := json.NewDecoder(resp.Body)
 	dec.Decode(&smRes)
-	smRes.Timestamp = now
+	smRes.Timestamp = *timestamp
 
 	log.Debugf("[textsecure] SendMessageResponse: %+v\n", smRes)
 	return &smRes, nil
@@ -772,7 +777,7 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 		return 0, err
 	}
 
-	resp, err := buildAndSendMessage(msg.tel, padMessage(b), false)
+	resp, err := buildAndSendMessage(msg.tel, padMessage(b), false, dm.Timestamp)
 	if err != nil {
 		return 0, err
 	}
@@ -782,12 +787,12 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 		sm := &signalservice.SyncMessage{
 			Sent: &signalservice.SyncMessage_Sent{
 				DestinationE164: &msg.tel,
-				Timestamp:       &resp.Timestamp,
+				Timestamp:       dm.Timestamp,
 				Message:         dm,
 			},
 		}
 
-		_, serr := sendSyncMessage(sm)
+		_, serr := sendSyncMessage(sm, dm.Timestamp)
 		if serr != nil {
 			log.WithFields(log.Fields{
 				"error":       serr,
@@ -800,7 +805,7 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 	return resp.Timestamp, err
 }
 
-func sendSyncMessage(sm *signalservice.SyncMessage) (uint64, error) {
+func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
 	if _, ok := deviceLists[config.Tel]; !ok {
 		deviceLists[config.Tel] = []uint32{1}
 	}
@@ -814,6 +819,6 @@ func sendSyncMessage(sm *signalservice.SyncMessage) (uint64, error) {
 		return 0, err
 	}
 
-	resp, err := buildAndSendMessage(config.Tel, padMessage(b), true)
+	resp, err := buildAndSendMessage(config.Tel, padMessage(b), true, timestamp)
 	return resp.Timestamp, err
 }

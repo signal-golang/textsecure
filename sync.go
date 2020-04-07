@@ -158,7 +158,7 @@ func sendContactUpdate() error {
 		},
 	}
 
-	_, err = sendSyncMessage(sm)
+	_, err = sendSyncMessage(sm, nil)
 	return err
 }
 
@@ -202,7 +202,7 @@ func sendGroupUpdate() error {
 		},
 	}
 
-	_, err = sendSyncMessage(sm)
+	_, err = sendSyncMessage(sm, nil)
 	return err
 }
 
