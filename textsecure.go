@@ -362,10 +362,11 @@ func registerDevice() error {
 		if credentials != nil {
 			log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
 			pin := client.GetPin()
-			for credentials != nil {
-				err, credentials = verifyCode(code, &pin, credentials)
+			err, credentials = verifyCode(code, &pin, credentials)
+			if err != nil {
+				log.Warnln("[textsecure] verfication failed", err.Error())
+				return err
 			}
-
 		} else {
 			log.Warnln("[textsecure] verfication failed", err.Error())
 			return err
