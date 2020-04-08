@@ -240,6 +240,7 @@ func (m *Message) XpireTimer() uint32 {
 type Client struct {
 	GetPhoneNumber        func() string
 	GetVerificationCode   func() string
+	GetPin                func() string
 	GetStoragePassword    func() string
 	GetConfig             func() (*Config, error)
 	GetLocalContacts      func() ([]Contact, error)
@@ -356,11 +357,22 @@ func registerDevice() error {
 	if config.VerificationType != "dev" {
 		code = client.GetVerificationCode()
 	}
-	err = verifyCode(code)
+	err, credentials := verifyCode(code, nil, nil)
 	if err != nil {
-		log.Warnln("[textsecure] verfication failed", err.Error())
-		return err
+		if credentials != nil {
+			log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
+			pin := client.GetPin()
+			for credentials != nil {
+				err, credentials = verifyCode(code, &pin, credentials)
+			}
+
+		} else {
+			log.Warnln("[textsecure] verfication failed", err.Error())
+			return err
+		}
+
 	}
+
 	err = generatePreKeys()
 	if err != nil {
 		return err
@@ -454,7 +466,7 @@ func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessa
 		message:     dm.GetBody(),
 		attachments: atts,
 		group:       gr,
-		timestamp:   timestamp,
+		timestamp:   *dm.Timestamp,
 		flags:       flags,
 	}
 

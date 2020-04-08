@@ -140,21 +140,26 @@ func requestCode(tel, method string) (string, error) {
 }
 
 type AccountAttributes struct {
-	SignalingKey    string `json:"signalingKey"`
-	RegistrationID  uint32 `json:"registrationId"`
-	FetchesMessages bool   `json:"fetchesMessages"`
-	Video           bool   `json:"video"`
-	Voice           bool   `json:"voice"`
-	// Pin                            *string `json:"pin"`
+	SignalingKey            string          `json:"signalingKey"`
+	RegistrationID          uint32          `json:"registrationId"`
+	FetchesMessages         bool            `json:"fetchesMessages"`
+	Video                   bool            `json:"video"`
+	Voice                   bool            `json:"voice"`
+	Pin                     string          `json:"pin"`
+	BasicStorageCredentials AuthCredentials `json:"basicStorageCredentials"`
 	// UnidentifiedAccessKey          *byte `json:"unidentifiedAccessKey"`
 	// UnrestrictedUnidentifiedAccess *bool `json:"unrestrictedUnidentifiedAccess"`
 }
+type AuthCredentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
 type RegistrationLockFailure struct {
-	TimeRemaining      string `json:"timeRemaining"`
-	StorageCredentials uint32 `json:"storageCredentials"`
+	TimeRemaining uint32          `json:"timeRemaining"`
+	Credentials   AuthCredentials `json:"backupCredentials"`
 }
 
-func verifyCode(code string) error {
+func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, *AuthCredentials) {
 	code = strings.Replace(code, "-", "", -1)
 
 	vd := AccountAttributes{
@@ -167,14 +172,18 @@ func verifyCode(code string) error {
 		// UnidentifiedAccessKey:          nil,
 		// UnrestrictedUnidentifiedAccess: nil,
 	}
+	if pin != nil {
+		vd.Pin = *pin
+		vd.BasicStorageCredentials = *credentials
+	}
 	body, err := json.Marshal(vd)
 	if err != nil {
-		return err
+		return err, nil
 	}
 	resp, err := transport.putJSON(fmt.Sprintf(verifyAccountPath, code), body)
 	if err != nil {
 		fmt.Println(err.Error())
-		return err
+		return err, nil
 	}
 	if resp.isError() {
 
@@ -182,18 +191,20 @@ func verifyCode(code string) error {
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
 			newStr := buf.String()
-			// fmt.Printf(newStr)
-			// v := RegistrationLockFailure{}
-			// err := json.NewDecoder(resp.Body).Decode(&v)
-			// if err != nil {
-			// 	return err
-			// }
-			return errors.New(fmt.Sprintf("RegistrationLockFailure \n Time to wait \n %s", newStr))
+			fmt.Printf(newStr)
+			v := RegistrationLockFailure{}
+			err := json.Unmarshal([]byte(newStr), &v)
+			log.Debugln("v", v)
+
+			if err != nil {
+				return err, nil
+			}
+			return errors.New(fmt.Sprintf("RegistrationLockFailure \n Time to wait \n %s", newStr)), &v.Credentials
 		} else {
-			return resp
+			return resp, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 type upsRegistration struct {
