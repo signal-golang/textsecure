@@ -191,8 +191,8 @@ type Message struct {
 	attachments             []*Attachment
 	group                   *Group
 	flags                   uint32
-	xpireTimer              uint32
-	ProfileKey              []byte
+	expireTimer             uint32
+	profileKey              []byte
 	timestamp               uint64
 	quote                   signalservice.DataMessage_Quote
 	contact                 []*signalservice.DataMessage_Contact
@@ -232,8 +232,8 @@ func (m *Message) Flags() uint32 {
 	return m.flags
 }
 
-func (m *Message) XpireTimer() uint32 {
-	return m.xpireTimer
+func (m *Message) ExpireTimer() uint32 {
+	return m.expireTimer
 }
 
 // Client contains application specific data and callbacks.
@@ -455,6 +455,7 @@ func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessa
 		return err
 	}
 	log.Debugln("[textsecure] handleDataMessage")
+	log.Debugln("[textsecure] handleDataMessage timestamps", timestamp, *dm.Timestamp)
 	gr, err := handleGroups(src, dm)
 	if err != nil {
 		return err
@@ -463,12 +464,20 @@ func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessa
 		return err
 	}
 	msg := &Message{
-		source:      src,
-		message:     dm.GetBody(),
-		attachments: atts,
-		group:       gr,
-		timestamp:   *dm.Timestamp,
-		flags:       flags,
+		source:                  src,
+		message:                 dm.GetBody(),
+		attachments:             atts,
+		group:                   gr,
+		flags:                   flags,
+		expireTimer:             dm.GetExpireTimer(),
+		profileKey:              dm.GetProfileKey(),
+		timestamp:               *dm.Timestamp,
+		quote:                   *dm.GetQuote(),
+		contact:                 dm.GetContact(),
+		preview:                 dm.GetPreview(),
+		sticker:                 *dm.GetSticker(),
+		requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
+		isViewOnce:              *dm.IsViewOnce,
 	}
 
 	if client.MessageHandler != nil {
