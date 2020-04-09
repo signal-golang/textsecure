@@ -135,7 +135,7 @@ func sendContactUpdate() error {
 
 		b, err := proto.Marshal(cd)
 		if err != nil {
-			log.Errorf("Failed to marshal contact details")
+			log.Errorf("[textsecure] Failed to marshal contact details")
 			continue
 		}
 
