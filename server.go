@@ -176,6 +176,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 		vd.Pin = *pin
 		vd.BasicStorageCredentials = *credentials
 	}
+	log.Debugln("[textsecure] verifyCode", vd)
 	body, err := json.Marshal(vd)
 	if err != nil {
 		return err, nil
