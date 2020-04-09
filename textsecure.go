@@ -266,18 +266,19 @@ func setupLogging() {
 		loglevel = os.Getenv("TEXTSECURE_LOGLEVEL")
 	}
 
-	switch strings.ToUpper(loglevel) {
-	case "DEBUG":
-		log.SetLevel(log.DebugLevel)
-	case "INFO":
-		log.SetLevel(log.InfoLevel)
-	case "WARN":
-		log.SetLevel(log.WarnLevel)
-	case "ERROR":
-		log.SetLevel(log.ErrorLevel)
-	default:
-		log.SetLevel(log.ErrorLevel)
-	}
+	// switch strings.ToUpper(loglevel) {
+	// case "DEBUG":
+	// 	log.SetLevel(log.DebugLevel)
+	// case "INFO":
+	// 	log.SetLevel(log.InfoLevel)
+	// case "WARN":
+	// 	log.SetLevel(log.WarnLevel)
+	// case "ERROR":
+	// 	log.SetLevel(log.ErrorLevel)
+	// default:
+	// 	log.SetLevel(log.DebugLevel)
+	// }
+	log.SetLevel(log.DebugLevel)
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
