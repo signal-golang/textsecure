@@ -102,11 +102,12 @@ type att struct {
 }
 
 type outgoingMessage struct {
-	tel        string
-	msg        string
-	group      *groupMessage
-	attachment *att
-	flags      uint32
+	tel         string
+	msg         string
+	group       *groupMessage
+	attachment  *att
+	flags       uint32
+	expireTimer uint32
 }
 
 // LinkedDevices returns the list of linked devices
@@ -130,10 +131,11 @@ func AddDevice(ephemeralId, publicKey, verificationCode string) error {
 }
 
 // SendMessage sends the given text message to the given contact.
-func SendMessage(tel, msg string) (uint64, error) {
+func SendMessage(tel, msg string, timer uint32) (uint64, error) {
 	omsg := &outgoingMessage{
-		tel: tel,
-		msg: msg,
+		tel:         tel,
+		msg:         msg,
+		expireTimer: timer,
 	}
 	return sendMessage(omsg)
 }
@@ -147,16 +149,17 @@ func MIMETypeFromReader(r io.Reader) (mime string, reader io.Reader) {
 
 // SendAttachment sends the contents of a reader, along
 // with an optional message to a given contact.
-func SendAttachment(tel, msg string, r io.Reader) (uint64, error) {
+func SendAttachment(tel, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
 	a, err := uploadAttachment(r, ct)
 	if err != nil {
 		return 0, err
 	}
 	omsg := &outgoingMessage{
-		tel:        tel,
-		msg:        msg,
-		attachment: a,
+		tel:         tel,
+		msg:         msg,
+		attachment:  a,
+		expireTimer: timer,
 	}
 	return sendMessage(omsg)
 }
@@ -194,10 +197,10 @@ type Message struct {
 	expireTimer             uint32
 	profileKey              []byte
 	timestamp               uint64
-	quote                   signalservice.DataMessage_Quote
+	quote                   *signalservice.DataMessage_Quote
 	contact                 []*signalservice.DataMessage_Contact
 	preview                 []*signalservice.DataMessage_Preview
-	sticker                 signalservice.DataMessage_Sticker
+	sticker                 *signalservice.DataMessage_Sticker
 	requiredProtocolVersion uint32
 	isViewOnce              bool
 }
@@ -247,6 +250,7 @@ type Client struct {
 	MessageHandler        func(*Message)
 	TypingMessageHandler  func(*Message)
 	ReceiptMessageHandler func(*Message)
+	CallMessageHandler    func(*Message)
 	ReceiptHandler        func(string, uint32, uint64)
 	SyncReadHandler       func(string, uint64)
 	SyncSentHandler       func(*Message, uint64)
@@ -456,29 +460,26 @@ func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessa
 		return err
 	}
 	log.Debugln("[textsecure] handleDataMessage")
-	log.Debugln("[textsecure] handleDataMessage timestamps", timestamp, *dm.Timestamp)
+	log.Debugln("[textsecure] handleDataMessage timestamps", timestamp, *dm.Timestamp, dm.GetExpireTimer())
 	gr, err := handleGroups(src, dm)
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
 	msg := &Message{
-		source:                  src,
-		message:                 dm.GetBody(),
-		attachments:             atts,
-		group:                   gr,
-		flags:                   flags,
-		expireTimer:             dm.GetExpireTimer(),
-		profileKey:              dm.GetProfileKey(),
-		timestamp:               *dm.Timestamp,
-		quote:                   *dm.GetQuote(),
-		contact:                 dm.GetContact(),
-		preview:                 dm.GetPreview(),
-		sticker:                 *dm.GetSticker(),
-		requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
-		isViewOnce:              *dm.IsViewOnce,
+		source:      src,
+		message:     dm.GetBody(),
+		attachments: atts,
+		group:       gr,
+		flags:       flags,
+		expireTimer: dm.GetExpireTimer(),
+		// profileKey:              dm.GetProfileKey(),
+		timestamp: *dm.Timestamp,
+		// quote:                   dm.GetQuote(),
+		// contact:                 dm.GetContact(),
+		// preview:                 dm.GetPreview(),
+		// sticker:                 dm.GetSticker(),
+		// requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
+		// isViewOnce:              *dm.IsViewOnce,
 	}
 
 	if client.MessageHandler != nil {

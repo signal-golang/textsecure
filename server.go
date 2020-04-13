@@ -549,6 +549,7 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	if msg.msg != "" {
 		dm.Body = &msg.msg
 	}
+	dm.ExpireTimer = &msg.expireTimer
 	if msg.attachment != nil {
 		dm.Attachments = []*signalservice.AttachmentPointer{
 			{

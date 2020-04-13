@@ -208,7 +208,7 @@ type groupMessage struct {
 	typ     signalservice.GroupContext_Type
 }
 
-func sendGroupHelper(hexid string, msg string, a *att) (uint64, error) {
+func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
 	var ts uint64
 	var err error
 	g, ok := groups[hexid]
@@ -230,9 +230,10 @@ func sendGroupHelper(hexid string, msg string, a *att) (uint64, error) {
 	for _, m := range g.Members {
 		if m != config.Tel {
 			omsg := &outgoingMessage{
-				tel:        m,
-				msg:        msg,
-				attachment: a,
+				tel:         m,
+				msg:         msg,
+				attachment:  a,
+				expireTimer: timer,
 				group: &groupMessage{
 					id:  g.ID,
 					typ: signalservice.GroupContext_DELIVER,
@@ -252,18 +253,18 @@ func sendGroupHelper(hexid string, msg string, a *att) (uint64, error) {
 }
 
 // SendGroupMessage sends a text message to a given group.
-func SendGroupMessage(hexid string, msg string) (uint64, error) {
-	return sendGroupHelper(hexid, msg, nil)
+func SendGroupMessage(hexid string, msg string, timer uint32) (uint64, error) {
+	return sendGroupHelper(hexid, msg, nil, timer)
 }
 
 // SendGroupAttachment sends an attachment to a given group.
-func SendGroupAttachment(hexid string, msg string, r io.Reader) (uint64, error) {
+func SendGroupAttachment(hexid string, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
 	a, err := uploadAttachment(r, ct)
 	if err != nil {
 		return 0, err
 	}
-	return sendGroupHelper(hexid, msg, a)
+	return sendGroupHelper(hexid, msg, a, timer)
 }
 
 func newGroupID() []byte {
