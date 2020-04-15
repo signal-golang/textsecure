@@ -514,16 +514,18 @@ func handleTypingMessage(src string, timestamp uint64, cm *signalservice.TypingM
 	return nil
 }
 func handleReceiptMessage(src string, timestamp uint64, cm *signalservice.ReceiptMessage) error {
+	if *cm.Type == signalservice.ReceiptMessage_READ {
+		msg := &Message{
+			source:    src,
+			message:   "receiptMessage",
+			timestamp: timestamp,
+		}
 
-	msg := &Message{
-		source:    src,
-		message:   "receiptMessage",
-		timestamp: timestamp,
+		if client.ReceiptMessageHandler != nil {
+			client.ReceiptMessageHandler(msg)
+		}
 	}
 
-	if client.ReceiptMessageHandler != nil {
-		client.ReceiptMessageHandler(msg)
-	}
 	return nil
 }
 
