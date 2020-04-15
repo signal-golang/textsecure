@@ -243,6 +243,7 @@ func (m *Message) ExpireTimer() uint32 {
 type Client struct {
 	GetPhoneNumber        func() string
 	GetVerificationCode   func() string
+	GetPin                func() string
 	GetStoragePassword    func() string
 	GetConfig             func() (*Config, error)
 	GetLocalContacts      func() ([]Contact, error)
@@ -360,11 +361,23 @@ func registerDevice() error {
 	if config.VerificationType != "dev" {
 		code = client.GetVerificationCode()
 	}
-	err = verifyCode(code)
+	err, credentials := verifyCode(code, nil, nil)
 	if err != nil {
-		log.Warnln("[textsecure] verfication failed", err.Error())
-		return err
+		if credentials != nil {
+			log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
+			pin := client.GetPin()
+			err, credentials = verifyCode(code, &pin, credentials)
+			if err != nil {
+				log.Warnln("[textsecure] verfication failed", err.Error())
+				return err
+			}
+		} else {
+			log.Warnln("[textsecure] verfication failed", err.Error())
+			return err
+		}
+
 	}
+
 	err = generatePreKeys()
 	if err != nil {
 		return err
