@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/go-redis/redis"
@@ -88,7 +89,7 @@ var (
 )
 
 type RedisMessage struct {
-	To string
+	To   string
 	Body string
 }
 
@@ -130,9 +131,9 @@ func sendMessageToRedis(rmsg RedisMessage) {
 		log.Fatal(err)
 	}
 	client := redis.NewClient(&redis.Options{
-			Addr: redisbind,
-			Password: redispw,
-			DB: redisdb,
+		Addr:     redisbind,
+		Password: redispw,
+		DB:       redisdb,
 	})
 	log.Debug("Publishing message to redis")
 	client.Publish("messages", b)
@@ -141,9 +142,9 @@ func sendMessageToRedis(rmsg RedisMessage) {
 func sendMessage(isGroup bool, to, message string) error {
 	var err error
 	if isGroup {
-		_, err = textsecure.SendGroupMessage(to, message)
+		_, err = textsecure.SendGroupMessage(to, message, 0) // 0 is the expire timer
 	} else {
-		_, err = textsecure.SendMessage(to, message)
+		_, err = textsecure.SendMessage(to, message, 0)
 		if nerr, ok := err.(axolotl.NotTrustedError); ok {
 			fmt.Printf("Peer identity not trusted. Remove the file .storage/identity/remote_%s to approve\n", nerr.ID)
 		}
@@ -154,9 +155,9 @@ func sendMessage(isGroup bool, to, message string) error {
 func sendAttachment(isGroup bool, to, message string, f io.Reader) error {
 	var err error
 	if isGroup {
-		_, err = textsecure.SendGroupAttachment(to, message, f)
+		_, err = textsecure.SendGroupAttachment(to, message, f, 0)
 	} else {
-		_, err = textsecure.SendAttachment(to, message, f)
+		_, err = textsecure.SendAttachment(to, message, f, 0)
 		if nerr, ok := err.(axolotl.NotTrustedError); ok {
 			fmt.Printf("Peer identity not trusted. Remove the file .storage/identity/remote_%s to approve\n", nerr.ID)
 		}
@@ -205,11 +206,11 @@ func messageHandler(msg *textsecure.Message) {
 	if msg.Message() != "" {
 		fmt.Printf("\r%s\n>", pretty(msg))
 		if hook != "" {
-			hookProcess := exec.Command(hook,pretty(msg))
+			hookProcess := exec.Command(hook, pretty(msg))
 			hookProcess.Start()
 			hookProcess.Wait()
 		}
-		if ! raw {
+		if !raw {
 			fmt.Printf("\r%s\n>", pretty(msg))
 		}
 	}
@@ -294,12 +295,12 @@ type GroupFile struct {
 
 // Group as json object for output
 type Group struct {
-	Name string    `json:"name"`
+	Name string `json:"name"`
 }
 
 // GroupsHandler will return all known groups as json
 func GroupsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type","application/json")
+	w.Header().Set("Content-Type", "application/json")
 
 	data := make(map[string]Group)
 
@@ -324,7 +325,7 @@ func GroupsHandler(w http.ResponseWriter, r *http.Request) {
 
 // RekeyHandler will delete existing peer identity
 func RekeyHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type","application/json")
+	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != "DELETE" {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -427,7 +428,7 @@ func GatewayHandler(w http.ResponseWriter, r *http.Request) {
 
 	filename := ""
 
-	w.Header().Set("Content-Type","application/json")
+	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != "POST" {
 		log.Error("Error: requires POST request")
@@ -441,7 +442,7 @@ func GatewayHandler(w http.ResponseWriter, r *http.Request) {
 	file, header, err := r.FormFile("file")
 	if err == nil {
 		defer file.Close()
-		f, err := os.OpenFile("/tmp/" + header.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+		f, err := os.OpenFile("/tmp/"+header.Filename, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			log.Error("Error: ", err.Error())
 		} else {
