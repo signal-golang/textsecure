@@ -15,6 +15,7 @@ func handleSyncMessage(src string, timestamp uint64, sm *signalservice.SyncMessa
 	log.Debugf("[textsecure] SyncMessage recieved at %d", timestamp)
 
 	if sm.GetSent() != nil {
+		log.Debugln("[textsecure] SyncMessage getSent")
 		return handleSyncSent(sm.GetSent(), timestamp)
 	} else if sm.GetContacts() != nil {
 		log.Debugln("[textsecure] SyncMessage contacts")
@@ -23,8 +24,10 @@ func handleSyncMessage(src string, timestamp uint64, sm *signalservice.SyncMessa
 		log.Debugln("[textsecure] SyncMessage groups")
 		return nil
 	} else if sm.GetRequest() != nil {
+		log.Debugln("[textsecure] SyncMessage getRequest")
 		return handleSyncRequest(sm.GetRequest())
 	} else if sm.GetRead() != nil {
+		log.Debugln("[textsecure] SyncMessage getRead")
 		return handleSyncRead(sm.GetRead())
 	} else if sm.GetBlocked() != nil {
 		log.Debugln("[textsecure] SyncMessage blocked")
@@ -43,6 +46,9 @@ func handleSyncMessage(src string, timestamp uint64, sm *signalservice.SyncMessa
 		return nil
 	} else if sm.GetViewOnceOpen() != nil {
 		log.Debugln("[textsecure] SyncMessage GetViewOnceOpen")
+		return nil
+	} else if sm.GetFetchLatest() != nil {
+		log.Debugln("[textsecure] SyncMessage GetFetchLatest")
 		return nil
 	} else {
 		log.Errorf("[textsecure] SyncMessage contains no known sync types")

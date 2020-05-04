@@ -473,7 +473,7 @@ func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessa
 		expireTimer: dm.GetExpireTimer(),
 		// profileKey:              dm.GetProfileKey(),
 		timestamp: *dm.Timestamp,
-		// quote:                   dm.GetQuote(),
+		quote:     dm.GetQuote(),
 		// contact:                 dm.GetContact(),
 		// preview:                 dm.GetPreview(),
 		// sticker:                 dm.GetSticker(),
