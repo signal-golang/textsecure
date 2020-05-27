@@ -6,7 +6,7 @@ The included sample command line app can send and receive text messages and atta
 
 **The API presented by the package is in flux**,  mainly driven by the needs of https://github.com/nanu-c/textsecure-qml
 
-Automatically generated documentation can be found on [GoDoc](https://godoc.org/github.com/nanu-c/textsecure)
+Automatically generated documentation can be found on [GoDoc](https://pkg.go.dev/github.com/signal-golang/textsecure)
 
 Installation
 ------------
