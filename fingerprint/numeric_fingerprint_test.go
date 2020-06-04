@@ -27,14 +27,14 @@ const FINGERPRINT = "30035447769286939689286987676545825756916257684344091807913
 
 func TestCreateFingerprintSimple_alice(t *testing.T) {
 
-	result, _ := CreateFingerprintSimple(1, ALICE_TEL, ALICE_KEY, BOB_TEL, BOB_KEY)
+	result := CreateFingerprintSimple(1, ALICE_TEL, ALICE_KEY, BOB_TEL, BOB_KEY)
 
 	assert.Equal(t, FINGERPRINT, result)
 }
 
 func TestCreateFingerprintSimple_bob(t *testing.T) {
 
-	result, _ := CreateFingerprintSimple(1, BOB_TEL, BOB_KEY, ALICE_TEL, ALICE_KEY)
+	result := CreateFingerprintSimple(1, BOB_TEL, BOB_KEY, ALICE_TEL, ALICE_KEY)
 
 	assert.Equal(t, FINGERPRINT, result)
 }

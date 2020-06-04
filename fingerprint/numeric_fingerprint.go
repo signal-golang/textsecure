@@ -19,31 +19,19 @@ import (
 const ITERATIONS int = 5200
 const FINGERPRINT_VERSION int16 = 0
 
-type CombinedFingerprints struct {
-	LocalFingerprint  []byte
-	RemoteFingerprint []byte
-}
-
-type ScannableFingerprint struct {
-	Version      int16
-	Fingerprints CombinedFingerprints
-}
-
 //https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/java/src/main/java/org/whispersystems/libsignal/fingerprint/NumericFingerprintGenerator.java#L85
-func CreateFingerprint(version int16, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) (string, ScannableFingerprint) {
+func CreateFingerprint(version int16, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) string {
 
 	lFingerprint := getFingerprint(ITERATIONS, localStableIdentifier, localIdentityKeys)
 	rFingerprint := getFingerprint(ITERATIONS, remoteStableIdentifier, remoteIdentityKeys)
 
 	displayableFingerprint := createDisplayableFingerprint(lFingerprint, rFingerprint)
 
-	scannableFingerprint := createScannableFingerprint(version, lFingerprint, rFingerprint)
-
-	return displayableFingerprint, scannableFingerprint
+	return displayableFingerprint
 }
 
 //I'm not particular happy with the name "CreateFingerprintSimple"
-func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) (string, ScannableFingerprint) {
+func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) string {
 
 	localStableIdentifier := []byte(local)
 
@@ -56,17 +44,6 @@ func CreateFingerprintSimple(version int16, local string, localKey []byte, remot
 	remoteECKeys := []axolotl.ECPublicKey{remoteECKey}
 
 	return CreateFingerprint(version, localStableIdentifier, localECKeys, remoteStableIdentifier, remoteECKeys)
-}
-
-func createScannableFingerprint(version int16, localFingerprintData []byte, remoteFingerprintData []byte) ScannableFingerprint {
-	combinedFingerprints := *&CombinedFingerprints{
-		LocalFingerprint:  localFingerprintData,
-		RemoteFingerprint: remoteFingerprintData,
-	}
-	return *&ScannableFingerprint{
-		Version:      version,
-		Fingerprints: combinedFingerprints,
-	}
 }
 
 func createDisplayableFingerprint(localFingerprint []byte, remoteFingerprint []byte) string {
