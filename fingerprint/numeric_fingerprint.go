@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"hash"
 	"sort"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -20,7 +21,8 @@ const ITERATIONS int = 5200
 const FINGERPRINT_VERSION int16 = 0
 
 //https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/java/src/main/java/org/whispersystems/libsignal/fingerprint/NumericFingerprintGenerator.java#L85
-func CreateFingerprint(version int16, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) string {
+//returns: the fingerprint in blocks of five digits
+func CreateFingerprint(version int16, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) []string {
 
 	lFingerprint := getFingerprint(ITERATIONS, localStableIdentifier, localIdentityKeys)
 	rFingerprint := getFingerprint(ITERATIONS, remoteStableIdentifier, remoteIdentityKeys)
@@ -31,28 +33,39 @@ func CreateFingerprint(version int16, localStableIdentifier []byte, localIdentit
 }
 
 //I'm not particular happy with the name "CreateFingerprintSimple"
-func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) string {
+func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) []string {
 
 	localStableIdentifier := []byte(local)
 
-	localECKey := *axolotl.NewECPublicKey(localKey)
+	localECKey := *axolotl.NewECPublicKey(localKey[1:])
 	localECKeys := []axolotl.ECPublicKey{localECKey}
 
 	remoteStableIdentifier := []byte(remote)
 
-	remoteECKey := *axolotl.NewECPublicKey(remoteKey)
+	remoteECKey := *axolotl.NewECPublicKey(remoteKey[1:])
 	remoteECKeys := []axolotl.ECPublicKey{remoteECKey}
 
 	return CreateFingerprint(version, localStableIdentifier, localECKeys, remoteStableIdentifier, remoteECKeys)
 }
 
-func createDisplayableFingerprint(localFingerprint []byte, remoteFingerprint []byte) string {
+func createDisplayableFingerprint(localFingerprint []byte, remoteFingerprint []byte) []string {
 	local := getDisplayStringFor(localFingerprint)
 	remote := getDisplayStringFor(remoteFingerprint)
-	if local <= remote {
-		return local + remote
+	if compareFingerprintBlocks(local, remote)  <= 0 {
+		return append(local, remote...)
 	}
-	return remote + local
+	return append(remote, local...)
+}
+
+func compareFingerprintBlocks(localBlocks []string, remoteBlocks []string) int {
+	result := len(localBlocks) - len(remoteBlocks)
+	if result == 0 {
+		result := strings.Compare(localBlocks[0], remoteBlocks[0])
+		if result == 0 && len(localBlocks) > 0 {
+			return compareFingerprintBlocks(localBlocks[1:], remoteBlocks[1:])
+		}
+	}
+	return result
 }
 
 //https://github.com/signalapp/libsignal-protocol-java/blob/master/java/src/main/java/org/whispersystems/libsignal/fingerprint/NumericFingerprintGenerator.java#L104
@@ -150,13 +163,14 @@ func SortByteArrays(src []axolotl.ECPublicKey) []axolotl.ECPublicKey {
 }
 
 //https://github.com/signalapp/libsignal-protocol-javascript/blob/f5a838f1ccc9bddb5e93b899a63de2dea9670e10/src/NumericFingerprint.js#L32
-func getDisplayStringFor(fingerprint []byte) string {
-	return getEncodedChunk(fingerprint, 0) +
-		getEncodedChunk(fingerprint, 5) +
-		getEncodedChunk(fingerprint, 10) +
-		getEncodedChunk(fingerprint, 15) +
-		getEncodedChunk(fingerprint, 20) +
-		getEncodedChunk(fingerprint, 25)
+func getDisplayStringFor(fingerprint []byte) []string {
+	chunks := []string{getEncodedChunk(fingerprint, 0),
+		getEncodedChunk(fingerprint, 5),
+		getEncodedChunk(fingerprint, 10),
+		getEncodedChunk(fingerprint, 15),
+		getEncodedChunk(fingerprint, 20),
+		getEncodedChunk(fingerprint, 25)}
+	return chunks
 }
 
 //https://github.com/signalapp/libsignal-protocol-javascript/blob/f5a838f1ccc9bddb5e93b899a63de2dea9670e10/src/NumericFingerprint.js#L19
