@@ -120,7 +120,7 @@ func LinkedDevices() ([]DeviceInfo, error) {
 func UnlinkDevice(id int) error {
 	return unlinkDevice(id)
 }
-func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) string {
+func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) []string {
 	return fingerprint.CreateFingerprintSimple(version, local, localKey, remote, remoteKey)
 }
 

@@ -90,7 +90,6 @@ func repeatedHashing(startData []byte, key []byte, iterations int) []byte {
 		javaLikeUpdate(digest, hash)
 		hash = javaLikeDigest(digest, key)
 	}
-	log.Debugln("hash", hash)
 
 	return hash
 }
@@ -123,7 +122,6 @@ func getLogicalKeyBytes(identityKeys []axolotl.ECPublicKey) []byte {
 	// sort IdentityKeyComparator
 	sorted := sortByteArrays(identityKeys)
 	sort.Sort(sorted)
-	log.Debugln(sorted)
 	var output []byte
 	for k := range sorted {
 		output = append(output, sorted[k].Serialize()...)
@@ -186,6 +184,5 @@ func byteArray5ToLong(bytes []byte, offset int) uint64 {
 		(uint64(bytes[offset+2]&0xff) << 16) |
 		(uint64(bytes[offset+3]&0xff) << 8) |
 		uint64(bytes[offset+4]&0xff)
-	log.Debugln(a)
 	return a
 }
