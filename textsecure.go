@@ -19,6 +19,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/fingerprint"
 	"github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 )
@@ -118,6 +119,9 @@ func LinkedDevices() ([]DeviceInfo, error) {
 // UnlinkDevice removes a linked device
 func UnlinkDevice(id int) error {
 	return unlinkDevice(id)
+}
+func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) string {
+	return fingerprint.CreateFingerprintSimple(version, local, localKey, remote, remoteKey)
 }
 
 // NewDeviceVerificationCode returns the verification code for linking devices
