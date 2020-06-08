@@ -19,6 +19,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/fingerprint"
 	"github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 )
@@ -623,4 +624,7 @@ func handleReceivedMessage(msg []byte) error {
 	}
 
 	return nil
+}
+func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) string {
+	return fingerprint.CreateFingerprintSimple(version, local, localKey, remote, remoteKey)
 }
