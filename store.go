@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/fingerprint"
 	"golang.org/x/crypto/pbkdf2"
 
 	log "github.com/sirupsen/logrus"
@@ -254,6 +255,19 @@ func ContactIdentityKey(id string) ([]byte, error) {
 		return nil, err
 	}
 	return append([]byte{5}, b...), nil
+}
+
+func GetFingerprint(remoteIdentifier string) ([]string, error) {
+	localIdentifier := config.Tel
+	localIdentityKey := MyIdentityKey()
+
+	remoteIdentityKey, err := ContactIdentityKey(remoteIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	fingerprint := fingerprint.CreateFingerprintSimple(1, localIdentifier, localIdentityKey, remoteIdentifier, remoteIdentityKey)
+	return fingerprint, nil
 }
 
 // Prekey and signed prekey store
