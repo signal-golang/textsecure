@@ -257,17 +257,20 @@ func ContactIdentityKey(id string) ([]byte, error) {
 	return append([]byte{5}, b...), nil
 }
 
-func GetFingerprint(remoteIdentifier string) ([]string, error) {
+func GetFingerprint(remoteIdentifier string) ([]string, string, error) {
 	localIdentifier := config.Tel
 	localIdentityKey := MyIdentityKey()
 
 	remoteIdentityKey, err := ContactIdentityKey(remoteIdentifier)
 	if err != nil {
-		return nil, err
+		return nil, "",  err
 	}
 
-	fingerprint := fingerprint.CreateFingerprintSimple(1, localIdentifier, localIdentityKey, remoteIdentifier, remoteIdentityKey)
-	return fingerprint, nil
+	numericFingerprint, scannableFingerprint, err := fingerprint.CreateFingerprintSimple(1, localIdentifier, localIdentityKey, remoteIdentifier, remoteIdentityKey)
+	if err != nil {
+		return nil, "",  err
+	}
+	return numericFingerprint, scannableFingerprint, nil
 }
 
 // Prekey and signed prekey store
