@@ -8,6 +8,21 @@ import (
 //based on https://github.com/signalapp/libsignal-protocol-java/blob/3662b6d705ae4162ad8b3a242daf35171edbb068/java/src/main/java/org/whispersystems/libsignal/fingerprint/ScannableFingerprint.java
 //and https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#
 func CreateQRFingerprint(version uint32, localFingerprint []byte, remoteFingerprint []byte) (string, error) {
+	data, err := getMarshalledCombinedFingerprints(version, localFingerprint, remoteFingerprint)
+	if err != nil {
+		return "", err
+	}
+    //https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#L501
+	decoder := charmap.ISO8859_1.NewDecoder()
+	var qrCodeContent []byte
+	qrCodeContent, err = decoder.Bytes(data)
+	if err != nil {
+		return "", err
+	}
+	return string(qrCodeContent), nil
+}
+
+func getMarshalledCombinedFingerprints(version uint32, localFingerprint []byte, remoteFingerprint []byte) ([]byte, error) {
 	combinedFingerprints := &textsecure.CombinedFingerprints{
 		Version: &version,
 		LocalFingerprint: &textsecure.LogicalFingerprint{
@@ -20,16 +35,9 @@ func CreateQRFingerprint(version uint32, localFingerprint []byte, remoteFingerpr
     //https://github.com/signalapp/libsignal-protocol-java/blob/3662b6d705ae4162ad8b3a242daf35171edbb068/java/src/main/java/org/whispersystems/libsignal/fingerprint/ScannableFingerprint.java#L43
 	data, err := proto.Marshal(combinedFingerprints)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-    //https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#L501
-	decoder := charmap.ISO8859_1.NewDecoder()
-	var qrCodeContent []byte
-	qrCodeContent, err = decoder.Bytes(data)
-	if err != nil {
-		return "", err
-	}
-	return string(qrCodeContent), nil
+	return data, nil
 }
 
 //based on https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#L403
