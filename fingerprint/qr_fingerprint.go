@@ -11,10 +11,10 @@ func CreateQRFingerprint(version uint32, localFingerprint []byte, remoteFingerpr
 	combinedFingerprints := &textsecure.CombinedFingerprints{
 		Version: &version,
 		LocalFingerprint: &textsecure.LogicalFingerprint{
-			Content: localFingerprint,
+			Content: localFingerprint[:32],
 		},
 		RemoteFingerprint: &textsecure.LogicalFingerprint{
-			Content: remoteFingerprint,
+			Content: remoteFingerprint[:32],
 		},
 	}
     //https://github.com/signalapp/libsignal-protocol-java/blob/3662b6d705ae4162ad8b3a242daf35171edbb068/java/src/main/java/org/whispersystems/libsignal/fingerprint/ScannableFingerprint.java#L43
