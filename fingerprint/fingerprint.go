@@ -21,7 +21,7 @@ const FINGERPRINT_VERSION int16 = 0
 
 //https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/java/src/main/java/org/whispersystems/libsignal/fingerprint/NumericFingerprintGenerator.java#L85
 //returns: the fingerprint in blocks of five digits
-func CreateFingerprint(version uint32, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) ([]string, string, error) {
+func CreateFingerprint(version uint32, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) ([]string, []byte, error) {
 
 	lFingerprint := getFingerprint(ITERATIONS, localStableIdentifier, localIdentityKeys)
 	rFingerprint := getFingerprint(ITERATIONS, remoteStableIdentifier, remoteIdentityKeys)
@@ -29,13 +29,13 @@ func CreateFingerprint(version uint32, localStableIdentifier []byte, localIdenti
 	fingerprintNumbers := CreateFingerprintNumbers(lFingerprint, rFingerprint)
 	qrFingerprint, err := CreateQRFingerprint(version, lFingerprint, rFingerprint)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 	return fingerprintNumbers, qrFingerprint, nil
 }
 
 //I'm not particular happy with the name "CreateFingerprintSimple"
-func CreateFingerprintSimple(version uint32, local string, localKey []byte, remote string, remoteKey []byte) ([]string, string, error) {
+func CreateFingerprintSimple(version uint32, local string, localKey []byte, remote string, remoteKey []byte) ([]string, []byte, error) {
 
 	localStableIdentifier, localECKeys := castParameters(local, localKey)
 

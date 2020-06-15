@@ -7,15 +7,19 @@ import (
 )
 //based on https://github.com/signalapp/libsignal-protocol-java/blob/3662b6d705ae4162ad8b3a242daf35171edbb068/java/src/main/java/org/whispersystems/libsignal/fingerprint/ScannableFingerprint.java
 //and https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#
-func CreateQRFingerprint(version uint32, localFingerprint []byte, remoteFingerprint []byte) (string, error) {
+func CreateQRFingerprint(version uint32, localFingerprint []byte, remoteFingerprint []byte) ([]byte, error) {
 	data, err := getMarshalledCombinedFingerprints(version, localFingerprint, remoteFingerprint)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-    //https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#L501
+
+	return data, nil
+}
+
+//https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#L501
+func decodeISO8859_1(encoded []byte) (string, error) {
 	decoder := charmap.ISO8859_1.NewDecoder()
-	var qrCodeContent []byte
-	qrCodeContent, err = decoder.Bytes(data)
+	qrCodeContent, err := decoder.Bytes(encoded)
 	if err != nil {
 		return "", err
 	}
@@ -42,15 +46,9 @@ func getMarshalledCombinedFingerprints(version uint32, localFingerprint []byte, 
 
 //based on https://github.com/signalapp/Signal-Android/blob/6f39f9849a002f6361d192a00fbd7c52ffaf3bba/app/src/main/java/org/thoughtcrime/securesms/VerifyIdentityActivity.java#L403
 //and https://github.com/signalapp/libsignal-protocol-java/blob/3662b6d705ae4162ad8b3a242daf35171edbb068/java/src/main/java/org/whispersystems/libsignal/fingerprint/ScannableFingerprint.java#L54
-func ScanQRFingerprint(qrCodeContent string) (*textsecure.CombinedFingerprints, error) {
-	content := []byte(qrCodeContent)
-	encoder := charmap.ISO8859_1.NewEncoder()
-	data, err := encoder.Bytes(content)
-	if err != nil {
-		return nil, err
-	}
+func ScanQRFingerprint(qrCodeContent []byte) (*textsecure.CombinedFingerprints, error) {
 	combinedFingerprints := &textsecure.CombinedFingerprints{}
-	err = proto.Unmarshal(data, combinedFingerprints)
+	err := proto.Unmarshal(qrCodeContent, combinedFingerprints)
 	if err != nil {
 		return nil, err
 	}
