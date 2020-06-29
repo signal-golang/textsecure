@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"hash"
 	"sort"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -22,50 +21,33 @@ const FINGERPRINT_VERSION int16 = 0
 
 //https://github.com/signalapp/libsignal-protocol-java/blob/fde96d22004f32a391554e4991e4e1f0a14c2d50/java/src/main/java/org/whispersystems/libsignal/fingerprint/NumericFingerprintGenerator.java#L85
 //returns: the fingerprint in blocks of five digits
-func CreateFingerprint(version int16, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) []string {
+func CreateFingerprint(version uint32, localStableIdentifier []byte, localIdentityKeys []axolotl.ECPublicKey, remoteStableIdentifier []byte, remoteIdentityKeys []axolotl.ECPublicKey) ([]string, []byte, error) {
 
 	lFingerprint := getFingerprint(ITERATIONS, localStableIdentifier, localIdentityKeys)
 	rFingerprint := getFingerprint(ITERATIONS, remoteStableIdentifier, remoteIdentityKeys)
 
-	displayableFingerprint := createDisplayableFingerprint(lFingerprint, rFingerprint)
-
-	return displayableFingerprint
+	fingerprintNumbers := CreateFingerprintNumbers(lFingerprint, rFingerprint)
+	qrFingerprint, err := CreateQRFingerprint(version, lFingerprint, rFingerprint)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fingerprintNumbers, qrFingerprint, nil
 }
 
 //I'm not particular happy with the name "CreateFingerprintSimple"
-func CreateFingerprintSimple(version int16, local string, localKey []byte, remote string, remoteKey []byte) []string {
+func CreateFingerprintSimple(version uint32, local string, localKey []byte, remote string, remoteKey []byte) ([]string, []byte, error) {
 
-	localStableIdentifier := []byte(local)
+	localStableIdentifier, localECKeys := castParameters(local, localKey)
 
-	localECKey := *axolotl.NewECPublicKey(localKey[1:])
-	localECKeys := []axolotl.ECPublicKey{localECKey}
-
-	remoteStableIdentifier := []byte(remote)
-
-	remoteECKey := *axolotl.NewECPublicKey(remoteKey[1:])
-	remoteECKeys := []axolotl.ECPublicKey{remoteECKey}
+	remoteStableIdentifier, remoteECKeys := castParameters(remote, remoteKey)
 
 	return CreateFingerprint(version, localStableIdentifier, localECKeys, remoteStableIdentifier, remoteECKeys)
 }
 
-func createDisplayableFingerprint(localFingerprint []byte, remoteFingerprint []byte) []string {
-	local := getDisplayStringFor(localFingerprint)
-	remote := getDisplayStringFor(remoteFingerprint)
-	if compareFingerprintBlocks(local, remote)  <= 0 {
-		return append(local, remote...)
-	}
-	return append(remote, local...)
-}
-
-func compareFingerprintBlocks(localBlocks []string, remoteBlocks []string) int {
-	result := len(localBlocks) - len(remoteBlocks)
-	if result == 0 {
-		result := strings.Compare(localBlocks[0], remoteBlocks[0])
-		if result == 0 && len(localBlocks) > 0 {
-			return compareFingerprintBlocks(localBlocks[1:], remoteBlocks[1:])
-		}
-	}
-	return result
+func castParameters(identifier string, key []byte) ([]byte, []axolotl.ECPublicKey) {
+	ECKey := *axolotl.NewECPublicKey(key[1:])
+	ECKeys := []axolotl.ECPublicKey{ECKey}
+	return []byte(identifier), ECKeys
 }
 
 //https://github.com/signalapp/libsignal-protocol-java/blob/master/java/src/main/java/org/whispersystems/libsignal/fingerprint/NumericFingerprintGenerator.java#L104
@@ -158,31 +140,4 @@ func SortByteArrays(src []axolotl.ECPublicKey) []axolotl.ECPublicKey {
 	sorted := sortByteArrays(src)
 	sort.Sort(sorted)
 	return sorted
-}
-
-//https://github.com/signalapp/libsignal-protocol-javascript/blob/f5a838f1ccc9bddb5e93b899a63de2dea9670e10/src/NumericFingerprint.js#L32
-func getDisplayStringFor(fingerprint []byte) []string {
-	chunks := []string{getEncodedChunk(fingerprint, 0),
-		getEncodedChunk(fingerprint, 5),
-		getEncodedChunk(fingerprint, 10),
-		getEncodedChunk(fingerprint, 15),
-		getEncodedChunk(fingerprint, 20),
-		getEncodedChunk(fingerprint, 25)}
-	return chunks
-}
-
-//https://github.com/signalapp/libsignal-protocol-javascript/blob/f5a838f1ccc9bddb5e93b899a63de2dea9670e10/src/NumericFingerprint.js#L19
-func getEncodedChunk(hash []byte, offset int) string {
-	chunk := byteArray5ToLong(hash, offset) % 100000
-	return fmt.Sprintf("%05d", chunk)
-}
-
-//https://github.com/signalapp/libsignal-protocol-java/blob/4f5e1ff299cea22cc75bb97249020a7da67b816d/java/src/main/java/org/whispersystems/libsignal/util/ByteUtil.java#L225
-func byteArray5ToLong(bytes []byte, offset int) uint64 {
-	a := (uint64(bytes[offset]&0xff) << 32) |
-		(uint64(bytes[offset+1]&0xff) << 24) |
-		(uint64(bytes[offset+2]&0xff) << 16) |
-		(uint64(bytes[offset+3]&0xff) << 8) |
-		uint64(bytes[offset+4]&0xff)
-	return a
 }
