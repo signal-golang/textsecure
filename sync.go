@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/common/log"
 	"github.com/signal-golang/textsecure/protobuf"
-	log "github.com/sirupsen/logrus"
 )
 
 // handleSyncMessage handles an incoming SyncMessage.
@@ -161,11 +161,12 @@ func sendContactUpdate() error {
 					CdnId: a.id,
 				},
 				ContentType: &a.ct,
-				Key:         a.keys,
+				Key:         a.keys[:],
+				Digest:      a.digest[:],
+				Size:        &a.size,
 			},
 		},
 	}
-
 	_, err = sendSyncMessage(sm, nil)
 	return err
 }

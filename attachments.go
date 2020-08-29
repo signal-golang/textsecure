@@ -15,7 +15,6 @@ import (
 	"strconv"
 
 	textsecure "github.com/signal-golang/textsecure/protobuf"
-	log "github.com/sirupsen/logrus"
 )
 
 // getAttachment downloads an encrypted attachment blob from the given URL
