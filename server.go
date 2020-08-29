@@ -40,26 +40,29 @@ var (
 	provisioningMessagePath = "/v1/provisioning/%s"
 	devicePath              = "/v1/devices/%s"
 
-	directoryTokensPath      = "/v1/directory/tokens"
-	DIRECTORY_AUTH_PATH      = "/v1/directory/auth"
-	DIRECTORY_FEEDBACK_PATH  = "/v1/directory/feedback-v3/%s"
-	directoryVerifyPath      = "/v1/directory/%s"
-	messagePath              = "/v1/messages/%s"
-	acknowledgeMessagePath   = "/v1/messages/%s/%d"
-	UUID_ACK_MESSAGE_PATH    = "/v1/messages/uuid/%s"
-	receiptPath              = "/v1/receipt/%s/%d"
-	attachmentPath           = "/v1/attachments/%d"
-	ATTACHMENT_DOWNLOAD_PATH = "attachments/%d"
-	ATTACHMENT_UPLOAD_PATH   = "attachments/"
-	ATTACHMENT_PATH          = "/v2/attachments/form/upload"
-	allocateAttachmentPath   = "/v1/attachments/"
-	PROFILE_PATH             = "/v1/profile/%s"
-	SENDER_CERTIFICATE_PATH  = "/v1/certificate/delivery"
-	STICKER_MANIFEST_PATH    = "stickers/%s/manifest.proto"
-	STICKER_PATH             = "stickers/%s/full/%d"
-	SERVICE_REFLECTOR_HOST   = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
-	cdn_url                  = "https://www.google.com/cdn"
-	SIGNAL_CDN_URL           = "https://cdn.signal.org"
+	directoryTokensPath          = "/v1/directory/tokens"
+	DIRECTORY_AUTH_PATH          = "/v1/directory/auth"
+	DIRECTORY_FEEDBACK_PATH      = "/v1/directory/feedback-v3/%s"
+	directoryVerifyPath          = "/v1/directory/%s"
+	messagePath                  = "/v1/messages/%s"
+	acknowledgeMessagePath       = "/v1/messages/%s/%d"
+	UUID_ACK_MESSAGE_PATH        = "/v1/messages/uuid/%s"
+	receiptPath                  = "/v1/receipt/%s/%d"
+	attachmentPath               = "/v2/attachments/form/upload"
+	ATTACHMENT_DOWNLOAD_PATH     = "/v2/attachments/"
+	ATTACHMENT_UPLOAD_PATH       = "/v2/attachments/" //cdnPath
+	ATTACHMENT_ID_DOWNLOAD_PATH  = "/attachments/%d"
+	ATTACHMENT_KEY_DOWNLOAD_PATH = "/attachments/%s"
+	ATTACHMENT_PATH              = "/v2/attachments/form/upload"
+	allocateAttachmentPath       = "/v1/attachments/"
+	PROFILE_PATH                 = "/v1/profile/%s"
+	SENDER_CERTIFICATE_PATH      = "/v1/certificate/delivery"
+	STICKER_MANIFEST_PATH        = "/stickers/%s/manifest.proto"
+	STICKER_PATH                 = "/stickers/%s/full/%d"
+	SERVICE_REFLECTOR_HOST       = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
+	cdn_url                      = "https://cdn.signal.org"
+	SIGNAL_CDN_URL               = "https://cdn.signal.org"
+	SIGNAL_CDN2_URL              = "https://cdn2.signal.org"
 )
 
 // RegistrationInfo holds the data required to be identified by and
@@ -404,8 +407,8 @@ func generateNonce(avatar []byte, length int) []byte {
 	var offset int
 	offset = 0
 	offset++
-	buffer := [12]byte{}
-	log.Debugln(buffer)
+	// buffer := [12]byte{}
+	// log.Debugln("[textsecure]" fer)
 	// 	public static void readFully(InputStream in, byte[] buffer) throws IOException {
 	//
 	// 	for (;;) {
@@ -521,15 +524,12 @@ func allocateAttachment() (uint64, string, error) {
 	return a.ID, a.Location, nil
 }
 
-func getAttachmentLocation(id uint64) (string, error) {
-	resp, err := transport.get(fmt.Sprintf(attachmentPath, id))
-	if err != nil {
-		return "", err
+func getAttachmentLocation(id uint64, key string) (string, error) {
+	if id != 0 {
+		return cdn_url + fmt.Sprintf(ATTACHMENT_ID_DOWNLOAD_PATH, id), nil
+	} else {
+		return cdn_url + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
 	}
-	dec := json.NewDecoder(resp.Body)
-	var a jsonAllocation
-	dec.Decode(&a)
-	return a.Location, nil
 }
 
 // Messages
@@ -551,13 +551,16 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	}
 	dm.ExpireTimer = &msg.expireTimer
 	if msg.attachment != nil {
+		id := signalservice.AttachmentPointer_CdnId{
+			CdnId: msg.attachment.id,
+		}
 		dm.Attachments = []*signalservice.AttachmentPointer{
 			{
-				Id:          &msg.attachment.id,
-				ContentType: &msg.attachment.ct,
-				Key:         msg.attachment.keys[:],
-				Digest:      msg.attachment.digest[:],
-				Size:        &msg.attachment.size,
+				AttachmentIdentifier: &id,
+				ContentType:          &msg.attachment.ct,
+				Key:                  msg.attachment.keys[:],
+				Digest:               msg.attachment.digest[:],
+				Size:                 &msg.attachment.size,
 			},
 		}
 	}

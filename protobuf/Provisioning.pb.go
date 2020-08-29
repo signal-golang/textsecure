@@ -3,9 +3,11 @@
 
 package signalservice
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -16,7 +18,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type ProvisioningVersion int32
 
@@ -31,6 +33,7 @@ var ProvisioningVersion_name = map[int32]string{
 	1: "TABLET_SUPPORT",
 	// Duplicate value: 1: "CURRENT",
 }
+
 var ProvisioningVersion_value = map[string]int32{
 	"INITIAL":        0,
 	"TABLET_SUPPORT": 1,
@@ -42,9 +45,11 @@ func (x ProvisioningVersion) Enum() *ProvisioningVersion {
 	*p = x
 	return p
 }
+
 func (x ProvisioningVersion) String() string {
 	return proto.EnumName(ProvisioningVersion_name, int32(x))
 }
+
 func (x *ProvisioningVersion) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(ProvisioningVersion_value, data, "ProvisioningVersion")
 	if err != nil {
@@ -53,8 +58,9 @@ func (x *ProvisioningVersion) UnmarshalJSON(data []byte) error {
 	*x = ProvisioningVersion(value)
 	return nil
 }
+
 func (ProvisioningVersion) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_Provisioning_6ab66841a1b13740, []int{0}
+	return fileDescriptor_cf02abe648905769, []int{0}
 }
 
 type ProvisionEnvelope struct {
@@ -69,16 +75,17 @@ func (m *ProvisionEnvelope) Reset()         { *m = ProvisionEnvelope{} }
 func (m *ProvisionEnvelope) String() string { return proto.CompactTextString(m) }
 func (*ProvisionEnvelope) ProtoMessage()    {}
 func (*ProvisionEnvelope) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Provisioning_6ab66841a1b13740, []int{0}
+	return fileDescriptor_cf02abe648905769, []int{0}
 }
+
 func (m *ProvisionEnvelope) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ProvisionEnvelope.Unmarshal(m, b)
 }
 func (m *ProvisionEnvelope) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ProvisionEnvelope.Marshal(b, m, deterministic)
 }
-func (dst *ProvisionEnvelope) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ProvisionEnvelope.Merge(dst, src)
+func (m *ProvisionEnvelope) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProvisionEnvelope.Merge(m, src)
 }
 func (m *ProvisionEnvelope) XXX_Size() int {
 	return xxx_messageInfo_ProvisionEnvelope.Size(m)
@@ -122,16 +129,17 @@ func (m *ProvisionMessage) Reset()         { *m = ProvisionMessage{} }
 func (m *ProvisionMessage) String() string { return proto.CompactTextString(m) }
 func (*ProvisionMessage) ProtoMessage()    {}
 func (*ProvisionMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Provisioning_6ab66841a1b13740, []int{1}
+	return fileDescriptor_cf02abe648905769, []int{1}
 }
+
 func (m *ProvisionMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ProvisionMessage.Unmarshal(m, b)
 }
 func (m *ProvisionMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ProvisionMessage.Marshal(b, m, deterministic)
 }
-func (dst *ProvisionMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ProvisionMessage.Merge(dst, src)
+func (m *ProvisionMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProvisionMessage.Merge(m, src)
 }
 func (m *ProvisionMessage) XXX_Size() int {
 	return xxx_messageInfo_ProvisionMessage.Size(m)
@@ -206,14 +214,14 @@ func (m *ProvisionMessage) GetProvisioningVersion() uint32 {
 }
 
 func init() {
+	proto.RegisterEnum("signalservice.ProvisioningVersion", ProvisioningVersion_name, ProvisioningVersion_value)
 	proto.RegisterType((*ProvisionEnvelope)(nil), "signalservice.ProvisionEnvelope")
 	proto.RegisterType((*ProvisionMessage)(nil), "signalservice.ProvisionMessage")
-	proto.RegisterEnum("signalservice.ProvisioningVersion", ProvisioningVersion_name, ProvisioningVersion_value)
 }
 
-func init() { proto.RegisterFile("Provisioning.proto", fileDescriptor_Provisioning_6ab66841a1b13740) }
+func init() { proto.RegisterFile("Provisioning.proto", fileDescriptor_cf02abe648905769) }
 
-var fileDescriptor_Provisioning_6ab66841a1b13740 = []byte{
+var fileDescriptor_cf02abe648905769 = []byte{
 	// 361 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x92, 0x61, 0x6b, 0xdb, 0x30,
 	0x10, 0x86, 0xa7, 0xac, 0x6b, 0x9b, 0x5b, 0x3b, 0xdc, 0x2b, 0x0c, 0x31, 0xc6, 0x30, 0xf9, 0x64,

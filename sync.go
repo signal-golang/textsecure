@@ -157,7 +157,9 @@ func sendContactUpdate() error {
 	sm := &signalservice.SyncMessage{
 		Contacts: &signalservice.SyncMessage_Contacts{
 			Blob: &signalservice.AttachmentPointer{
-				Id:          &a.id,
+				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnId{
+					CdnId: a.id,
+				},
 				ContentType: &a.ct,
 				Key:         a.keys,
 			},
@@ -201,7 +203,9 @@ func sendGroupUpdate() error {
 	sm := &signalservice.SyncMessage{
 		Groups: &signalservice.SyncMessage_Groups{
 			Blob: &signalservice.AttachmentPointer{
-				Id:          &a.id,
+				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnId{
+					CdnId: a.id,
+				},
 				ContentType: &a.ct,
 				Key:         a.keys,
 			},

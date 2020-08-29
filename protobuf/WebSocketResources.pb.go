@@ -3,9 +3,11 @@
 
 package signalservice
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -16,7 +18,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type WebSocketMessage_Type int32
 
@@ -31,6 +33,7 @@ var WebSocketMessage_Type_name = map[int32]string{
 	1: "REQUEST",
 	2: "RESPONSE",
 }
+
 var WebSocketMessage_Type_value = map[string]int32{
 	"UNKNOWN":  0,
 	"REQUEST":  1,
@@ -42,9 +45,11 @@ func (x WebSocketMessage_Type) Enum() *WebSocketMessage_Type {
 	*p = x
 	return p
 }
+
 func (x WebSocketMessage_Type) String() string {
 	return proto.EnumName(WebSocketMessage_Type_name, int32(x))
 }
+
 func (x *WebSocketMessage_Type) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(WebSocketMessage_Type_value, data, "WebSocketMessage_Type")
 	if err != nil {
@@ -53,8 +58,9 @@ func (x *WebSocketMessage_Type) UnmarshalJSON(data []byte) error {
 	*x = WebSocketMessage_Type(value)
 	return nil
 }
+
 func (WebSocketMessage_Type) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_WebSocketResources_39c2df86603aa621, []int{2, 0}
+	return fileDescriptor_0b4a22cf81b88b58, []int{2, 0}
 }
 
 type WebSocketRequestMessage struct {
@@ -72,16 +78,17 @@ func (m *WebSocketRequestMessage) Reset()         { *m = WebSocketRequestMessage
 func (m *WebSocketRequestMessage) String() string { return proto.CompactTextString(m) }
 func (*WebSocketRequestMessage) ProtoMessage()    {}
 func (*WebSocketRequestMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_WebSocketResources_39c2df86603aa621, []int{0}
+	return fileDescriptor_0b4a22cf81b88b58, []int{0}
 }
+
 func (m *WebSocketRequestMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WebSocketRequestMessage.Unmarshal(m, b)
 }
 func (m *WebSocketRequestMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WebSocketRequestMessage.Marshal(b, m, deterministic)
 }
-func (dst *WebSocketRequestMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_WebSocketRequestMessage.Merge(dst, src)
+func (m *WebSocketRequestMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WebSocketRequestMessage.Merge(m, src)
 }
 func (m *WebSocketRequestMessage) XXX_Size() int {
 	return xxx_messageInfo_WebSocketRequestMessage.Size(m)
@@ -142,16 +149,17 @@ func (m *WebSocketResponseMessage) Reset()         { *m = WebSocketResponseMessa
 func (m *WebSocketResponseMessage) String() string { return proto.CompactTextString(m) }
 func (*WebSocketResponseMessage) ProtoMessage()    {}
 func (*WebSocketResponseMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_WebSocketResources_39c2df86603aa621, []int{1}
+	return fileDescriptor_0b4a22cf81b88b58, []int{1}
 }
+
 func (m *WebSocketResponseMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WebSocketResponseMessage.Unmarshal(m, b)
 }
 func (m *WebSocketResponseMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WebSocketResponseMessage.Marshal(b, m, deterministic)
 }
-func (dst *WebSocketResponseMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_WebSocketResponseMessage.Merge(dst, src)
+func (m *WebSocketResponseMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WebSocketResponseMessage.Merge(m, src)
 }
 func (m *WebSocketResponseMessage) XXX_Size() int {
 	return xxx_messageInfo_WebSocketResponseMessage.Size(m)
@@ -210,16 +218,17 @@ func (m *WebSocketMessage) Reset()         { *m = WebSocketMessage{} }
 func (m *WebSocketMessage) String() string { return proto.CompactTextString(m) }
 func (*WebSocketMessage) ProtoMessage()    {}
 func (*WebSocketMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_WebSocketResources_39c2df86603aa621, []int{2}
+	return fileDescriptor_0b4a22cf81b88b58, []int{2}
 }
+
 func (m *WebSocketMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WebSocketMessage.Unmarshal(m, b)
 }
 func (m *WebSocketMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WebSocketMessage.Marshal(b, m, deterministic)
 }
-func (dst *WebSocketMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_WebSocketMessage.Merge(dst, src)
+func (m *WebSocketMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WebSocketMessage.Merge(m, src)
 }
 func (m *WebSocketMessage) XXX_Size() int {
 	return xxx_messageInfo_WebSocketMessage.Size(m)
@@ -252,17 +261,15 @@ func (m *WebSocketMessage) GetResponse() *WebSocketResponseMessage {
 }
 
 func init() {
+	proto.RegisterEnum("signalservice.WebSocketMessage_Type", WebSocketMessage_Type_name, WebSocketMessage_Type_value)
 	proto.RegisterType((*WebSocketRequestMessage)(nil), "signalservice.WebSocketRequestMessage")
 	proto.RegisterType((*WebSocketResponseMessage)(nil), "signalservice.WebSocketResponseMessage")
 	proto.RegisterType((*WebSocketMessage)(nil), "signalservice.WebSocketMessage")
-	proto.RegisterEnum("signalservice.WebSocketMessage_Type", WebSocketMessage_Type_name, WebSocketMessage_Type_value)
 }
 
-func init() {
-	proto.RegisterFile("WebSocketResources.proto", fileDescriptor_WebSocketResources_39c2df86603aa621)
-}
+func init() { proto.RegisterFile("WebSocketResources.proto", fileDescriptor_0b4a22cf81b88b58) }
 
-var fileDescriptor_WebSocketResources_39c2df86603aa621 = []byte{
+var fileDescriptor_0b4a22cf81b88b58 = []byte{
 	// 357 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x92, 0x3f, 0x4f, 0x83, 0x50,
 	0x14, 0xc5, 0x85, 0xa2, 0x6d, 0x5f, 0xff, 0x48, 0xde, 0xa0, 0x8c, 0x84, 0x18, 0x65, 0x62, 0xa8,

@@ -3,27 +3,57 @@
 
 package signalservice
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+
 type Pack struct {
-	Title            *string         `protobuf:"bytes,1,opt,name=title" json:"title,omitempty"`
-	Author           *string         `protobuf:"bytes,2,opt,name=author" json:"author,omitempty"`
-	Cover            *Pack_Sticker   `protobuf:"bytes,3,opt,name=cover" json:"cover,omitempty"`
-	Stickers         []*Pack_Sticker `protobuf:"bytes,4,rep,name=stickers" json:"stickers,omitempty"`
-	XXX_unrecognized []byte          `json:"-"`
+	Title                *string         `protobuf:"bytes,1,opt,name=title" json:"title,omitempty"`
+	Author               *string         `protobuf:"bytes,2,opt,name=author" json:"author,omitempty"`
+	Cover                *Pack_Sticker   `protobuf:"bytes,3,opt,name=cover" json:"cover,omitempty"`
+	Stickers             []*Pack_Sticker `protobuf:"bytes,4,rep,name=stickers" json:"stickers,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
 }
 
-func (m *Pack) Reset()                    { *m = Pack{} }
-func (m *Pack) String() string            { return proto.CompactTextString(m) }
-func (*Pack) ProtoMessage()               {}
-func (*Pack) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (m *Pack) Reset()         { *m = Pack{} }
+func (m *Pack) String() string { return proto.CompactTextString(m) }
+func (*Pack) ProtoMessage()    {}
+func (*Pack) Descriptor() ([]byte, []int) {
+	return fileDescriptor_61d9ca4c7de4706f, []int{0}
+}
+
+func (m *Pack) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Pack.Unmarshal(m, b)
+}
+func (m *Pack) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Pack.Marshal(b, m, deterministic)
+}
+func (m *Pack) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Pack.Merge(m, src)
+}
+func (m *Pack) XXX_Size() int {
+	return xxx_messageInfo_Pack.Size(m)
+}
+func (m *Pack) XXX_DiscardUnknown() {
+	xxx_messageInfo_Pack.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Pack proto.InternalMessageInfo
 
 func (m *Pack) GetTitle() string {
 	if m != nil && m.Title != nil {
@@ -54,15 +84,37 @@ func (m *Pack) GetStickers() []*Pack_Sticker {
 }
 
 type Pack_Sticker struct {
-	Id               *uint32 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
-	Emoji            *string `protobuf:"bytes,2,opt,name=emoji" json:"emoji,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	Id                   *uint32  `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
+	Emoji                *string  `protobuf:"bytes,2,opt,name=emoji" json:"emoji,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Pack_Sticker) Reset()                    { *m = Pack_Sticker{} }
-func (m *Pack_Sticker) String() string            { return proto.CompactTextString(m) }
-func (*Pack_Sticker) ProtoMessage()               {}
-func (*Pack_Sticker) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0, 0} }
+func (m *Pack_Sticker) Reset()         { *m = Pack_Sticker{} }
+func (m *Pack_Sticker) String() string { return proto.CompactTextString(m) }
+func (*Pack_Sticker) ProtoMessage()    {}
+func (*Pack_Sticker) Descriptor() ([]byte, []int) {
+	return fileDescriptor_61d9ca4c7de4706f, []int{0, 0}
+}
+
+func (m *Pack_Sticker) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Pack_Sticker.Unmarshal(m, b)
+}
+func (m *Pack_Sticker) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Pack_Sticker.Marshal(b, m, deterministic)
+}
+func (m *Pack_Sticker) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Pack_Sticker.Merge(m, src)
+}
+func (m *Pack_Sticker) XXX_Size() int {
+	return xxx_messageInfo_Pack_Sticker.Size(m)
+}
+func (m *Pack_Sticker) XXX_DiscardUnknown() {
+	xxx_messageInfo_Pack_Sticker.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Pack_Sticker proto.InternalMessageInfo
 
 func (m *Pack_Sticker) GetId() uint32 {
 	if m != nil && m.Id != nil {
@@ -83,9 +135,9 @@ func init() {
 	proto.RegisterType((*Pack_Sticker)(nil), "signalservice.Pack.Sticker")
 }
 
-func init() { proto.RegisterFile("StickerResources.proto", fileDescriptor2) }
+func init() { proto.RegisterFile("StickerResources.proto", fileDescriptor_61d9ca4c7de4706f) }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor_61d9ca4c7de4706f = []byte{
 	// 220 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x90, 0xcd, 0x4e, 0xc3, 0x30,
 	0x10, 0x84, 0xe5, 0xb4, 0xe5, 0x67, 0x51, 0x38, 0x58, 0xa8, 0xb2, 0xe0, 0x12, 0x71, 0xea, 0xc9,
