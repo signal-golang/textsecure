@@ -14,7 +14,7 @@ import (
 
 	"bytes"
 
-	"bitbucket.org/taruti/mimemagic"
+	"github.com/signal-golang/mimemagic"
 
 	"github.com/golang/protobuf/proto"
 

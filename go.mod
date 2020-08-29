@@ -3,7 +3,7 @@ module github.com/signal-golang/textsecure
 go 1.14
 
 require (
-	bitbucket.org/taruti/mimemagic v0.0.0-20120314151349-e5179c80a024
+	github.com/signal-golang/mimemagic v0.0.0-20200821045537-3f613cf2cd3f
 	github.com/go-redis/redis v6.15.7+incompatible
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/golang/protobuf v1.4.2
