@@ -208,11 +208,12 @@ func sendGroupUpdate() error {
 					CdnId: a.id,
 				},
 				ContentType: &a.ct,
-				Key:         a.keys,
+				Key:         a.keys[:],
+				Digest:      a.digest[:],
+				Size:        &a.size,
 			},
 		},
 	}
-
 	_, err = sendSyncMessage(sm, nil)
 	return err
 }
