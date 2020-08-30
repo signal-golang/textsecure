@@ -60,7 +60,6 @@ var (
 	STICKER_MANIFEST_PATH        = "/stickers/%s/manifest.proto"
 	STICKER_PATH                 = "/stickers/%s/full/%d"
 	SERVICE_REFLECTOR_HOST       = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
-	cdn_url                      = "https://cdn.signal.org"
 	SIGNAL_CDN_URL               = "https://cdn.signal.org"
 	SIGNAL_CDN2_URL              = "https://cdn2.signal.org"
 )
@@ -375,6 +374,7 @@ func setupCDNTransporter() {
 func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
 	log.Debugln(SIGNAL_CDN_URL + "/" + avatarUrl)
 	resp, err := cdnTransport.get("/" + avatarUrl)
+
 	if err != nil {
 		log.Debugln("[textsecure] getAvatar ", err)
 		return nil, err
@@ -524,11 +524,15 @@ func allocateAttachment() (uint64, string, error) {
 	return a.ID, a.Location, nil
 }
 
-func getAttachmentLocation(id uint64, key string) (string, error) {
+func getAttachmentLocation(id uint64, key string, cdnNumber uint32) (string, error) {
+	cdn := SIGNAL_CDN_URL
+	if cdnNumber == 2 {
+		cdn = SIGNAL_CDN2_URL
+	}
 	if id != 0 {
-		return cdn_url + fmt.Sprintf(ATTACHMENT_ID_DOWNLOAD_PATH, id), nil
+		return cdn + fmt.Sprintf(ATTACHMENT_ID_DOWNLOAD_PATH, id), nil
 	} else {
-		return cdn_url + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
+		return cdn + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
 	}
 }
 

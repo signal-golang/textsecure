@@ -3,7 +3,6 @@ module github.com/signal-golang/textsecure
 go 1.14
 
 require (
-	github.com/signal-golang/mimemagic v0.0.0-20200821045537-3f613cf2cd3f
 	github.com/go-redis/redis v6.15.7+incompatible
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/golang/protobuf v1.4.2
@@ -14,6 +13,7 @@ require (
 	github.com/pieterbork/ed25519 v0.0.0-20200301051623-f19b832d0d2e // indirect
 	github.com/prometheus/common v0.13.0
 	github.com/signal-golang/ed25519 v0.0.0-20200301051623-f19b832d0d2e
+	github.com/signal-golang/mimemagic v0.0.0-20200821045537-3f613cf2cd3f
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.5.1
