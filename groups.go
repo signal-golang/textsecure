@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -227,6 +228,7 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 		RequestGroupInfo(g)
 		return 0, fmt.Errorf("[textsecure] sendGroupHelper: need someone in the group to send you a message")
 	}
+	timestamp := uint64(time.Now().UnixNano() / 1000000)
 	for _, m := range g.Members {
 		if m != config.Tel {
 			omsg := &outgoingMessage{
@@ -234,6 +236,7 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 				msg:         msg,
 				attachment:  a,
 				expireTimer: timer,
+				timestamp:   &timestamp,
 				group: &groupMessage{
 					id:  g.ID,
 					typ: signalservice.GroupContext_DELIVER,

@@ -108,6 +108,7 @@ type outgoingMessage struct {
 	attachment  *att
 	flags       uint32
 	expireTimer uint32
+	timestamp   *uint64
 }
 
 // LinkedDevices returns the list of linked devices

@@ -545,6 +545,10 @@ type jsonMessage struct {
 func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	dm := &signalservice.DataMessage{}
 	now := uint64(time.Now().UnixNano() / 1000000)
+	if msg.timestamp != nil {
+		now = *msg.timestamp
+	}
+
 	dm.Timestamp = &now
 	if msg.msg != "" {
 		dm.Body = &msg.msg
