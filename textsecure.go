@@ -204,6 +204,7 @@ type Message struct {
 	sticker                 *signalservice.DataMessage_Sticker
 	requiredProtocolVersion uint32
 	isViewOnce              bool
+	reaction                *signalservice.DataMessage_Reaction
 }
 
 // Source returns the ID of the sender of the message.
@@ -238,6 +239,21 @@ func (m *Message) Flags() uint32 {
 
 func (m *Message) ExpireTimer() uint32 {
 	return m.expireTimer
+}
+
+func (m *Message) Sticker() *signalservice.DataMessage_Sticker {
+	return m.sticker
+}
+
+func (m *Message) Contact() []*signalservice.DataMessage_Contact {
+	return m.contact
+}
+
+func (m *Message) Quote() *signalservice.DataMessage_Quote {
+	return m.quote
+}
+func (m *Message) Reaction() *signalservice.DataMessage_Reaction {
+	return m.reaction
 }
 
 // Client contains application specific data and callbacks.
@@ -472,14 +488,15 @@ func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessa
 		group:       gr,
 		flags:       flags,
 		expireTimer: dm.GetExpireTimer(),
-		// profileKey:              dm.GetProfileKey(),
-		timestamp: *dm.Timestamp,
-		quote:     dm.GetQuote(),
-		// contact:                 dm.GetContact(),
-		// preview:                 dm.GetPreview(),
-		// sticker:                 dm.GetSticker(),
+		profileKey:  dm.GetProfileKey(),
+		timestamp:   *dm.Timestamp,
+		quote:       dm.GetQuote(),
+		contact:     dm.GetContact(),
+		preview:     dm.GetPreview(),
+		sticker:     dm.GetSticker(),
+		reaction:    dm.GetReaction(),
 		// requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
-		// isViewOnce:              *dm.IsViewOnce,
+		// isViewOnce: *dm.IsViewOnce,
 	}
 
 	if client.MessageHandler != nil {
