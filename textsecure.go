@@ -534,7 +534,7 @@ func handleReceiptMessage(src string, timestamp uint64, cm *signalservice.Receip
 	msg := &Message{
 		source:    src,
 		message:   "sentReceiptMessage",
-		timestamp: timestamp,
+		timestamp: cm.Timestamp[0],
 	}
 	if *cm.Type == signalservice.ReceiptMessage_READ {
 		msg.message = "readReceiptMessage"
