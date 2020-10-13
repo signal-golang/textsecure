@@ -269,7 +269,14 @@ func SendGroupAttachment(hexid string, msg string, r io.Reader, timer uint32) (u
 	}
 	return sendGroupHelper(hexid, msg, a, timer)
 }
-
+func SendGroupVoiceNote(hexid string, msg string, r io.Reader, timer uint32) (uint64, error) {
+	ct, r := MIMETypeFromReader(r)
+	a, err := uploadVoiceNote(r, ct)
+	if err != nil {
+		return 0, err
+	}
+	return sendGroupHelper(hexid, msg, a, timer)
+}
 func newGroupID() []byte {
 	id := make([]byte, 16)
 	randBytes(id)

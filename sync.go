@@ -61,7 +61,6 @@ func handleSyncMessage(src string, timestamp uint64, sm *signalservice.SyncMessa
 func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 	dm := s.GetMessage()
 	dest := s.GetDestinationE164()
-	timestamp := s.GetTimestamp()
 
 	if dm == nil {
 		return fmt.Errorf("DataMessage was nil for SyncMessage_Sent")
@@ -92,8 +91,14 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 		attachments: atts,
 		group:       gr,
 		contact:     cs,
-		timestamp:   timestamp,
 		flags:       flags,
+		expireTimer: dm.GetExpireTimer(),
+		profileKey:  dm.GetProfileKey(),
+		timestamp:   *dm.Timestamp,
+		quote:       dm.GetQuote(),
+		preview:     dm.GetPreview(),
+		sticker:     dm.GetSticker(),
+		reaction:    dm.GetReaction(),
 	}
 
 	if client.SyncSentHandler != nil {

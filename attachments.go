@@ -90,7 +90,37 @@ func uploadAttachment(r io.Reader, ct string) (*att, error) {
 		return nil, err
 	}
 
-	return &att{id, ct, keys, digest, uint32(plaintextLength)}, nil
+	return &att{id, ct, keys, digest, uint32(plaintextLength), false}, nil
+}
+func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
+	//combined AES-256 and HMAC-SHA256 key
+	keys := make([]byte, 64)
+	randBytes(keys)
+
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	plaintextLength := len(b)
+
+	e, err := aesEncrypt(keys[:32], b)
+	if err != nil {
+		return nil, err
+	}
+
+	m := appendMAC(keys[32:], e)
+
+	id, location, err := allocateAttachment()
+	if err != nil {
+		return nil, err
+	}
+	digest, err := putAttachment(location, m)
+	if err != nil {
+		return nil, err
+	}
+
+	return &att{id, ct, keys, digest, uint32(plaintextLength), true}, nil
 }
 
 // ErrInvalidMACForAttachment signals that the downloaded attachment has an invalid MAC.

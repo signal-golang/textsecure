@@ -571,6 +571,10 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 				Size:                 &msg.attachment.size,
 			},
 		}
+		if msg.attachment.voiceNote {
+			var flag uint32 = 1
+			dm.Attachments[0].Flags = &flag
+		}
 	}
 	if msg.group != nil {
 		dm.Group = &signalservice.GroupContext{

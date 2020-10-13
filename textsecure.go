@@ -94,11 +94,12 @@ func needsRegistration() bool {
 var identityKey *axolotl.IdentityKeyPair
 
 type att struct {
-	id     uint64
-	ct     string
-	keys   []byte
-	digest []byte
-	size   uint32
+	id        uint64
+	ct        string
+	keys      []byte
+	digest    []byte
+	size      uint32
+	voiceNote bool
 }
 
 type outgoingMessage struct {
@@ -153,6 +154,20 @@ func MIMETypeFromReader(r io.Reader) (mime string, reader io.Reader) {
 func SendAttachment(tel, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
 	a, err := uploadAttachment(r, ct)
+	if err != nil {
+		return 0, err
+	}
+	omsg := &outgoingMessage{
+		tel:         tel,
+		msg:         msg,
+		attachment:  a,
+		expireTimer: timer,
+	}
+	return sendMessage(omsg)
+}
+func SendVoiceNote(tel, msg string, r io.Reader, timer uint32) (uint64, error) {
+	ct, r := MIMETypeFromReader(r)
+	a, err := uploadVoiceNote(r, ct)
 	if err != nil {
 		return 0, err
 	}
@@ -534,7 +549,7 @@ func handleReceiptMessage(src string, timestamp uint64, cm *signalservice.Receip
 	msg := &Message{
 		source:    src,
 		message:   "sentReceiptMessage",
-		timestamp: cm.Timestamp[0],
+		timestamp: cm.GetTimestamp()[0],
 	}
 	if *cm.Type == signalservice.ReceiptMessage_READ {
 		msg.message = "readReceiptMessage"
