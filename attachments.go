@@ -93,6 +93,7 @@ func uploadAttachment(r io.Reader, ct string) (*att, error) {
 	return &att{id, ct, keys, digest, uint32(plaintextLength), false}, nil
 }
 func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
+	ct = "audio/mpeg"
 	//combined AES-256 and HMAC-SHA256 key
 	keys := make([]byte, 64)
 	randBytes(keys)
