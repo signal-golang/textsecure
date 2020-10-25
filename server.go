@@ -20,7 +20,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	siv "github.com/secure-io/siv-go"
+	siv "github.com/agl/gcmsiv"
 )
 
 const NONCE_LEN = 12
@@ -397,7 +397,7 @@ func decryptAvatar(avatar []byte, identityKey []byte) []byte {
 }
 
 func decrypt(key, data, nonce []byte) ([]byte, error) {
-	aessiv, err := siv.NewGCM(key)
+	aessiv, err := siv.NewGCMSIV(key)
 	if err != nil {
     return nil, err
 	}
@@ -409,7 +409,7 @@ func decrypt(key, data, nonce []byte) ([]byte, error) {
 }
 
 func encrypt(key, data, nonce []byte) ([]byte, error) {
-	aessiv, err := siv.NewGCM(key)
+	aessiv, err := siv.NewGCMSIV(key)
 	if err != nil {
 		return nil, err
 	}
