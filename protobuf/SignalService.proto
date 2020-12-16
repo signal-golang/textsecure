@@ -6,6 +6,7 @@
 syntax = "proto2";
 
 package signalservice;
+option go_package = ".;signalservice";
 
 option java_package         = "org.whispersystems.signalservice.internal.push";
 option java_outer_classname = "SignalServiceProtos";
@@ -44,9 +45,9 @@ message Content {
 message CallMessage {
   message Offer {
     enum Type {
-      OFFER_AUDIO_CALL      = 0;
-      OFFER_VIDEO_CALL      = 1;
-      // 2 is reserved, removed OFFER_NEED_PERMISSION
+      OFFER_AUDIO_CALL                   = 0;
+      OFFER_VIDEO_CALL                   = 1;
+      reserved /* OFFER_NEED_PERMISSION */ 2; // removed
     }
 
     optional uint64 id     = 1;
@@ -92,16 +93,20 @@ message CallMessage {
     optional uint32 deviceId = 3;
   }
 
+  message Opaque {
+    optional bytes data = 1;
+  }
 
   optional Offer     offer               = 1;
   optional Answer    answer              = 2;
   repeated IceUpdate iceUpdate           = 3;
   optional Hangup    legacyHangup        = 4;
   optional Busy      busy                = 5;
-  // 6 is reserved.
+  reserved        /* profileKey */         6;
   optional Hangup    hangup              = 7;
   optional bool      multiRing           = 8;
   optional uint32    destinationDeviceId = 9;
+  optional Opaque    opaque              = 10;
 }
 
 message DataMessage {
@@ -215,18 +220,23 @@ message DataMessage {
     optional bytes             packKey   = 2;
     optional uint32            stickerId = 3;
     optional AttachmentPointer data      = 4;
+    optional string            emoji     = 5;
   }
 
   message Reaction {
     optional string emoji               = 1;
     optional bool   remove              = 2;
-    optional string targetAuthorE164    = 3;
+    reserved     /* targetAuthorE164 */   3; // removed
     optional string targetAuthorUuid    = 4;
     optional uint64 targetSentTimestamp = 5;
   }
 
   message Delete {
     optional uint64 targetSentTimestamp = 1;
+  }
+
+  message GroupCallUpdate {
+    optional string eraId = 1;
   }
 
   enum ProtocolVersion {
@@ -259,6 +269,8 @@ message DataMessage {
   optional Reaction           reaction                = 16;
   optional Delete             delete                  = 17;
   repeated BodyRange          bodyRanges              = 18;
+  optional GroupCallUpdate    groupCallUpdate         = 19;
+  reserved                 /* future use */             20;
 }
 
 message NullMessage {
@@ -269,6 +281,7 @@ message ReceiptMessage {
   enum Type {
     DELIVERY = 0;
     READ     = 1;
+    VIEWED   = 2;
   }
 
   optional Type   type      = 1;
@@ -355,7 +368,7 @@ message SyncMessage {
     optional bool   readReceipts                   = 1;
     optional bool   unidentifiedDeliveryIndicators = 2;
     optional bool   typingIndicators               = 3;
-    // 4 is reserved (old link preview setting)
+    reserved     /* linkPreviews */                  4; // removed
     optional uint32 provisioningVersion            = 5;
     optional bool   linkPreviews                   = 6;
   }
@@ -458,8 +471,8 @@ message GroupContext {
   }
 
   message Member {
-    // 1 is reserved
-    optional string e164 = 2;
+    reserved     /* uuid */ 1; // removed
+    optional string e164  = 2;
   }
 
   optional bytes             id          = 1;
@@ -502,8 +515,8 @@ message GroupDetails {
   }
 
   message Member {
-    // 1 is reserved
-    optional string e164 = 2;
+    reserved     /* uuid */ 1; // removed
+    optional string e164  = 2;
   }
 
   optional bytes  id            = 1;

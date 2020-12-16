@@ -7,6 +7,7 @@ syntax = "proto2";
 
 package textsecure;
 
+option go_package = ".;signalservice";
 option java_package         = "org.whispersystems.signalservice.internal.keybackup.protos";
 option java_multiple_files  = true;
 

@@ -9,6 +9,7 @@ package textsecure;
 
 import "SignalService.proto";
 
+option go_package = ".;signalservice";
 option java_package        = "org.whispersystems.signalservice.internal.serialize.protos";
 option java_multiple_files = true;
 

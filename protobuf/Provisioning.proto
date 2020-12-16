@@ -5,6 +5,7 @@
  */
 syntax = "proto2";
 
+option go_package = ".;signalservice";
 package signalservice;
 
 option java_package         = "org.whispersystems.signalservice.internal.push";
