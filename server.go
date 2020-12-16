@@ -24,12 +24,28 @@ import (
 )
 
 var (
-	createAccountPath      = "/v1/accounts/%s/code/%s?client=%s"
-	verifyAccountPath      = "/v1/accounts/code/%s"
-	registerUPSAccountPath = "/v1/accounts/ups/"
-	TURN_SERVER_INFO       = "/v1/accounts/turn"
-	SET_ACCOUNT_ATTRIBUTES = "/v1/accounts/attributes/"
-	PIN_PATH               = "/v1/accounts/pin/"
+	SERVICE_REFLECTOR_HOST = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
+	SIGNAL_CDN_URL         = "https://cdn.signal.org"
+	SIGNAL_CDN2_URL        = "https://cdn2.signal.org"
+
+	createAccountPath = "/v1/accounts/%s/code/%s?client=%s"
+	// CREATE_ACCOUNT_SMS_PATH   = "/v1/accounts/sms/code/%s?client=%s";
+	CREATE_ACCOUNT_VOICE_PATH = "/v1/accounts/voice/code/%s"
+	VERIFY_ACCOUNT_CODE_PATH  = "/v1/accounts/code/%s"
+	registerUPSAccountPath    = "/v1/accounts/ups/"
+	TURN_SERVER_INFO          = "/v1/accounts/turn"
+	SET_ACCOUNT_ATTRIBUTES    = "/v1/accounts/attributes/"
+	PIN_PATH                  = "/v1/accounts/pin/"
+	REGISTRATION_LOCK_PATH    = "/v1/accounts/registration_lock"
+	REQUEST_PUSH_CHALLENGE    = "/v1/accounts/fcm/preauth/%s/%s"
+	WHO_AM_I                  = "/v1/accounts/whoami"
+	SET_USERNAME_PATH         = "/v1/accounts/username/%s"
+	DELETE_USERNAME_PATH      = "/v1/accounts/username"
+	DELETE_ACCOUNT_PATH       = "/v1/accounts/me"
+
+	allocateAttachmentPath   = "/v1/attachments/"
+	attachmentPath           = "/v2/attachments/form/upload"
+	ATTACHMENT_DOWNLOAD_PATH = "/v2/attachments/"
 
 	prekeyMetadataPath = "/v2/keys/"
 	prekeyPath         = "/v2/keys/%s"
@@ -40,28 +56,44 @@ var (
 	provisioningMessagePath = "/v1/provisioning/%s"
 	devicePath              = "/v1/devices/%s"
 
-	directoryTokensPath          = "/v1/directory/tokens"
-	DIRECTORY_AUTH_PATH          = "/v1/directory/auth"
-	DIRECTORY_FEEDBACK_PATH      = "/v1/directory/feedback-v3/%s"
-	directoryVerifyPath          = "/v1/directory/%s"
-	messagePath                  = "/v1/messages/%s"
-	acknowledgeMessagePath       = "/v1/messages/%s/%d"
-	UUID_ACK_MESSAGE_PATH        = "/v1/messages/uuid/%s"
-	receiptPath                  = "/v1/receipt/%s/%d"
-	attachmentPath               = "/v2/attachments/form/upload"
-	ATTACHMENT_DOWNLOAD_PATH     = "/v2/attachments/"
-	ATTACHMENT_UPLOAD_PATH       = "/v2/attachments/" //cdnPath
-	ATTACHMENT_ID_DOWNLOAD_PATH  = "/attachments/%d"
-	ATTACHMENT_KEY_DOWNLOAD_PATH = "/attachments/%s"
-	ATTACHMENT_PATH              = "/v2/attachments/form/upload"
-	allocateAttachmentPath       = "/v1/attachments/"
-	PROFILE_PATH                 = "/v1/profile/%s"
-	SENDER_CERTIFICATE_PATH      = "/v1/certificate/delivery"
-	STICKER_MANIFEST_PATH        = "/stickers/%s/manifest.proto"
-	STICKER_PATH                 = "/stickers/%s/full/%d"
-	SERVICE_REFLECTOR_HOST       = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
-	SIGNAL_CDN_URL               = "https://cdn.signal.org"
-	SIGNAL_CDN2_URL              = "https://cdn2.signal.org"
+	DIRECTORY_TOKENS_PATH   = "/v1/directory/tokens"
+	DIRECTORY_VERIFY_PATH   = "/v1/directory/%s"
+	DIRECTORY_AUTH_PATH     = "/v1/directory/auth"
+	DIRECTORY_FEEDBACK_PATH = "/v1/directory/feedback-v3/%s"
+
+	MESSAGE_PATH            = "/v1/messages/%s"
+	acknowledgeMessagePath  = "/v1/messages/%s/%d"
+	receiptPath             = "/v1/receipt/%s/%d"
+	SENDER_ACK_MESSAGE_PATH = "/v1/messages/%s/%d"
+	UUID_ACK_MESSAGE_PATH   = "/v1/messages/uuid/%s"
+	ATTACHMENT_V2_PATH      = "/v2/attachments/form/upload"
+	ATTACHMENT_V3_PATH      = "/v3/attachments/form/upload"
+
+	PROFILE_PATH          = "/v1/profile/%s"
+	PROFILE_USERNAME_PATH = "/v1/profile/username/%s"
+
+	SENDER_CERTIFICATE_PATH         = "/v1/certificate/delivery?includeUuid=true"
+	SENDER_CERTIFICATE_NO_E164_PATH = "/v1/certificate/delivery?includeUuid=true&includeE164=false"
+
+	KBS_AUTH_PATH = "/v1/backup/auth"
+
+	ATTACHMENT_KEY_DOWNLOAD_PATH = "attachments/%s"
+	ATTACHMENT_ID_DOWNLOAD_PATH  = "attachments/%d"
+	ATTACHMENT_UPLOAD_PATH       = "attachments/"
+	AVATAR_UPLOAD_PATH           = ""
+
+	STICKER_MANIFEST_PATH = "/stickers/%s/manifest.proto"
+	STICKER_PATH          = "/stickers/%s/full/%d"
+
+	GROUPSV2_CREDENTIAL     = "/v1/certificate/group/%d/%d"
+	GROUPSV2_GROUP          = "/v1/groups/"
+	GROUPSV2_GROUP_PASSWORD = "/v1/groups/?inviteLinkPassword=%s"
+	GROUPSV2_GROUP_CHANGES  = "/v1/groups/logs/%s"
+	GROUPSV2_AVATAR_REQUEST = "/v1/groups/avatar/form"
+	GROUPSV2_GROUP_JOIN     = "/v1/groups/join/%s"
+	GROUPSV2_TOKEN          = "/v1/groups/token"
+
+	SERVER_DELIVERED_TIMESTAMP_HEADER = "X-Signal-Timestamp"
 )
 
 // RegistrationInfo holds the data required to be identified by and
@@ -183,7 +215,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 	if err != nil {
 		return err, nil
 	}
-	resp, err := transport.putJSON(fmt.Sprintf(verifyAccountPath, code), body)
+	resp, err := transport.putJSON(fmt.Sprintf(VERIFY_ACCOUNT_CODE_PATH, code), body)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err, nil
@@ -482,7 +514,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.putJSON(directoryTokensPath, body)
+	resp, err := transport.putJSON(DIRECTORY_TOKENS_PATH, body)
 	// // TODO: breaks when there is no internet
 	if resp != nil && resp.Status == 413 {
 		log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
@@ -741,7 +773,7 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestam
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.putJSON(fmt.Sprintf(messagePath, tel), body)
+	resp, err := transport.putJSON(fmt.Sprintf(MESSAGE_PATH, tel), body)
 	if err != nil {
 		return nil, err
 	}
