@@ -5,8 +5,6 @@ package textsecure
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -21,7 +19,11 @@ import (
 	"github.com/signal-golang/textsecure/protobuf"
 
 	log "github.com/sirupsen/logrus"
+
+	siv "github.com/agl/gcmsiv"
 )
+
+const NONCE_LEN = 12
 
 var (
 	SERVICE_REFLECTOR_HOST = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
@@ -415,26 +417,42 @@ func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
 }
 
 func decryptAvatar(avatar []byte, identityKey []byte) []byte {
-	block, err := aes.NewCipher(identityKey[:32])
-	log.Debugln("-0", avatar[:12])
-	if err != nil {
-		log.Debugln("0", err)
-
-		return nil
-	}
-	// nonce := []byte{}
-	aesgcm, err := cipher.NewGCM(block)
-	log.Debugln("-0", aesgcm.NonceSize())
-
-	if err != nil {
-		log.Debugln("1", err)
-	}
-	b, err := aesgcm.Open(nil, avatar[:12], avatar, nil)
+	avatar_len := len(avatar) - NONCE_LEN
+	nonce := avatar[avatar_len:]
+	encrypted_avatar := avatar[:avatar_len]
+	decryptedAvatar, err := decrypt(identityKey[:32], encrypted_avatar, nonce)
 	if err != nil {
 		log.Debugln("3", err)
+		return nil
 	}
-	return b
+	return decryptedAvatar
 }
+
+func decrypt(key, data, nonce []byte) ([]byte, error) {
+	aessiv, err := siv.NewGCMSIV(key)
+	if err != nil {
+    return nil, err
+	}
+	decrypted, err := aessiv.Open(nil, nonce, data, nil)
+	if err != nil {
+    return nil, err
+	}
+	return decrypted, nil
+}
+
+func encrypt(key, data, nonce []byte) ([]byte, error) {
+	aessiv, err := siv.NewGCMSIV(key)
+	if err != nil {
+		return nil, err
+	}
+
+	encrypted := aessiv.Seal(nil, nonce, data, nil)
+	if err != nil {
+		return nil, err
+	}
+	return encrypted, nil
+}
+
 func generateNonce(avatar []byte, length int) []byte {
 	var offset int
 	offset = 0
