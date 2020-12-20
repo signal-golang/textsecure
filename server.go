@@ -77,9 +77,9 @@ var (
 
 	KBS_AUTH_PATH = "/v1/backup/auth"
 
-	ATTACHMENT_KEY_DOWNLOAD_PATH = "attachments/%s"
-	ATTACHMENT_ID_DOWNLOAD_PATH  = "attachments/%d"
-	ATTACHMENT_UPLOAD_PATH       = "attachments/"
+	ATTACHMENT_KEY_DOWNLOAD_PATH = "/attachments/%s"
+	ATTACHMENT_ID_DOWNLOAD_PATH  = "/attachments/%d"
+	ATTACHMENT_UPLOAD_PATH       = "/attachments/"
 	AVATAR_UPLOAD_PATH           = ""
 
 	STICKER_MANIFEST_PATH = "/stickers/%s/manifest.proto"
