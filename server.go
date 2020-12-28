@@ -5,20 +5,20 @@ package textsecure
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
-	"github.com/signal-golang/textsecure/protobuf"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -173,17 +173,29 @@ func requestCode(tel, method string) (string, error) {
 	// return "", nil
 }
 
+// AccountAttributes describes what features are supported
 type AccountAttributes struct {
-	SignalingKey            string          `json:"signalingKey"`
-	RegistrationID          uint32          `json:"registrationId"`
-	FetchesMessages         bool            `json:"fetchesMessages"`
-	Video                   bool            `json:"video"`
-	Voice                   bool            `json:"voice"`
-	Pin                     string          `json:"pin"`
-	BasicStorageCredentials AuthCredentials `json:"basicStorageCredentials"`
+	SignalingKey            string              `json:"signalingKey"`
+	RegistrationID          uint32              `json:"registrationId"`
+	FetchesMessages         bool                `json:"fetchesMessages"`
+	Video                   bool                `json:"video"`
+	Voice                   bool                `json:"voice"`
+	Pin                     string              `json:"pin"`
+	BasicStorageCredentials AuthCredentials     `json:"basicStorageCredentials"`
+	Capabilities            AccountCapabilities `json:"capabilities"`
 	// UnidentifiedAccessKey          *byte `json:"unidentifiedAccessKey"`
 	// UnrestrictedUnidentifiedAccess *bool `json:"unrestrictedUnidentifiedAccess"`
 }
+
+// AccountCapabilities describes what functions axolotl supports
+type AccountCapabilities struct {
+	UUID         bool `json:"uuid"`
+	Gv2          bool `json:"gv2"`
+	Storage      bool `json:"storage"`
+	Gv1Migration bool `json:"gv1Migration"`
+}
+
+// AuthCredentials holds the credentials for the websocket connection
 type AuthCredentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -193,6 +205,7 @@ type RegistrationLockFailure struct {
 	Credentials   AuthCredentials `json:"backupCredentials"`
 }
 
+// verifyCode verificates the account with signal server
 func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, *AuthCredentials) {
 	code = strings.Replace(code, "-", "", -1)
 
@@ -202,6 +215,12 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 		FetchesMessages: true,
 		Voice:           false,
 		Video:           false,
+		Capabilities: AccountCapabilities{
+			UUID:         true,
+			Gv2:          true,
+			Storage:      false,
+			Gv1Migration: false,
+		},
 		// Pin:             nil,
 		// UnidentifiedAccessKey:          nil,
 		// UnrestrictedUnidentifiedAccess: nil,
@@ -234,7 +253,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 			if err != nil {
 				return err, nil
 			}
-			return errors.New(fmt.Sprintf("RegistrationLockFailure \n Time to wait \n %s", newStr)), &v.Credentials
+			return fmt.Errorf(fmt.Sprintf("RegistrationLockFailure \n Time to wait \n %s", newStr)), &v.Credentials
 		} else {
 			return resp, nil
 		}
@@ -356,18 +375,25 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 
 // profiles
 type Profile struct {
-	IdentityKey                    []byte          `json:"identityKey"`
+	IdentityKey                    string          `json:"identityKey"`
 	Name                           string          `json:"name"`
 	Avatar                         string          `json:"avatar"`
 	UnidentifiedAccess             string          `json:"unidentifiedAccess"`
 	UnrestrictedUnidentifiedAccess bool            `json:"unrestrictedUnidentifiedAccess"`
 	Capabilities                   ProfileSettings `json:"capabilities"`
+	Username                       string          `json:"username"`
+	UUID                           string          `json:"uuid"`
+	Payments                       string          `json:"payments"`
+	Credential                     string          `json:"credential"`
 }
 type ProfileSettings struct {
-	Uuid bool `json:"uuid"`
+	Uuid         bool `json:"uuid"`
+	Gv2          bool `json:"gv2"`
+	Gv1Migration bool `json:"gv1-migration"`
 }
 
-func GetProfile(tel string) (*Profile, error) {
+//
+func GetProfile(tel string) (Contact, error) {
 
 	resp, err := transport.get(fmt.Sprintf(PROFILE_PATH, tel))
 	if err != nil {
@@ -376,24 +402,25 @@ func GetProfile(tel string) (*Profile, error) {
 
 	profile := &Profile{}
 	dec := json.NewDecoder(resp.Body)
-
 	err = dec.Decode(&profile)
 	if err != nil {
 		log.Debugln(err)
-
 	}
 	avatar, _ := GetAvatar(profile.Avatar)
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(avatar)
 
 	c := contacts[tel]
-	c.Avatar = decryptAvatar(buf.Bytes(), profile.IdentityKey)
+	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
+	if err != nil {
+		log.Debugln(err)
+	}
+	c.Username = profile.Username
+	c.UUID = profile.UUID
+	c.Avatar = avatarDecrypted
 	contacts[tel] = c
 	WriteContactsToPath()
-
-	//
-	// return devices.DeviceList, nil
-	return profile, nil
+	return c, nil
 }
 
 var cdnTransport *httpTransporter
@@ -404,36 +431,55 @@ func setupCDNTransporter() {
 }
 
 func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
-	log.Debugln(SIGNAL_CDN_URL + "/" + avatarUrl)
-	resp, err := cdnTransport.get("/" + avatarUrl)
+	log.Debugln("[a]" + SIGNAL_CDN_URL + "/" + avatarUrl)
 
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	c := &http.Client{Transport: customTransport}
+	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarUrl, nil)
+	req.Header.Add("Host", SERVICE_REFLECTOR_HOST)
+	req.Header.Add("Content-Type", "application/octet-stream")
+	resp, err := c.Do(req)
 	if err != nil {
 		log.Debugln("[textsecure] getAvatar ", err)
+
 		return nil, err
 	}
+
 	return resp.Body, nil
 }
 
-func decryptAvatar(avatar []byte, identityKey []byte) []byte {
-	block, err := aes.NewCipher(identityKey[:32])
-	log.Debugln("-0", avatar[:12])
-	if err != nil {
-		log.Debugln("0", err)
+func decryptAvatar(avatar []byte, identityKey []byte) ([]byte, error) {
 
-		return nil
+	l := len(avatar[:]) - 30
+	// if !verifyMAC(identityKey[16:], avatar[:l], avatar[l:]) {
+	// 	return nil, ErrInvalidMACForAttachment
+	// }
+	b, err := aesCtrNoPaddingDecrypt(identityKey[:16], avatar[:l])
+	if err != nil {
+		return nil, err
 	}
-	// nonce := []byte{}
-	aesgcm, err := cipher.NewGCM(block)
-	log.Debugln("-0", aesgcm.NonceSize())
+	return b, nil
 
-	if err != nil {
-		log.Debugln("1", err)
-	}
-	b, err := aesgcm.Open(nil, avatar[:12], avatar, nil)
-	if err != nil {
-		log.Debugln("3", err)
-	}
-	return b
+	// block, err := aes.NewCipher(identityKey[:32])
+	// log.Debugln("-0", avatar[:12])
+	// if err != nil {
+	// 	log.Debugln("0", err)
+
+	// 	return nil, err
+	// }
+	// // nonce := []byte{}
+	// aesgcm, err := cipher.NewGCM(block)
+	// log.Debugln("-0", aesgcm.NonceSize())
+
+	// if err != nil {
+	// 	log.Debugln("1", err)
+	// }
+	// b, err := aesgcm.Open(nil, avatar[:12], avatar, nil)
+	// if err != nil {
+	// 	log.Debugln("3", err)
+	// }
+	// return b
 }
 func generateNonce(avatar []byte, length int) []byte {
 	var offset int
@@ -527,6 +573,11 @@ func GetRegisteredContacts() ([]Contact, error) {
 		return nil, resp
 	}
 	dec := json.NewDecoder(resp.Body)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	newStr := buf.String()
+
+	fmt.Printf(newStr)
 	var jc map[string][]jsonContact
 	dec.Decode(&jc)
 
@@ -566,6 +617,11 @@ func getAttachmentLocation(id uint64, key string, cdnNumber uint32) (string, err
 	} else {
 		return cdn + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
 	}
+}
+
+func getProfileLocation(profilePath string) (string, error) {
+	cdn := SIGNAL_CDN_URL
+	return cdn + fmt.Sprintf(profilePath), nil
 }
 
 // Messages
@@ -615,6 +671,9 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 			Name:        &msg.group.name,
 			MembersE164: msg.group.members,
 		}
+	}
+	if msg.groupV2 != nil {
+		dm.GroupV2 = msg.groupV2
 	}
 
 	dm.Flags = &msg.flags
@@ -756,8 +815,8 @@ var ErrRemoteGone = errors.New("the remote device is gone (probably reinstalled)
 
 var deviceLists = map[string][]uint32{}
 
-func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestamp *uint64) (*sendMessageResponse, error) {
-	bm, err := buildMessage(tel, paddedMessage, deviceLists[tel], isSync)
+func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timestamp *uint64) (*sendMessageResponse, error) {
+	bm, err := buildMessage(uuid, paddedMessage, deviceLists[uuid], isSync)
 	if err != nil {
 		return nil, err
 	}
@@ -768,12 +827,12 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestam
 		timestamp = &now
 	}
 	m["timestamp"] = timestamp
-	m["destination"] = tel
+	m["destination"] = uuid
 	body, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.putJSON(fmt.Sprintf(MESSAGE_PATH, tel), body)
+	resp, err := transport.putJSON(fmt.Sprintf(MESSAGE_PATH, uuid), body)
 	if err != nil {
 		return nil, err
 	}
@@ -784,7 +843,7 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestam
 		dec.Decode(&j)
 		log.Debugf("[textsecure] Mismatched devices: %+v\n", j)
 		devs := []uint32{}
-		for _, id := range deviceLists[tel] {
+		for _, id := range deviceLists[uuid] {
 			in := true
 			for _, eid := range j.ExtraDevices {
 				if id == eid {
@@ -796,8 +855,8 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestam
 				devs = append(devs, id)
 			}
 		}
-		deviceLists[tel] = append(devs, j.MissingDevices...)
-		return buildAndSendMessage(tel, paddedMessage, isSync, timestamp)
+		deviceLists[uuid] = append(devs, j.MissingDevices...)
+		return buildAndSendMessage(uuid, paddedMessage, isSync, timestamp)
 	}
 	if resp.Status == staleDevicesStatus {
 		dec := json.NewDecoder(resp.Body)
@@ -805,9 +864,9 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestam
 		dec.Decode(&j)
 		log.Debugf("[textsecure] Stale devices: %+v\n", j)
 		for _, id := range j.StaleDevices {
-			textSecureStore.DeleteSession(recID(tel), id)
+			textSecureStore.DeleteSession(recID(uuid), id)
 		}
-		return buildAndSendMessage(tel, paddedMessage, isSync, timestamp)
+		return buildAndSendMessage(uuid, paddedMessage, isSync, timestamp)
 	}
 	if resp.isError() {
 		return nil, resp
@@ -823,8 +882,8 @@ func buildAndSendMessage(tel string, paddedMessage []byte, isSync bool, timestam
 }
 
 func sendMessage(msg *outgoingMessage) (uint64, error) {
-	if _, ok := deviceLists[msg.tel]; !ok {
-		deviceLists[msg.tel] = []uint32{1}
+	if _, ok := deviceLists[msg.destination]; !ok {
+		deviceLists[msg.destination] = []uint32{1}
 	}
 
 	dm := createMessage(msg)
@@ -837,16 +896,16 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 		return 0, err
 	}
 
-	resp, err := buildAndSendMessage(msg.tel, padMessage(b), false, dm.Timestamp)
+	resp, err := buildAndSendMessage(msg.destination, padMessage(b), false, dm.Timestamp)
 	if err != nil {
 		return 0, err
 	}
 
 	if resp.NeedsSync {
-		log.Debugf("[textsecure] Needs sync. destination: %s", msg.tel)
+		log.Debugf("[textsecure] Needs sync. destination: %s", msg.destination)
 		sm := &signalservice.SyncMessage{
 			Sent: &signalservice.SyncMessage_Sent{
-				DestinationE164: &msg.tel,
+				DestinationE164: &msg.destination,
 				Timestamp:       dm.Timestamp,
 				Message:         dm,
 			},
@@ -856,7 +915,7 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 		if serr != nil {
 			log.WithFields(log.Fields{
 				"error":       serr,
-				"destination": msg.tel,
+				"destination": msg.destination,
 				"timestamp":   resp.Timestamp,
 			}).Error("Failed to send sync message")
 		}
@@ -866,6 +925,7 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 }
 
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
+	log.Debugln("[textsecure] sendSyncMessage", sm.Request.Type)
 	if _, ok := deviceLists[config.Tel]; !ok {
 		deviceLists[config.Tel] = []uint32{1}
 	}

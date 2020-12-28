@@ -4,9 +4,11 @@
 package textsecure
 
 import (
+	"bytes"
+	"io"
 	"io/ioutil"
 
-	"github.com/signal-golang/textsecure/protobuf"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
@@ -14,13 +16,19 @@ import (
 
 // Contact contains information about a contact.
 type Contact struct {
-	Tel         string
-	Uuid        string
-	Name        string
-	Color       string
-	Avatar      []byte
-	Blocked     bool
-	ExpireTimer uint32
+	UUID          string
+	Tel           string
+	ProfileKey    []byte
+	IdentityKey   []byte
+	Name          string
+	Username      string
+	Avatar        []byte
+	Color         string
+	Blocked       bool
+	Verified      *signalservice.Verified
+	ExpireTimer   uint32
+	InboxPosition uint32
+	Archived      bool
 }
 
 type yamlContacts struct {
@@ -41,6 +49,7 @@ func loadContacts(contactsYaml *yamlContacts) {
 
 var filePath string
 
+// ReadContacts loads the contacts yaml file and pareses it
 func ReadContacts(fileName string) ([]Contact, error) {
 	b, err := ioutil.ReadFile(fileName)
 	filePath = fileName
@@ -66,6 +75,8 @@ func WriteContacts(filename string, contacts2 []Contact) error {
 	}
 	return ioutil.WriteFile(filename, b, 0600)
 }
+
+// WriteContactsToPath saves a list of contacts to a file at the standard location
 func WriteContactsToPath() error {
 	c := contactsToYaml()
 	b, err := yaml.Marshal(c)
@@ -89,29 +100,36 @@ func contactsToYaml() *yamlContacts {
 func updateContact(c *signalservice.ContactDetails) error {
 	log.Debugln("[textsecure] updateContact ", c.GetName())
 
-	// var r io.Reader
-	// av := c.GetAvatar()
-	// buf := new(bytes.Buffer)
-	// if av != nil {
-	// 	att, err := handleSingleAttachment(av)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r = att.R
-	// 	buf.ReadFrom(r)
-	// }
+	var r io.Reader
+	av := c.GetAvatar()
+	buf := new(bytes.Buffer)
+	if av != nil {
+		att, err := handleProfileAvatar(av, c.GetProfileKey())
+		if err != nil {
+			return err
+		}
+		r = att.R
+		buf.ReadFrom(r)
+	}
+	avatar, _ := ioutil.ReadAll(buf)
 
 	contacts[c.GetNumber()] = Contact{
-		Tel:         c.GetNumber(),
-		Uuid:        c.GetUuid(),
-		Name:        c.GetName(),
-		Color:       c.GetColor(),
-		Avatar:      []byte(""),
-		Blocked:     c.GetBlocked(),
-		ExpireTimer: c.GetExpireTimer(),
+		Tel:           c.GetNumber(),
+		UUID:          c.GetUuid(),
+		Name:          c.GetName(),
+		Avatar:        avatar,
+		Color:         c.GetColor(),
+		Verified:      c.GetVerified(),
+		ProfileKey:    c.GetProfileKey(),
+		Blocked:       c.GetBlocked(),
+		ExpireTimer:   c.GetExpireTimer(),
+		InboxPosition: c.GetInboxPosition(),
+		Archived:      c.GetArchived(),
 	}
+	log.Debugln(c.GetAvatar(), buf)
 	return WriteContactsToPath()
 }
+
 func handleContacts(src string, dm *signalservice.DataMessage) ([]*signalservice.DataMessage_Contact, error) {
 	cs := dm.GetContact()
 	if cs == nil {
@@ -145,6 +163,8 @@ func handleContacts(src string, dm *signalservice.DataMessage) ([]*signalservice
 
 	return nil, nil
 }
+
+// RequestContactInfo sends
 func RequestContactInfo() error {
 	var t signalservice.SyncMessage_Request_Type
 	t = 1

@@ -11,7 +11,8 @@ import (
 
 // Config holds application configuration settings
 type Config struct {
-	Tel                string `yaml:"tel"`                // Our telephone number
+	Tel                string `yaml:"tel"` // Our telephone number
+	UUID               string `yaml:"uuid"`
 	Server             string `yaml:"server"`             // The TextSecure server URL
 	RootCA             string `yaml:"rootCA"`             // The TLS signing certificate of the server we connect to
 	ProxyServer        string `yaml:"proxy"`              // HTTP Proxy URL if one is being used

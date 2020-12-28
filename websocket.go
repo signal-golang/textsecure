@@ -3,7 +3,6 @@ package textsecure
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"net"
 	"net/url"
 	"strings"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
-	"github.com/signal-golang/textsecure/protobuf"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -210,7 +209,6 @@ func StartListening() error {
 
 	}
 
-	return fmt.Errorf("[textsecure] Connection closed")
 }
 
 // ErrNotListening is returned when trying to stop listening when there's no

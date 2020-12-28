@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/signal-golang/textsecure/protobuf"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -135,9 +135,10 @@ func sendContactUpdate() error {
 	for _, c := range lc {
 		cd := &signalservice.ContactDetails{
 			Number:      &c.Tel,
-			Uuid:        &c.Uuid,
+			Uuid:        &c.UUID,
 			Name:        &c.Name,
 			Color:       &c.Color,
+			Verified:    c.Verified,
 			Blocked:     &c.Blocked,
 			ExpireTimer: &c.ExpireTimer,
 

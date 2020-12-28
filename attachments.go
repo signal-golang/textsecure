@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
 )
 
@@ -156,6 +157,37 @@ func handleSingleAttachment(a *textsecure.AttachmentPointer) (*Attachment, error
 	// TODO: verify digest
 
 	return &Attachment{bytes.NewReader(b), a.GetContentType(), a.GetFileName()}, nil
+}
+func handleProfileAvatar(profileAvatar *signalservice.ContactDetails_Avatar, key []byte) (*Attachment, error) {
+
+	loc, err := getProfileLocation(profileAvatar.String())
+	if err != nil {
+		return nil, err
+	}
+	r, err := getAttachment(loc)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	l := len(b) - 16
+	if !verifyMAC(key[16:], b[:l], b[l:]) {
+		return nil, ErrInvalidMACForAttachment
+	}
+
+	b, err = aesDecrypt(key[:16], b[:l])
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: verify digest
+
+	return &Attachment{bytes.NewReader(b), profileAvatar.GetContentType(), ""}, nil
 }
 
 func handleAttachments(dm *textsecure.DataMessage) ([]*Attachment, error) {

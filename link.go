@@ -8,6 +8,7 @@ import (
 
 var code2 string
 
+// AddNewLinkedDevice adds a new signal desktop client
 func AddNewLinkedDevice(uuid string, publicKey string) error {
 	log.Printf("AddNewLinkedDevice")
 	if code2 == "" {
@@ -17,9 +18,6 @@ func AddNewLinkedDevice(uuid string, publicKey string) error {
 		}
 		code2 = code
 	}
-	// log.Printf("code: " + code2)
-	// log.Printf("uuid: " + uuid)
-	// log.Printf("publicKey: " + publicKey)
 
 	err := addNewDevice(uuid, publicKey, code2)
 	if err != nil {
