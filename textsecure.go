@@ -460,7 +460,10 @@ func handleReceipt(env *signalservice.Envelope) {
 
 // recID removes the + from phone numbers
 func recID(source string) string {
-	return source[1:]
+	if source[0] == '+' {
+		return source[1:]
+	}
+	return source
 }
 
 func handleMessage(src string, srcUUID string, timestamp uint64, b []byte) error {
@@ -497,7 +500,9 @@ func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
 	flags := uint32(0)
 	if dm.GetFlags() == uint32(signalservice.DataMessage_END_SESSION) {
 		flags = EndSessionFlag
+
 		textSecureStore.DeleteAllSessions(recID(src))
+		textSecureStore.DeleteAllSessions(src)
 	}
 	return flags, nil
 }
@@ -693,13 +698,13 @@ func handleReceivedMessage(msg []byte) error {
 				log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
 				return nil
 			}
-			haveToResetMsg := &Message{
-				source:    config.Tel,
-				message:   "needs to reset encryption",
-				timestamp: env.GetTimestamp(),
-				flags:     99,
-			}
-			go client.MessageHandler(haveToResetMsg)
+			// haveToResetMsg := &Message{
+			// 	source:    config.Tel,
+			// 	message:   "needs to reset encryption",
+			// 	timestamp: env.GetTimestamp(),
+			// 	flags:     99,
+			// }
+			// go client.MessageHandler(haveToResetMsg)
 		}
 		if err != nil {
 			return err

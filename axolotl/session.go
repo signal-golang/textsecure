@@ -13,7 +13,6 @@ import (
 	protobuf "github.com/signal-golang/textsecure/axolotl/protobuf"
 	"github.com/signal-golang/textsecure/curve25519sign"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
-	log "github.com/sirupsen/logrus"
 )
 
 type sessionState struct {
@@ -659,7 +658,6 @@ func (ss *sessionState) decrypt(ciphertext *WhisperMessage) ([]byte, error) {
 func (sc *SessionCipher) SessionDecryptWhisperMessage(ciphertext *WhisperMessage) ([]byte, error) {
 	sc.SessionStore.Lock()
 	defer sc.SessionStore.Unlock()
-	log.Debugln("a", sc.RecipientID)
 	sr, err := sc.SessionStore.LoadSession(sc.RecipientID, sc.DeviceID)
 	if err != nil {
 		return nil, err
