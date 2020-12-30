@@ -43,7 +43,7 @@ var (
 // ReadContacts reads a YAML contacts file
 func loadContacts(contactsYaml *yamlContacts) {
 	for _, c := range contactsYaml.Contacts {
-		contacts[c.Tel] = c
+		contacts[c.UUID] = c
 	}
 }
 
@@ -66,9 +66,8 @@ func ReadContacts(fileName string) ([]Contact, error) {
 }
 
 // WriteContacts saves a list of contacts to a file
-func WriteContacts(filename string, contacts2 []Contact) error {
-	c := &yamlContacts{contacts2}
-	// func WriteContacts(filename string) error {
+func WriteContacts(filename string, contacts []Contact) error {
+	c := &yamlContacts{contacts}
 	b, err := yaml.Marshal(c)
 	if err != nil {
 		return err
@@ -93,12 +92,8 @@ func contactsToYaml() *yamlContacts {
 	return c
 }
 
-// type AvatarDetail struct {
-// 	Length
-// }
-
 func updateContact(c *signalservice.ContactDetails) error {
-	log.Debugln("[textsecure] updateContact ", c.GetName())
+	log.Debugln("[textsecure] updateContact ", c.GetUuid())
 
 	var r io.Reader
 	av := c.GetAvatar()
@@ -113,7 +108,7 @@ func updateContact(c *signalservice.ContactDetails) error {
 	}
 	avatar, _ := ioutil.ReadAll(buf)
 
-	contacts[c.GetNumber()] = Contact{
+	contacts[c.GetUuid()] = Contact{
 		Tel:           c.GetNumber(),
 		UUID:          c.GetUuid(),
 		Name:          c.GetName(),
@@ -140,34 +135,13 @@ func handleContacts(src string, dm *signalservice.DataMessage) ([]*signalservice
 
 		log.Debugln("[textsecure] handle Contact", c.GetName())
 	}
-	// switch c.GetType() {
-	// case signalservice.GroupContext_UPDATE:
-	// 	if err := updateGroup(gr); err != nil {
-	// 		return nil, err
-	// 	}
-	// 	groups[hexid].Flags = GroupUpdateFlag
-	// case signalservice.GroupContext_DELIVER:
-	// 	if _, ok := groups[hexid]; !ok {
-	// 		g, _ := newPartlyGroup(gr.GetId())
-	// 		RequestGroupInfo(g)
-	// 		setupGroups()
-	// 		return nil, UnknownGroupIDError{hexid}
-	// 	}
-	// 	groups[hexid].Flags = 0
-	// case signalservice.GroupContext_QUIT:
-	// 	if err := quitGroup(src, hexid); err != nil {
-	// 		return nil, err
-	// 	}
-	// 	groups[hexid].Flags = GroupLeaveFlag
-	// }
-
 	return nil, nil
 }
 
-// RequestContactInfo sends
-func RequestContactInfo() error {
+// SyncContacts syncs the contacts
+func SyncContacts() error {
 	var t signalservice.SyncMessage_Request_Type
-	t = 1
+	t = signalservice.SyncMessage_Request_CONTACTS
 	omsg := &signalservice.SyncMessage{
 		Request: &signalservice.SyncMessage_Request{
 			Type: &t,

@@ -19,7 +19,11 @@ var transport transporter
 
 func setupTransporter() {
 	setupCA()
-	transport = newHTTPTransporter(config.Server, config.Tel, registrationInfo.password)
+	user := config.Tel
+	if config.UUID != "" {
+		user = config.UUID
+	}
+	transport = newHTTPTransporter(config.Server, user, registrationInfo.password)
 }
 
 type response struct {
@@ -125,7 +129,7 @@ func (ht *httpTransporter) del(url string) (*response, error) {
 		r.Body = resp.Body
 	}
 
-	log.Debugf("DELETE %s %d\n", url, r.Status)
+	log.Debugf("[textsecure] DELETE %s %d\n", url, r.Status)
 
 	return r, err
 }

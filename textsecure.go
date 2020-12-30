@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"bytes"
@@ -207,92 +206,6 @@ type Attachment struct {
 	FileName string
 }
 
-// Message represents a message received from the peer.
-// It can optionally include attachments and be sent to a group.
-type Message struct {
-	sourceUUID              string
-	source                  string
-	message                 string
-	attachments             []*Attachment
-	group                   *Group
-	flags                   uint32
-	expireTimer             uint32
-	profileKey              []byte
-	timestamp               uint64
-	quote                   *signalservice.DataMessage_Quote
-	contact                 []*signalservice.DataMessage_Contact
-	preview                 []*signalservice.DataMessage_Preview
-	sticker                 *signalservice.DataMessage_Sticker
-	requiredProtocolVersion uint32
-	isViewOnce              bool
-	reaction                *signalservice.DataMessage_Reaction
-}
-
-// Source returns the ID of the sender of the message.
-func (m *Message) Source() string {
-	return m.source
-}
-
-// SourceUUID returns the UUID of the sender of the message.
-func (m *Message) SourceUUID() string {
-	return m.sourceUUID
-}
-
-// ChatID returns the ChatID of the sender of the message.
-func (m *Message) ChatID() string {
-	return m.sourceUUID
-}
-
-// Message returns the message body.
-func (m *Message) Message() string {
-	return m.message
-}
-
-// Attachments returns the list of attachments on the message.
-func (m *Message) Attachments() []*Attachment {
-	return m.attachments
-}
-
-// Group returns group information.
-func (m *Message) Group() *Group {
-	return m.group
-}
-
-// Timestamp returns the timestamp of the message
-func (m *Message) Timestamp() uint64 {
-	return m.timestamp
-}
-
-// Flags returns the flags in the message
-func (m *Message) Flags() uint32 {
-	return m.flags
-}
-
-// ExpireTimer returns the expire timer in the message
-func (m *Message) ExpireTimer() uint32 {
-	return m.expireTimer
-}
-
-// Sticker returns the sticker in the message
-func (m *Message) Sticker() *signalservice.DataMessage_Sticker {
-	return m.sticker
-}
-
-// Contact returns the contact in the message
-func (m *Message) Contact() []*signalservice.DataMessage_Contact {
-	return m.contact
-}
-
-// Quote returns the quote in the message
-func (m *Message) Quote() *signalservice.DataMessage_Quote {
-	return m.quote
-}
-
-// Reaction returns the reaction in the message
-func (m *Message) Reaction() *signalservice.DataMessage_Reaction {
-	return m.reaction
-}
-
 // Client contains application specific data and callbacks.
 type Client struct {
 	GetPhoneNumber        func() string
@@ -397,6 +310,8 @@ func Setup(c *Client) error {
 	setupTransporter()
 	setupCDNTransporter()
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
+	// check if we have a uuid and if not get it
+	config = checkUUID(config)
 	return err
 }
 
@@ -466,7 +381,7 @@ func recID(source string) string {
 	return source
 }
 
-func handleMessage(src string, srcUUID string, timestamp uint64, b []byte) error {
+func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) error {
 	b = stripPadding(b)
 
 	content := &signalservice.Content{}
@@ -476,15 +391,15 @@ func handleMessage(src string, srcUUID string, timestamp uint64, b []byte) error
 	}
 
 	if dm := content.GetDataMessage(); dm != nil {
-		return handleDataMessage(src, srcUUID, timestamp, dm)
-	} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == src {
-		return handleSyncMessage(src, timestamp, sm)
+		return handleDataMessage(srcE164, srcUUID, timestamp, dm)
+	} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == srcE164 {
+		return handleSyncMessage(srcUUID, timestamp, sm)
 	} else if cm := content.GetCallMessage(); cm != nil {
-		return handleCallMessage(src, timestamp, cm)
+		return handleCallMessage(srcUUID, timestamp, cm)
 	} else if rm := content.GetReceiptMessage(); rm != nil {
-		return handleReceiptMessage(src, timestamp, rm)
+		return handleReceiptMessage(srcUUID, timestamp, rm)
 	} else if tm := content.GetTypingMessage(); tm != nil {
-		return handleTypingMessage(src, timestamp, tm)
+		return handleTypingMessage(srcUUID, timestamp, tm)
 	}
 
 	//FIXME get the right content
@@ -604,48 +519,6 @@ func (err MessageTypeNotImplementedError) Error() string {
 // ErrInvalidMACForMessage signals an incoming message with invalid MAC.
 var ErrInvalidMACForMessage = errors.New("invalid MAC for incoming message")
 
-var currentSessionToRenameUUID string
-var currentSessionToRenameE164 string
-
-func renameSession(path string, f os.FileInfo, err error) error {
-	if name := f.Name(); strings.HasPrefix(name, currentSessionToRenameE164) {
-		log.Debugln("bliub", name)
-		dir := filepath.Dir(path)
-		newname := strings.Replace(name,
-			currentSessionToRenameE164,
-			currentSessionToRenameUUID, 1)
-		newpath := filepath.Join(dir, newname)
-		err := os.Rename(path, newpath)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	return nil
-}
-
-// migrateKeyToUUID migrate keys base on phone numbers to uuids
-func migrateKeyToUUID(session *axolotl.SessionCipher, e164 string, uuid string) error {
-	log.Infoln("[textsecure] migrate key for ", uuid)
-	oldIdentity := config.StorageDir + "/identity/remote_" + e164
-	newIdentity := config.StorageDir + "/identity/remote_" + uuid
-	if _, err := os.Stat(oldIdentity); err == nil {
-		err := os.Rename(oldIdentity, newIdentity)
-		if err != nil {
-			// return err
-			log.Errorln("[textsecure] migrate key ", err)
-		}
-	}
-	log.Infoln("[textsecure] migrate sessions for ", uuid)
-	currentSessionToRenameUUID = uuid
-	currentSessionToRenameE164 = e164
-	err := filepath.Walk(config.StorageDir+"/sessions", renameSession)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // Authenticate and decrypt a received message
 func handleReceivedMessage(msg []byte) error {
 	macpos := len(msg) - 10
@@ -698,13 +571,6 @@ func handleReceivedMessage(msg []byte) error {
 				log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
 				return nil
 			}
-			// haveToResetMsg := &Message{
-			// 	source:    config.Tel,
-			// 	message:   "needs to reset encryption",
-			// 	timestamp: env.GetTimestamp(),
-			// 	flags:     99,
-			// }
-			// go client.MessageHandler(haveToResetMsg)
 		}
 		if err != nil {
 			return err

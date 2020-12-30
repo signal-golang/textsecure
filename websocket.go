@@ -141,8 +141,7 @@ func StartListening() error {
 	var err error
 
 	wsconn = &Conn{send: make(chan []byte, 256)}
-
-	err = wsconn.connect(config.Server+websocketPath, config.Tel, registrationInfo.password)
+	err = wsconn.connect(config.Server+websocketPath, config.UUID, registrationInfo.password)
 	if err != nil {
 		log.Errorf(err.Error())
 		return err
@@ -188,7 +187,7 @@ func StartListening() error {
 				}).Error("[textsecure] Failed to handle received message")
 			}
 		} else {
-			log.Debugln(wsm.GetRequest())
+			log.Debugln("[textsecure] Ask for new messages")
 			if wsm.GetRequest().GetPath() == "/api/v1/queue/empty" {
 				log.Println("[textsecure] No new messages")
 			} else {

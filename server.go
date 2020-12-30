@@ -1,4 +1,5 @@
 // Copyright (c) 2014 Canonical Ltd.
+// Copyright (c) 2020 Aaron Kimmig
 // Licensed under the GPLv3, see the COPYING file for details.
 
 package textsecure
@@ -175,24 +176,24 @@ func requestCode(tel, method string) (string, error) {
 
 // AccountAttributes describes what features are supported
 type AccountAttributes struct {
-	SignalingKey            string              `json:"signalingKey"`
-	RegistrationID          uint32              `json:"registrationId"`
-	FetchesMessages         bool                `json:"fetchesMessages"`
-	Video                   bool                `json:"video"`
-	Voice                   bool                `json:"voice"`
-	Pin                     string              `json:"pin"`
-	BasicStorageCredentials AuthCredentials     `json:"basicStorageCredentials"`
-	Capabilities            AccountCapabilities `json:"capabilities"`
+	SignalingKey            string              `json:"signalingKey" yaml:"signalingKey"`
+	RegistrationID          uint32              `json:"registrationId" yaml:"registrationId"`
+	FetchesMessages         bool                `json:"fetchesMessages" yaml:"fetchesMessages"`
+	Video                   bool                `json:"video" yaml:"video"`
+	Voice                   bool                `json:"voice" yaml:"voice"`
+	Pin                     string              `json:"pin" yaml:"pin"` // deprecated
+	BasicStorageCredentials AuthCredentials     `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
+	Capabilities            AccountCapabilities `json:"capabilities" yaml:"capabilities"`
 	// UnidentifiedAccessKey          *byte `json:"unidentifiedAccessKey"`
 	// UnrestrictedUnidentifiedAccess *bool `json:"unrestrictedUnidentifiedAccess"`
 }
 
 // AccountCapabilities describes what functions axolotl supports
 type AccountCapabilities struct {
-	UUID         bool `json:"uuid"`
-	Gv2          bool `json:"gv2"`
-	Storage      bool `json:"storage"`
-	Gv1Migration bool `json:"gv1Migration"`
+	UUID         bool `json:"uuid" yaml:"uuid"`
+	Gv2          bool `json:"gv2" yaml:"gv2"`
+	Storage      bool `json:"storage" yaml:"storage"`
+	Gv1Migration bool `json:"gv1Migration" yaml:"gv1Migration"`
 }
 
 // AuthCredentials holds the credentials for the websocket connection
@@ -258,6 +259,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 			return resp, nil
 		}
 	}
+	config.AccountCapabilities = vd.Capabilities
 	return nil, nil
 }
 
@@ -282,6 +284,42 @@ func RegisterWithUPS(token string) error {
 		return resp
 	}
 	return nil
+}
+
+// SetAccountAttributes updates the account attributes
+func SetAccountAttributes(attributes *AccountAttributes) error {
+	log.Debugln("[textsecure] setAccountAttributes")
+	body, err := json.Marshal(attributes)
+	if err != nil {
+		return err
+	}
+	resp, err := transport.putJSON(SET_ACCOUNT_ATTRIBUTES, body)
+	if err != nil {
+		return err
+	}
+	if resp.isError() {
+		return resp
+	}
+	return nil
+}
+
+type whoAmIResponse struct {
+	UUID string `json:"uuid"`
+}
+
+func GetMyUUID() (string, error) {
+	log.Debugln("[textsecure] get my uuid")
+	resp, err := transport.get(WHO_AM_I)
+	if err != nil {
+		return "", err
+	}
+	if resp.isError() {
+		return "", resp
+	}
+	dec := json.NewDecoder(resp.Body)
+	var response whoAmIResponse
+	dec.Decode(&response)
+	return response.UUID, nil
 }
 
 type jsonDeviceCode struct {
@@ -373,7 +411,7 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	return nil
 }
 
-// profiles
+// Profile describes the profile type
 type Profile struct {
 	IdentityKey                    string          `json:"identityKey"`
 	Name                           string          `json:"name"`
@@ -386,14 +424,16 @@ type Profile struct {
 	Payments                       string          `json:"payments"`
 	Credential                     string          `json:"credential"`
 }
+
+// ProfileSettings contains the settings for the profile
 type ProfileSettings struct {
-	Uuid         bool `json:"uuid"`
+	UUID         bool `json:"uuid"`
 	Gv2          bool `json:"gv2"`
 	Gv1Migration bool `json:"gv1-migration"`
 }
 
-//
-func GetProfile(tel string) (Contact, error) {
+// GetProfileE164 get a profile by a phone number
+func GetProfileE164(tel string) (Contact, error) {
 
 	resp, err := transport.get(fmt.Sprintf(PROFILE_PATH, tel))
 	if err != nil {
@@ -410,7 +450,7 @@ func GetProfile(tel string) (Contact, error) {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(avatar)
 
-	c := contacts[tel]
+	c := contacts[profile.UUID]
 	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
 	if err != nil {
 		log.Debugln(err)
@@ -418,7 +458,7 @@ func GetProfile(tel string) (Contact, error) {
 	c.Username = profile.Username
 	c.UUID = profile.UUID
 	c.Avatar = avatarDecrypted
-	contacts[tel] = c
+	contacts[c.UUID] = c
 	WriteContactsToPath()
 	return c, nil
 }
@@ -430,13 +470,14 @@ func setupCDNTransporter() {
 	cdnTransport = newHTTPTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password)
 }
 
-func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
-	log.Debugln("[a]" + SIGNAL_CDN_URL + "/" + avatarUrl)
+// GetAvatar retuns an avatar for it's url from signal cdn
+func GetAvatar(avatarURL string) (io.ReadCloser, error) {
+	log.Debugln("[textsecure] get avatar from ", avatarURL)
 
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	c := &http.Client{Transport: customTransport}
-	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarUrl, nil)
+	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarURL, nil)
 	req.Header.Add("Host", SERVICE_REFLECTOR_HOST)
 	req.Header.Add("Content-Type", "application/octet-stream")
 	resp, err := c.Do(req)
@@ -452,53 +493,11 @@ func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
 func decryptAvatar(avatar []byte, identityKey []byte) ([]byte, error) {
 
 	l := len(avatar[:]) - 30
-	// if !verifyMAC(identityKey[16:], avatar[:l], avatar[l:]) {
-	// 	return nil, ErrInvalidMACForAttachment
-	// }
 	b, err := aesCtrNoPaddingDecrypt(identityKey[:16], avatar[:l])
 	if err != nil {
 		return nil, err
 	}
 	return b, nil
-
-	// block, err := aes.NewCipher(identityKey[:32])
-	// log.Debugln("-0", avatar[:12])
-	// if err != nil {
-	// 	log.Debugln("0", err)
-
-	// 	return nil, err
-	// }
-	// // nonce := []byte{}
-	// aesgcm, err := cipher.NewGCM(block)
-	// log.Debugln("-0", aesgcm.NonceSize())
-
-	// if err != nil {
-	// 	log.Debugln("1", err)
-	// }
-	// b, err := aesgcm.Open(nil, avatar[:12], avatar, nil)
-	// if err != nil {
-	// 	log.Debugln("3", err)
-	// }
-	// return b
-}
-func generateNonce(avatar []byte, length int) []byte {
-	var offset int
-	offset = 0
-	offset++
-	// buffer := [12]byte{}
-	// log.Debugln("[textsecure]" fer)
-	// 	public static void readFully(InputStream in, byte[] buffer) throws IOException {
-	//
-	// 	for (;;) {
-	// 					12							12 bytes b, 0 , 12 -0
-	// 		int read = in.read(buffer, offset, buffer.length - offset);
-	//				12 +0					< 12								0+= 12
-	// 		if (read + offset < buffer.length) offset += read;
-	// 		else                		           return;
-	// 	}
-	// }
-	a := []byte{}
-	return a
 }
 
 // PUT /v2/keys/
@@ -519,8 +518,8 @@ func registerPreKeys() error {
 }
 
 // GET /v2/keys/{number}/{device_id}?relay={relay}
-func getPreKeys(tel string, deviceID string) (*preKeyResponse, error) {
-	resp, err := transport.get(fmt.Sprintf(prekeyDevicePath, tel, deviceID))
+func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
+	resp, err := transport.get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
 	if err != nil {
 		return nil, err
 	}
@@ -536,18 +535,24 @@ func getPreKeys(tel string, deviceID string) (*preKeyResponse, error) {
 // jsonContact is the data returned by the server for each registered contact
 type jsonContact struct {
 	Token string `json:"token"`
-	Relay string `json:"relay"`
+	Voice string `json:"voice"`
+	Video string `json:"video"`
+}
+type jsonContacts struct {
+	Contacts []jsonContact `json:"contacts"`
 }
 
 // GetRegisteredContacts returns the subset of the local contacts
 // that are also registered with the server
+
 func GetRegisteredContacts() ([]Contact, error) {
 	lc, err := client.GetLocalContacts()
 	if err != nil {
-		return nil, fmt.Errorf("could not get local contacts :%s\n", err)
+		return nil, fmt.Errorf("could not get local contacts :%s", err)
 	}
 	tokens := make([]string, len(lc))
 	m := make(map[string]Contact)
+	// todo deduplicate contacts
 	for i, c := range lc {
 		t := telToToken(c.Tel)
 		tokens[i] = t
@@ -564,7 +569,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	// // TODO: breaks when there is no internet
 	if resp != nil && resp.Status == 413 {
 		log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
-		return nil, errors.New("Rate limit exceeded: 413")
+		return nil, errors.New("Refreshing contacts: rate limit exceeded: 413")
 	}
 	if err != nil {
 		return nil, err
@@ -573,16 +578,10 @@ func GetRegisteredContacts() ([]Contact, error) {
 		return nil, resp
 	}
 	dec := json.NewDecoder(resp.Body)
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(resp.Body)
-	newStr := buf.String()
-
-	fmt.Printf(newStr)
-	var jc map[string][]jsonContact
+	var jc jsonContacts
 	dec.Decode(&jc)
-
-	lc = make([]Contact, len(jc["contacts"]))
-	for i, c := range jc["contacts"] {
+	lc = make([]Contact, len(jc.Contacts))
+	for i, c := range jc.Contacts {
 		lc[i] = m[c.Token]
 	}
 	return lc, nil
@@ -614,9 +613,8 @@ func getAttachmentLocation(id uint64, key string, cdnNumber uint32) (string, err
 	}
 	if id != 0 {
 		return cdn + fmt.Sprintf(ATTACHMENT_ID_DOWNLOAD_PATH, id), nil
-	} else {
-		return cdn + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
 	}
+	return cdn + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
 }
 
 func getProfileLocation(profilePath string) (string, error) {
@@ -699,20 +697,20 @@ func stripPadding(msg []byte) []byte {
 	return msg
 }
 
-func makePreKeyBundle(tel string, deviceID uint32) (*axolotl.PreKeyBundle, error) {
-	pkr, err := getPreKeys(tel, strconv.Itoa(int(deviceID)))
+func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, error) {
+	pkr, err := getPreKeys(UUID, strconv.Itoa(int(deviceID)))
 	if err != nil {
 		return nil, err
 	}
 
 	if len(pkr.Devices) != 1 {
-		return nil, fmt.Errorf("no prekeys for contact %s, device %d\n", tel, deviceID)
+		return nil, fmt.Errorf("no prekeys for contact %s, device %d", UUID, deviceID)
 	}
 
 	d := pkr.Devices[0]
 
 	if d.PreKey == nil {
-		return nil, fmt.Errorf("no prekey for contact %s, device %d\n", tel, deviceID)
+		return nil, fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID)
 	}
 
 	decPK, err := decodeKey(d.PreKey.PublicKey)
@@ -721,7 +719,7 @@ func makePreKeyBundle(tel string, deviceID uint32) (*axolotl.PreKeyBundle, error
 	}
 
 	if d.SignedPreKey == nil {
-		return nil, fmt.Errorf("no signed prekey for contact %s, device %d\n", tel, deviceID)
+		return nil, fmt.Errorf("no signed prekey for contact %s, device %d", UUID, deviceID)
 	}
 
 	decSPK, err := decodeKey(d.SignedPreKey.PublicKey)
@@ -750,13 +748,13 @@ func makePreKeyBundle(tel string, deviceID uint32) (*axolotl.PreKeyBundle, error
 	return pkb, nil
 }
 
-func buildMessage(tel string, paddedMessage []byte, devices []uint32, isSync bool) ([]jsonMessage, error) {
-	recid := recID(tel)
+func buildMessage(reciever string, paddedMessage []byte, devices []uint32, isSync bool) ([]jsonMessage, error) {
+	recid := recID(reciever)
 	messages := []jsonMessage{}
 
 	for _, devid := range devices {
 		if !textSecureStore.ContainsSession(recid, devid) {
-			pkb, err := makePreKeyBundle(tel, devid)
+			pkb, err := makePreKeyBundle(reciever, devid)
 			if err != nil {
 				return nil, err
 			}
@@ -924,10 +922,15 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 	return resp.Timestamp, err
 }
 
+// TODO switch to uuids
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
 	log.Debugln("[textsecure] sendSyncMessage", sm.Request.Type)
-	if _, ok := deviceLists[config.Tel]; !ok {
-		deviceLists[config.Tel] = []uint32{1}
+	user := config.Tel
+	if config.UUID != "" {
+		user = config.UUID
+	}
+	if _, ok := deviceLists[user]; !ok {
+		deviceLists[user] = []uint32{1}
 	}
 
 	content := &signalservice.Content{
@@ -939,6 +942,6 @@ func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, 
 		return 0, err
 	}
 
-	resp, err := buildAndSendMessage(config.Tel, padMessage(b), true, timestamp)
+	resp, err := buildAndSendMessage(user, padMessage(b), true, timestamp)
 	return resp.Timestamp, err
 }
