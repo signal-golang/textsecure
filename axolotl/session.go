@@ -9,10 +9,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/golang/protobuf/proto"
 	protobuf "github.com/signal-golang/textsecure/axolotl/protobuf"
 	"github.com/signal-golang/textsecure/curve25519sign"
-	"github.com/signal-golang/textsecure/protobuf"
-	"github.com/golang/protobuf/proto"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 )
 
 type sessionState struct {
@@ -658,7 +658,6 @@ func (ss *sessionState) decrypt(ciphertext *WhisperMessage) ([]byte, error) {
 func (sc *SessionCipher) SessionDecryptWhisperMessage(ciphertext *WhisperMessage) ([]byte, error) {
 	sc.SessionStore.Lock()
 	defer sc.SessionStore.Unlock()
-
 	sr, err := sc.SessionStore.LoadSession(sc.RecipientID, sc.DeviceID)
 	if err != nil {
 		return nil, err

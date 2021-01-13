@@ -16,9 +16,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/signal-golang/textsecure/axolotl"
-	"github.com/signal-golang/textsecure/protobuf"
 	"github.com/golang/protobuf/proto"
+	"github.com/signal-golang/textsecure/axolotl"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/curve25519"
 )
 
@@ -87,6 +88,8 @@ func aesDecrypt(key, ciphertext []byte) ([]byte, error) {
 	}
 
 	if len(ciphertext)%aes.BlockSize != 0 {
+		length := len(ciphertext) % aes.BlockSize
+		log.Debugln("[textsecure] aesDecrypt ciphertext not multiple of AES blocksize", length)
 		return nil, errors.New("ciphertext not multiple of AES blocksize")
 	}
 
@@ -98,6 +101,29 @@ func aesDecrypt(key, ciphertext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("pad value (%d) larger than AES blocksize (%d)", pad, aes.BlockSize)
 	}
 	return ciphertext[aes.BlockSize : len(ciphertext)-int(pad)], nil
+}
+
+func aesCtrNoPaddingDecrypt(key, ciphertext []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ciphertext)%aes.BlockSize != 0 {
+		length := len(ciphertext) % aes.BlockSize
+		log.Debugln("[textsecure] aesDecrypt ciphertext not multiple of AES blocksize", length)
+		return nil, errors.New("ciphertext not multiple of AES blocksize")
+	}
+
+	iv := ciphertext[:aes.BlockSize]
+	mode := cipher.NewCBCDecrypter(block, iv)
+	// CryptBlocks can work in-place if the two arguments are the same.
+	mode.CryptBlocks(ciphertext, ciphertext)
+	// s := string(ciphertext[:])
+
+	return ciphertext, nil
+
+	// return ciphertext[aes.BlockSize : len(ciphertext)-int(pad)], nil
 }
 
 // ProvisioningCipher

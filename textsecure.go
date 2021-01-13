@@ -19,7 +19,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/signal-golang/textsecure/axolotl"
-	"github.com/signal-golang/textsecure/protobuf"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -103,9 +103,10 @@ type att struct {
 }
 
 type outgoingMessage struct {
-	tel         string
+	destination string
 	msg         string
 	group       *groupMessage
+	groupV2     *signalservice.GroupContextV2
 	attachment  *att
 	flags       uint32
 	expireTimer uint32
@@ -128,20 +129,21 @@ func NewDeviceVerificationCode() (string, error) {
 }
 
 // AddDevice links a new device
-func AddDevice(ephemeralId, publicKey, verificationCode string) error {
-	return addNewDevice(ephemeralId, publicKey, verificationCode)
+func AddDevice(ephemeralID, publicKey, verificationCode string) error {
+	return addNewDevice(ephemeralID, publicKey, verificationCode)
 }
 
 // SendMessage sends the given text message to the given contact.
-func SendMessage(tel, msg string, timer uint32) (uint64, error) {
+func SendMessage(uuid, msg string, timer uint32) (uint64, error) {
 	omsg := &outgoingMessage{
-		tel:         tel,
+		destination: uuid,
 		msg:         msg,
 		expireTimer: timer,
 	}
 	return sendMessage(omsg)
 }
 
+// MIMETypeFromReader returns the mime type that is inside the reader
 func MIMETypeFromReader(r io.Reader) (mime string, reader io.Reader) {
 	var buf bytes.Buffer
 	io.CopyN(&buf, r, 1024)
@@ -151,28 +153,30 @@ func MIMETypeFromReader(r io.Reader) (mime string, reader io.Reader) {
 
 // SendAttachment sends the contents of a reader, along
 // with an optional message to a given contact.
-func SendAttachment(tel, msg string, r io.Reader, timer uint32) (uint64, error) {
+func SendAttachment(uuid string, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
 	a, err := uploadAttachment(r, ct)
 	if err != nil {
 		return 0, err
 	}
 	omsg := &outgoingMessage{
-		tel:         tel,
+		destination: uuid,
 		msg:         msg,
 		attachment:  a,
 		expireTimer: timer,
 	}
 	return sendMessage(omsg)
 }
-func SendVoiceNote(tel, msg string, r io.Reader, timer uint32) (uint64, error) {
+
+// SendVoiceNote sends a voice note
+func SendVoiceNote(uuid, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
 	a, err := uploadVoiceNote(r, ct)
 	if err != nil {
 		return 0, err
 	}
 	omsg := &outgoingMessage{
-		tel:         tel,
+		destination: uuid,
 		msg:         msg,
 		attachment:  a,
 		expireTimer: timer,
@@ -181,17 +185,17 @@ func SendVoiceNote(tel, msg string, r io.Reader, timer uint32) (uint64, error) {
 }
 
 // EndSession terminates the session with the given peer.
-func EndSession(tel string, msg string) (uint64, error) {
+func EndSession(uuid string, msg string) (uint64, error) {
 	omsg := &outgoingMessage{
-		tel:   tel,
-		msg:   msg,
-		flags: uint32(signalservice.DataMessage_END_SESSION),
+		destination: uuid,
+		msg:         msg,
+		flags:       uint32(signalservice.DataMessage_END_SESSION),
 	}
 	ts, err := sendMessage(omsg)
 	if err != nil {
 		return 0, err
 	}
-	textSecureStore.DeleteAllSessions(recID(tel))
+	textSecureStore.DeleteAllSessions(recID(uuid))
 	return ts, nil
 }
 
@@ -200,75 +204,6 @@ type Attachment struct {
 	R        io.Reader
 	MimeType string
 	FileName string
-}
-
-// Message represents a message received from the peer.
-// It can optionally include attachments and be sent to a group.
-type Message struct {
-	source                  string
-	message                 string
-	attachments             []*Attachment
-	group                   *Group
-	flags                   uint32
-	expireTimer             uint32
-	profileKey              []byte
-	timestamp               uint64
-	quote                   *signalservice.DataMessage_Quote
-	contact                 []*signalservice.DataMessage_Contact
-	preview                 []*signalservice.DataMessage_Preview
-	sticker                 *signalservice.DataMessage_Sticker
-	requiredProtocolVersion uint32
-	isViewOnce              bool
-	reaction                *signalservice.DataMessage_Reaction
-}
-
-// Source returns the ID of the sender of the message.
-func (m *Message) Source() string {
-	return m.source
-}
-
-// Message returns the message body.
-func (m *Message) Message() string {
-	return m.message
-}
-
-// Attachments returns the list of attachments on the message.
-func (m *Message) Attachments() []*Attachment {
-	return m.attachments
-}
-
-// Group returns group information.
-func (m *Message) Group() *Group {
-	return m.group
-}
-
-// Timestamp returns the timestamp of the message
-func (m *Message) Timestamp() uint64 {
-	return m.timestamp
-}
-
-// Flags returns the flags in the message
-func (m *Message) Flags() uint32 {
-	return m.flags
-}
-
-func (m *Message) ExpireTimer() uint32 {
-	return m.expireTimer
-}
-
-func (m *Message) Sticker() *signalservice.DataMessage_Sticker {
-	return m.sticker
-}
-
-func (m *Message) Contact() []*signalservice.DataMessage_Contact {
-	return m.contact
-}
-
-func (m *Message) Quote() *signalservice.DataMessage_Quote {
-	return m.quote
-}
-func (m *Message) Reaction() *signalservice.DataMessage_Reaction {
-	return m.reaction
 }
 
 // Client contains application specific data and callbacks.
@@ -375,6 +310,8 @@ func Setup(c *Client) error {
 	setupTransporter()
 	setupCDNTransporter()
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
+	// check if we have a uuid and if not get it
+	config = checkUUID(config)
 	return err
 }
 
@@ -432,15 +369,19 @@ func registerDevice() error {
 
 func handleReceipt(env *signalservice.Envelope) {
 	if client.ReceiptHandler != nil {
-		client.ReceiptHandler(env.GetSourceE164(), env.GetSourceDevice(), env.GetTimestamp())
+		client.ReceiptHandler(env.GetSourceUuid(), env.GetSourceDevice(), env.GetTimestamp())
 	}
 }
 
+// recID removes the + from phone numbers
 func recID(source string) string {
-	return source[1:]
+	if source[0] == '+' {
+		return source[1:]
+	}
+	return source
 }
 
-func handleMessage(src string, timestamp uint64, b []byte) error {
+func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) error {
 	b = stripPadding(b)
 
 	content := &signalservice.Content{}
@@ -450,20 +391,20 @@ func handleMessage(src string, timestamp uint64, b []byte) error {
 	}
 
 	if dm := content.GetDataMessage(); dm != nil {
-		return handleDataMessage(src, timestamp, dm)
-	} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == src {
-		return handleSyncMessage(src, timestamp, sm)
+		return handleDataMessage(srcE164, srcUUID, timestamp, dm)
+	} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == srcE164 {
+		return handleSyncMessage(srcUUID, timestamp, sm)
 	} else if cm := content.GetCallMessage(); cm != nil {
-		return handleCallMessage(src, timestamp, cm)
+		return handleCallMessage(srcUUID, timestamp, cm)
 	} else if rm := content.GetReceiptMessage(); rm != nil {
-		return handleReceiptMessage(src, timestamp, rm)
+		return handleReceiptMessage(srcUUID, timestamp, rm)
 	} else if tm := content.GetTypingMessage(); tm != nil {
-		return handleTypingMessage(src, timestamp, tm)
+		return handleTypingMessage(srcUUID, timestamp, tm)
 	}
 
 	//FIXME get the right content
 	// log.Errorf(content)
-	log.Errorln("Unknown message content received", content)
+	log.Errorln("[textsecure] Unknown message content received", content)
 	return nil
 }
 
@@ -474,13 +415,15 @@ func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
 	flags := uint32(0)
 	if dm.GetFlags() == uint32(signalservice.DataMessage_END_SESSION) {
 		flags = EndSessionFlag
+
 		textSecureStore.DeleteAllSessions(recID(src))
+		textSecureStore.DeleteAllSessions(src)
 	}
 	return flags, nil
 }
 
 // handleDataMessage handles an incoming DataMessage and calls client callbacks
-func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessage) error {
+func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signalservice.DataMessage) error {
 	flags, err := handleFlags(src, dm)
 	if err != nil {
 		return err
@@ -490,13 +433,13 @@ func handleDataMessage(src string, timestamp uint64, dm *signalservice.DataMessa
 	if err != nil {
 		return err
 	}
-	log.Debugln("[textsecure] handleDataMessage")
-	log.Debugln("[textsecure] handleDataMessage timestamps", timestamp, *dm.Timestamp, dm.GetExpireTimer())
+	log.Debugln("[textsecure] handleDataMessage", timestamp, *dm.Timestamp, dm.GetExpireTimer())
 	gr, err := handleGroups(src, dm)
 	if err != nil {
 		return err
 	}
 	msg := &Message{
+		sourceUUID:  srcUUID,
 		source:      src,
 		message:     dm.GetBody(),
 		attachments: atts,
@@ -595,7 +538,8 @@ func handleReceivedMessage(msg []byte) error {
 	if err != nil {
 		return err
 	}
-	recid := recID(env.GetSourceE164())
+	recid := env.GetSourceUuid()
+
 	sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
 	switch *env.Type {
 	case signalservice.Envelope_RECEIPT:
@@ -604,25 +548,34 @@ func handleReceivedMessage(msg []byte) error {
 	case signalservice.Envelope_CIPHERTEXT:
 		msg := env.GetContent()
 		if msg == nil {
-			return errors.New("Legacy messages unsupported")
+			return errors.New("[textsecure] Legacy messages unsupported")
 		}
 		wm, err := axolotl.LoadWhisperMessage(msg)
 		if err != nil {
+			log.Infof("[textsecure] Incoming WhisperMessage %s.\n", err)
 			return err
 		}
 		b, err := sc.SessionDecryptWhisperMessage(wm)
 		if _, ok := err.(axolotl.DuplicateMessageError); ok {
-			log.Infof("Incoming WhisperMessage %s. Ignoring.\n", err)
+			log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
 			return nil
 		}
 		if _, ok := err.(axolotl.InvalidMessageError); ok {
-			log.Infof("Incoming WhisperMessage %s. Ignoring.\n", err)
-			return nil
+			// try the legacy way
+			log.Infof("[textsecure] Incoming WhisperMessage try legacy decrypting")
+
+			recid := recID(env.GetSourceE164())
+			sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
+			b, err = sc.SessionDecryptWhisperMessage(wm)
+			if _, ok := err.(axolotl.DuplicateMessageError); ok {
+				log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
+				return nil
+			}
 		}
 		if err != nil {
 			return err
 		}
-		err = handleMessage(env.GetSourceE164(), env.GetTimestamp(), b)
+		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
 		if err != nil {
 			return err
 		}
@@ -635,21 +588,21 @@ func handleReceivedMessage(msg []byte) error {
 		}
 		b, err := sc.SessionDecryptPreKeyWhisperMessage(pkwm)
 		if _, ok := err.(axolotl.DuplicateMessageError); ok {
-			log.Infof("Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
+			log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
 			return nil
 		}
 		if _, ok := err.(axolotl.PreKeyNotFoundError); ok {
-			log.Infof("Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
+			log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
 			return nil
 		}
 		if _, ok := err.(axolotl.InvalidMessageError); ok {
-			log.Infof("Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
+			log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		err = handleMessage(env.GetSourceE164(), env.GetTimestamp(), b)
+		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
 		if err != nil {
 			return err
 		}

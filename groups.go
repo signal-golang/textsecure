@@ -16,7 +16,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/signal-golang/textsecure/protobuf"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"gopkg.in/yaml.v2"
 )
 
@@ -74,6 +74,8 @@ func loadGroup(path string) error {
 	groups[hexid] = group
 	return nil
 }
+
+// RemoveGroupKey removes the group key
 func RemoveGroupKey(hexid string) error {
 	err := os.Remove(config.StorageDir + "/groups/" + hexid)
 	if err != nil {
@@ -163,7 +165,7 @@ func quitGroup(src string, hexid string) error {
 // GroupUpdateFlag signals that this message updates the group membership or name.
 var GroupUpdateFlag uint32 = 1
 
-// GroupLeavelag signals that this message is a group leave message
+// GroupLeaveFlag signals that this message is a group leave message
 var GroupLeaveFlag uint32 = 2
 
 // handleGroups is the main entry point for handling the group metadata on messages.
@@ -232,7 +234,7 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 	for _, m := range g.Members {
 		if m != config.Tel {
 			omsg := &outgoingMessage{
-				tel:         m,
+				destination: m,
 				msg:         msg,
 				attachment:  a,
 				expireTimer: timer,
@@ -246,10 +248,9 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 			if err != nil {
 				log.Errorln("[textsecure] sendGroupHelper", err, m)
 				return 0, err
-			} else {
-				log.Debugln("[textsecure] sendGroupHelper message to group sent", m)
-
 			}
+			log.Debugln("[textsecure] sendGroupHelper message to group sent", m)
+
 		}
 	}
 	return ts, nil
@@ -269,6 +270,8 @@ func SendGroupAttachment(hexid string, msg string, r io.Reader, timer uint32) (u
 	}
 	return sendGroupHelper(hexid, msg, a, timer)
 }
+
+// SendGroupVoiceNote sends an voice note to a group
 func SendGroupVoiceNote(hexid string, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
 	a, err := uploadVoiceNote(r, ct)
@@ -316,7 +319,7 @@ func sendUpdate(g *Group) error {
 	for _, m := range g.Members {
 		if m != config.Tel {
 			omsg := &outgoingMessage{
-				tel: m,
+				destination: m,
 				group: &groupMessage{
 					id:      g.ID,
 					name:    g.Name,
@@ -347,13 +350,15 @@ func newGroup(name string, members []string) (*Group, error) {
 	}
 	return groups[hexid], nil
 }
+
+// RequestGroupInfo updates the info for the group like members or the avatat
 func RequestGroupInfo(g *Group) error {
 	log.Debugln("[textsecure] request group update", g.Hexid)
 	for _, m := range g.Members {
 		if m != config.Tel {
 			log.Debugln(m)
 			omsg := &outgoingMessage{
-				tel: m,
+				destination: m,
 				group: &groupMessage{
 					id:  g.ID,
 					typ: signalservice.GroupContext_REQUEST_INFO,
@@ -367,7 +372,7 @@ func RequestGroupInfo(g *Group) error {
 	}
 	if len(g.Members) == 0 {
 		omsg := &outgoingMessage{
-			tel: config.Tel,
+			destination: config.Tel,
 			group: &groupMessage{
 				id:  g.ID,
 				typ: signalservice.GroupContext_REQUEST_INFO,
@@ -409,10 +414,12 @@ func removeGroup(id []byte) error {
 	}
 	return nil
 }
-func GetGroupById(hexId string) (*Group, error) {
-	g, ok := groups[hexId]
+
+// GetGroupById returns a group by it's id
+func GetGroupById(hexID string) (*Group, error) {
+	g, ok := groups[hexID]
 	if !ok {
-		return nil, UnknownGroupIDError{hexId}
+		return nil, UnknownGroupIDError{hexID}
 	}
 	return g, nil
 }
@@ -427,7 +434,7 @@ func LeaveGroup(hexid string) error {
 	for _, m := range g.Members {
 		if m != config.Tel {
 			omsg := &outgoingMessage{
-				tel: m,
+				destination: m,
 				group: &groupMessage{
 					id:  g.ID,
 					typ: signalservice.GroupContext_QUIT,
