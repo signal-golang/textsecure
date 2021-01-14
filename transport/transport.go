@@ -6,13 +6,14 @@ package transport
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/signal-golang/textsecure/rootCa"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,12 +24,27 @@ func SetupTransporter(server string,
 	password string,
 	userAgent string,
 	proxyServer string) {
-	Transport = newHTTPTransporter(server, tel, password, userAgent, proxyServer)
+	Transport = newHTTPTransporter(server, tel, password, userAgent, proxyServer, rootCa.RootCA)
+}
+
+var CdnTransport *httpTransporter
+
+func SetupCDNTransporter(cdnUrl string, tel string, password string, userAgent string, proxyServer string) {
+	// setupCA()
+	CdnTransport = newHTTPTransporter(cdnUrl, tel, password, userAgent, proxyServer, rootCa.RootCA)
+}
+
+var DirectoryTransport *httpTransporter
+
+func SetupDirectoryTransporter(Url string, tel string, password string, userAgent string, proxyServer string) {
+	// setupCA()
+	DirectoryTransport = newHTTPTransporter(Url, tel, password, userAgent, proxyServer, rootCa.DirectoryCA)
 }
 
 type response struct {
-	Status int
-	Body   io.ReadCloser
+	Status  int
+	Body    io.ReadCloser
+	Cookies []string
 }
 
 func (r *response) IsError() bool {
@@ -43,8 +59,11 @@ type Transporter interface {
 	Get(url string) (*response, error)
 	Del(url string) (*response, error)
 	Put(url string, body []byte, ct string) (*response, error)
+	PutWithAuth(url string, body []byte, ct string, auth string) (*response, error)
+
 	PutJSON(url string, body []byte) (*response, error)
 	PutBinary(url string, body []byte) (*response, error)
+	PutJSONWithAuth(url string, body []byte, auth string) (*response, error)
 }
 
 type httpTransporter struct {
@@ -77,17 +96,14 @@ func NewHTTPClient() *http.Client {
 	return client
 }
 
-var CdnTransport *httpTransporter
-
-func SetupCDNTransporter(cdnUrl string, tel string, password string, userAgent string, proxyServer string) {
-	// setupCA()
-	CdnTransport = newHTTPTransporter(cdnUrl, tel, password, userAgent, proxyServer)
-}
-func newHTTPTransporter(baseURL, user, pass string, userAgent string, proxyServer string) *httpTransporter {
+func newHTTPTransporter(baseURL, user, pass string, userAgent string, proxyServer string, rootCA *x509.CertPool) *httpTransporter {
 	client := &http.Client{
 		Timeout: 15 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{RootCAs: rootCa.RootCA},
+			TLSClientConfig: &tls.Config{
+				RootCAs:            rootCA,
+				InsecureSkipVerify: true,
+			},
 			// Proxy:           getProxy,
 		},
 	}
@@ -154,6 +170,7 @@ func (ht *httpTransporter) Put(url string, body []byte, ct string) (*response, e
 	}
 	req.Header.Add("Content-Type", ct)
 	req.SetBasicAuth(ht.user, ht.pass)
+	log.Debugln("hey", req)
 	resp, err := ht.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -168,11 +185,52 @@ func (ht *httpTransporter) Put(url string, body []byte, ct string) (*response, e
 
 	return r, err
 }
+func (ht *httpTransporter) PutWithAuth(url string, body []byte, ct string, auth string) (*response, error) {
+	log.Debugln(auth)
+	br := bytes.NewReader(body)
+	req, err := http.NewRequest("PUT", ht.baseURL+url, br)
+	if err != nil {
+		return nil, err
+	}
+	if ht.userAgent != "" {
+		req.Header.Set("X-Signal-Agent", ht.userAgent)
+	}
+	log.Debugln(req.Header.Get("Authorization"))
+	req.Header.Get("Authorization")
+	req.Header.Add("Content-Type", ct)
+	req.Header.Set("Authorization", auth)
+	log.Debugln(req.Header.Get("Authorization"))
+	fmt.Printf("%+v\n", req)
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	cookies := resp.Header.Get("Set-Cookie")
+
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+		r.Cookies = strings.Split(cookies, ";")
+	}
+
+	log.Debugf("[textsecure] PUT %s %d\n", url, r.Status)
+
+	return r, err
+}
 
 func (ht *httpTransporter) PutJSON(url string, body []byte) (*response, error) {
 	return ht.Put(url, body, "application/json")
 }
-
+func (ht *httpTransporter) PutJSONWithAuth(url string, body []byte, auth string) (*response, error) {
+	return ht.PutWithAuth(url, body, "application/json; charset=utf-8", auth)
+}
 func (ht *httpTransporter) PutBinary(url string, body []byte) (*response, error) {
 	return ht.Put(url, body, "application/octet-stream")
+}
+
+func (ht *httpTransporter) Duplicate() *httpTransporter {
+	pHt := *ht
+	newTransport := &pHt
+	return newTransport
 }

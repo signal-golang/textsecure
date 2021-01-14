@@ -310,6 +310,7 @@ func Setup(c *Client) error {
 	rootCa.SetupCA(config.RootCA)
 	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
 	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
+	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	config = checkUUID(config)

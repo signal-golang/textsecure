@@ -19,8 +19,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/contactsDiscovery"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/transport"
+	"golang.org/x/text/encoding/charmap"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -29,6 +31,7 @@ var (
 	SERVICE_REFLECTOR_HOST = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
 	SIGNAL_CDN_URL         = "https://cdn.signal.org"
 	SIGNAL_CDN2_URL        = "https://cdn2.signal.org"
+	DIRECTORY_URL          = "https://api.directory.signal.org"
 
 	createAccountPath = "/v1/accounts/%s/code/%s?client=%s"
 	// CREATE_ACCOUNT_SMS_PATH   = "/v1/accounts/sms/code/%s?client=%s";
@@ -206,7 +209,9 @@ type AuthCredentials struct {
 
 func (a *AuthCredentials) AsBasic() string {
 	usernameAndPassword := a.Username + ":" + a.Password
-	encoded := base64.StdEncoding.EncodeToString([]byte(usernameAndPassword))
+	dec := charmap.Windows1250.NewDecoder()
+	out, _ := dec.String(usernameAndPassword)
+	encoded := base64.StdEncoding.EncodeToString([]byte(out))
 	return "Basic " + encoded
 }
 
@@ -542,7 +547,8 @@ func getCredendtails(path string) (*AuthCredentials, error) {
 	dec := json.NewDecoder(resp.Body)
 	var a AuthCredentials
 	dec.Decode(&a)
-
+	fmt.Printf("%+v\n", a)
+	log.Debugln("[textsecure] getCredentials ", path, a)
 	return &a, nil
 
 }
@@ -574,32 +580,43 @@ func GetRegisteredContacts() ([]Contact, error) {
 		m[t] = c
 	}
 
-	contacts := make(map[string][]string)
-	contacts["contacts"] = tokens
-	body, err := json.MarshalIndent(contacts, "", "    ")
+	authCredentials, err := getCredendtails(DIRECTORY_AUTH_PATH)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Could not get auth credentials", err)
 	}
-	resp, err := transport.Transport.PutJSON(DIRECTORY_TOKENS_PATH, body)
-	// // TODO: breaks when there is no internet
-	if resp != nil && resp.Status == 413 {
-		log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
-		return nil, errors.New("Refreshing contacts: rate limit exceeded: 413")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if resp.IsError() {
-		return nil, resp
-	}
-	dec := json.NewDecoder(resp.Body)
-	var jc jsonContacts
-	dec.Decode(&jc)
-	lc = make([]Contact, len(jc.Contacts))
-	for i, c := range jc.Contacts {
-		lc[i] = m[c.Token]
-	}
-	return lc, nil
+	remoteAttestation := contactsDiscovery.RemoteAttestation{}
+	attestations, err := remoteAttestation.GetAndVerifyMultiRemoteAttestation(CDS_MRENCLAVE,
+		authCredentials.AsBasic(),
+	)
+	log.Debugln(attestations)
+	return nil, nil
+	// contacts := make(map[string][]string)
+	// contacts["contacts"] = tokens
+	// body, err := json.MarshalIndent(contacts, "", "    ")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// // resp, err := transport.Transport.PutJSON(DIRECTORY_TOKENS_PATH, body)
+	// // // TODO: breaks when there is no internet
+	// if resp != nil && resp.Status == 413 {
+	// 	log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
+	// 	return nil, errors.New("Rate limit exceeded: 413")
+	// }
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if resp.IsError() {
+	// 	return nil, resp
+	// }
+	// dec := json.NewDecoder(resp.Body)
+	// var jc map[string][]jsonContact
+	// dec.Decode(&jc)
+
+	// lc = make([]Contact, len(jc["contacts"]))
+	// for i, c := range jc["contacts"] {
+	// 	lc[i] = m[c.Token]
+	// }
+	// return lc, nil
 }
 
 // Attachment handling
