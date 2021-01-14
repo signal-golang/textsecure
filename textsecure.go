@@ -307,8 +307,9 @@ func Setup(c *Client) error {
 		return err
 	}
 	client.RegistrationDone()
-	setupTransporter()
-	setupCDNTransporter()
+	rootCa.SetupCA(config.RootCA)
+	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
+	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	config = checkUUID(config)
@@ -322,7 +323,8 @@ func registerDevice() error {
 			return errors.New("empty phone number")
 		}
 	}
-	setupTransporter()
+	rootCa.SetupCA(config.RootCA)
+	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
 	code, err := requestCode(config.Tel, config.VerificationType)
 	if err != nil {
 		return err

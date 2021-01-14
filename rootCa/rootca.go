@@ -1,8 +1,10 @@
-package textsecure
+package rootCa
 
 import (
 	"crypto/x509"
 	"io/ioutil"
+
+	"github.com/signal-golang/textsecure/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -36,12 +38,12 @@ ljy42A/WrwXzyUMDkcAtZHTjkUAuSLivn434nLcYXalMUIW8sQNLksKTqVH26MKS
 -----END CERTIFICATE-----
 `
 
-var rootCA *x509.CertPool
+var RootCA *x509.CertPool
 
-func setupCA() {
+func SetupCA(rootca string) {
 	pem := []byte(rootPEM)
-	if config.RootCA != "" && exists(config.RootCA) {
-		b, err := ioutil.ReadFile(config.RootCA)
+	if rootca != "" && utils.Exists(rootca) {
+		b, err := ioutil.ReadFile(rootca)
 		if err != nil {
 			log.Error(err)
 			return
@@ -49,8 +51,8 @@ func setupCA() {
 		pem = b
 	}
 
-	rootCA = x509.NewCertPool()
-	if !rootCA.AppendCertsFromPEM(pem) {
-		log.Error("Cannot load PEM")
+	RootCA = x509.NewCertPool()
+	if !RootCA.AppendCertsFromPEM(pem) {
+		log.Error("[textsecure] Cannot load PEM")
 	}
 }

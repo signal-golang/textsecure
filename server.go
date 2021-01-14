@@ -20,6 +20,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/transport"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -95,6 +96,7 @@ var (
 	GROUPSV2_TOKEN          = "/v1/groups/token"
 
 	SERVER_DELIVERED_TIMESTAMP_HEADER = "X-Signal-Timestamp"
+	CDS_MRENCLAVE                     = "c98e00a4e3ff977a56afefe7362a27e4961e4f19e211febfbb19b897e6b80b15"
 )
 
 // RegistrationInfo holds the data required to be identified by and
@@ -128,12 +130,12 @@ var registrationInfo RegistrationInfo
 
 func requestCode(tel, method string) (string, error) {
 	log.Infoln("[textsecure] request verification code for ", tel)
-	resp, err := transport.get(fmt.Sprintf(createAccountPath, method, tel, "android"))
+	resp, err := transport.Transport.Get(fmt.Sprintf(createAccountPath, method, tel, "android"))
 	if err != nil {
 		fmt.Println(err.Error())
 		return "", err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		if resp.Status == 402 {
 			log.Debugln(resp.Body)
 			buf := new(bytes.Buffer)
@@ -201,6 +203,13 @@ type AuthCredentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+func (a *AuthCredentials) AsBasic() string {
+	usernameAndPassword := a.Username + ":" + a.Password
+	encoded := base64.StdEncoding.EncodeToString([]byte(usernameAndPassword))
+	return "Basic " + encoded
+}
+
 type RegistrationLockFailure struct {
 	TimeRemaining uint32          `json:"timeRemaining"`
 	Credentials   AuthCredentials `json:"backupCredentials"`
@@ -235,12 +244,12 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 	if err != nil {
 		return err, nil
 	}
-	resp, err := transport.putJSON(fmt.Sprintf(VERIFY_ACCOUNT_CODE_PATH, code), body)
+	resp, err := transport.Transport.PutJSON(fmt.Sprintf(VERIFY_ACCOUNT_CODE_PATH, code), body)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err, nil
 	}
-	if resp.isError() {
+	if resp.IsError() {
 
 		if resp.Status == 423 {
 			buf := new(bytes.Buffer)
@@ -276,11 +285,11 @@ func RegisterWithUPS(token string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := transport.putJSON(registerUPSAccountPath, body)
+	resp, err := transport.Transport.PutJSON(registerUPSAccountPath, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -293,11 +302,11 @@ func SetAccountAttributes(attributes *AccountAttributes) error {
 	if err != nil {
 		return err
 	}
-	resp, err := transport.putJSON(SET_ACCOUNT_ATTRIBUTES, body)
+	resp, err := transport.Transport.PutJSON(SET_ACCOUNT_ATTRIBUTES, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -309,11 +318,11 @@ type whoAmIResponse struct {
 
 func GetMyUUID() (string, error) {
 	log.Debugln("[textsecure] get my uuid")
-	resp, err := transport.get(WHO_AM_I)
+	resp, err := transport.Transport.Get(WHO_AM_I)
 	if err != nil {
 		return "", err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return "", resp
 	}
 	dec := json.NewDecoder(resp.Body)
@@ -327,7 +336,7 @@ type jsonDeviceCode struct {
 }
 
 func getNewDeviceVerificationCode() (string, error) {
-	resp, err := transport.get(provisioningCodePath)
+	resp, err := transport.Transport.Get(provisioningCodePath)
 	if err != nil {
 		return "", err
 	}
@@ -351,7 +360,7 @@ func getLinkedDevices() ([]DeviceInfo, error) {
 
 	devices := &jsonDevices{}
 
-	resp, err := transport.get(fmt.Sprintf(devicePath, ""))
+	resp, err := transport.Transport.Get(fmt.Sprintf(devicePath, ""))
 	if err != nil {
 		return devices.DeviceList, err
 	}
@@ -366,7 +375,7 @@ func getLinkedDevices() ([]DeviceInfo, error) {
 }
 
 func unlinkDevice(id int) error {
-	_, err := transport.del(fmt.Sprintf(devicePath, strconv.Itoa(id)))
+	_, err := transport.Transport.Del(fmt.Sprintf(devicePath, strconv.Itoa(id)))
 	if err != nil {
 		return err
 	}
@@ -401,11 +410,11 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	}
 
 	url := fmt.Sprintf(provisioningMessagePath, ephemeralId)
-	resp, err := transport.putJSON(url, body)
+	resp, err := transport.Transport.PutJSON(url, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -435,7 +444,7 @@ type ProfileSettings struct {
 // GetProfileE164 get a profile by a phone number
 func GetProfileE164(tel string) (Contact, error) {
 
-	resp, err := transport.get(fmt.Sprintf(PROFILE_PATH, tel))
+	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, tel))
 	if err != nil {
 		log.Debugln(err)
 	}
@@ -463,16 +472,9 @@ func GetProfileE164(tel string) (Contact, error) {
 	return c, nil
 }
 
-var cdnTransport *httpTransporter
-
-func setupCDNTransporter() {
-	// setupCA()
-	cdnTransport = newHTTPTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password)
-}
-
-// GetAvatar retuns an avatar for it's url from signal cdn
-func GetAvatar(avatarURL string) (io.ReadCloser, error) {
-	log.Debugln("[textsecure] get avatar from ", avatarURL)
+func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
+	log.Debugln(SIGNAL_CDN_URL + "/" + avatarUrl)
+	resp, err := transport.Transport.CdnTransport.Get("/" + avatarUrl)
 
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -507,11 +509,11 @@ func registerPreKeys() error {
 		return err
 	}
 
-	resp, err := transport.putJSON(prekeyMetadataPath, body)
+	resp, err := transport.Transport.PutJSON(prekeyMetadataPath, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -519,17 +521,30 @@ func registerPreKeys() error {
 
 // GET /v2/keys/{number}/{device_id}?relay={relay}
 func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
-	resp, err := transport.get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
+	resp, err := transport.Transport.get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
 	if err != nil {
 		return nil, err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return nil, resp
 	}
 	dec := json.NewDecoder(resp.Body)
 	k := &preKeyResponse{}
 	dec.Decode(k)
 	return k, nil
+}
+
+func getCredendtails(path string) (*AuthCredentials, error) {
+	resp, err := transport.Transport.Get(path)
+	if err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(resp.Body)
+	var a AuthCredentials
+	dec.Decode(&a)
+
+	return &a, nil
+
 }
 
 // jsonContact is the data returned by the server for each registered contact
@@ -565,7 +580,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.putJSON(DIRECTORY_TOKENS_PATH, body)
+	resp, err := transport.Transport.PutJSON(DIRECTORY_TOKENS_PATH, body)
 	// // TODO: breaks when there is no internet
 	if resp != nil && resp.Status == 413 {
 		log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
@@ -574,7 +589,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	if err != nil {
 		return nil, err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return nil, resp
 	}
 	dec := json.NewDecoder(resp.Body)
@@ -596,7 +611,7 @@ type jsonAllocation struct {
 
 // GET /v1/attachments/
 func allocateAttachment() (uint64, string, error) {
-	resp, err := transport.get(allocateAttachmentPath)
+	resp, err := transport.Transport.Get(allocateAttachmentPath)
 	if err != nil {
 		return 0, "", err
 	}
@@ -830,7 +845,7 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.putJSON(fmt.Sprintf(MESSAGE_PATH, uuid), body)
+	resp, err := transport.Transport.PutJSON(fmt.Sprintf(MESSAGE_PATH, uuid), body)
 	if err != nil {
 		return nil, err
 	}
@@ -866,7 +881,7 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 		}
 		return buildAndSendMessage(uuid, paddedMessage, isSync, timestamp)
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return nil, resp
 	}
 
