@@ -1,6 +1,9 @@
 package textsecure
 
-import signalservice "github.com/signal-golang/textsecure/protobuf"
+import (
+	"github.com/signal-golang/textsecure/groupsv2"
+	signalservice "github.com/signal-golang/textsecure/protobuf"
+)
 
 // Message represents a message received from the peer.
 // It can optionally include attachments and be sent to a group.
@@ -10,6 +13,7 @@ type Message struct {
 	message                 string
 	attachments             []*Attachment
 	group                   *Group
+	groupV2                 *groupsv2.GroupV2
 	flags                   uint32
 	expireTimer             uint32
 	profileKey              []byte
@@ -51,6 +55,11 @@ func (m *Message) Attachments() []*Attachment {
 // Group returns group information.
 func (m *Message) Group() *Group {
 	return m.group
+}
+
+// GroupV2 returns group information.
+func (m *Message) GroupV2() *groupsv2.GroupV2 {
+	return m.groupV2
 }
 
 // Timestamp returns the timestamp of the message

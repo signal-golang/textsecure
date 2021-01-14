@@ -1,6 +1,6 @@
 // Copyright (c) 2014 Canonical Ltd.
 // Licensed under the GPLv3, see the COPYING file for details.
-
+// Groups v1 only working with tel numbers
 package textsecure
 
 import (
@@ -16,6 +16,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"gopkg.in/yaml.v2"
 )
@@ -87,6 +88,7 @@ func RemoveGroupKey(hexid string) error {
 
 // setupGroups reads all groups' state from storage.
 func setupGroups() error {
+	groupsv2.SetupGroups(config.StorageDir)
 	groupDir = filepath.Join(config.StorageDir, "groups")
 	if err := os.MkdirAll(groupDir, 0700); err != nil {
 		return err

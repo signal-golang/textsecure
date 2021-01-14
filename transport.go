@@ -159,6 +159,31 @@ func (ht *httpTransporter) put(url string, body []byte, ct string) (*response, e
 
 	return r, err
 }
+func (ht *httpTransporter) patch(url string, body []byte) (*response, error) {
+	br := bytes.NewReader(body)
+	req, err := http.NewRequest("PATCH", ht.baseURL+url, br)
+	if err != nil {
+		return nil, err
+	}
+	if config.UserAgent != "" {
+		req.Header.Set("X-Signal-Agent", config.UserAgent)
+	}
+	// req.Header.Add("Content-Type", ct)
+	req.SetBasicAuth(ht.user, ht.pass)
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+	}
+
+	log.Debugf("[textsecure] PATCH %s %d\n", url, r.Status)
+
+	return r, err
+}
 
 func (ht *httpTransporter) putJSON(url string, body []byte) (*response, error) {
 	return ht.put(url, body, "application/json")
