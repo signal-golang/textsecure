@@ -19,6 +19,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
 	transport "github.com/signal-golang/textsecure/transport"
@@ -262,7 +263,6 @@ func setupLogging() {
 // Setup initializes the package.
 func Setup(c *Client) error {
 	var err error
-
 	client = c
 
 	config, err = loadConfig()
@@ -317,6 +317,7 @@ func Setup(c *Client) error {
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	config = checkUUID(config)
+	GetProfile(config.UUID)
 	return err
 }
 
@@ -421,8 +422,10 @@ func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) e
 		return handleReceiptMessage(srcE164, srcUUID, timestamp, rm)
 	} else if tm := content.GetTypingMessage(); tm != nil {
 		return handleTypingMessage(srcE164, srcUUID, timestamp, tm)
+	} else if nm := content.GetNullMessage(); nm != nil {
+		log.Errorln("[textsecure] Nullmessage content received", content)
+		return nil
 	}
-
 	//FIXME get the right content
 	// log.Errorf(content)
 	log.Errorln("[textsecure] Unknown message content received", content)
@@ -459,12 +462,31 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 	if err != nil {
 		return err
 	}
+	gr2, err := groupsv2.HandleGroupsV2(src, dm)
+	if err != nil {
+		return err
+	}
+	if gr2 != nil {
+		if gr2.DecryptedGroup.PendingMembers != nil {
+			groupAction := groupsv2.CreateRequestForGroup(gr2.Hexid, gr2.DecryptedGroup.PendingMembers[0].Uuid)
+			authorization, err := groupsv2.NewGroupsV2AuthorizationForGroup(gr2.DecryptedGroup.PendingMembers[0].Uuid, gr2.Hexid)
+			if err != nil {
+				log.Errorln("[textsecure] pacth gro", err)
+			} else {
+				log.Errorln("[textsecure] Yeai", err)
+
+				PatchGroupV2(groupAction, authorization)
+			}
+
+		}
+	}
 	msg := &Message{
 		source:      src,
 		sourceUUID:  srcUUID,
 		message:     dm.GetBody(),
 		attachments: atts,
 		group:       gr,
+		groupV2:     gr2,
 		flags:       flags,
 		expireTimer: dm.GetExpireTimer(),
 		profileKey:  dm.GetProfileKey(),

@@ -1,3 +1,5 @@
+// Copyright (c) 2020 Aaron Kimmig
+// Licensed under the GPLv3, see the COPYING file for details.
 package textsecure
 
 import (

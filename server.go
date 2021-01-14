@@ -22,6 +22,8 @@ import (
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
+	"github.com/signal-golang/textsecure/credentials"
+	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/transport"
 	"golang.org/x/text/encoding/charmap"
@@ -99,6 +101,9 @@ var (
 	GROUPSV2_AVATAR_REQUEST = "/v1/groups/avatar/form"
 	GROUPSV2_GROUP_JOIN     = "/v1/groups/join/%s"
 	GROUPSV2_TOKEN          = "/v1/groups/token"
+
+	ATTESTATION_REQUEST = "/v1/attestation/%s"
+	DISCOVERY_REQUEST   = "/v1/discovery/%s"
 
 	SERVER_DELIVERED_TIMESTAMP_HEADER = "X-Signal-Timestamp"
 	CDS_MRENCLAVE                     = "c98e00a4e3ff977a56afefe7362a27e4961e4f19e211febfbb19b897e6b80b15"
@@ -191,24 +196,41 @@ func requestCode(tel, method, captcha string) (string,*int,error) {
 
 // AccountAttributes describes what features are supported
 type AccountAttributes struct {
-	SignalingKey            string              `json:"signalingKey" yaml:"signalingKey"`
-	RegistrationID          uint32              `json:"registrationId" yaml:"registrationId"`
-	FetchesMessages         bool                `json:"fetchesMessages" yaml:"fetchesMessages"`
-	Video                   bool                `json:"video" yaml:"video"`
-	Voice                   bool                `json:"voice" yaml:"voice"`
-	Pin                     string              `json:"pin" yaml:"pin"` // deprecated
-	BasicStorageCredentials AuthCredentials     `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
-	Capabilities            AccountCapabilities `json:"capabilities" yaml:"capabilities"`
-	// UnidentifiedAccessKey          *byte `json:"unidentifiedAccessKey"`
-	// UnrestrictedUnidentifiedAccess *bool `json:"unrestrictedUnidentifiedAccess"`
+	SignalingKey                   string              `json:"signalingKey" yaml:"signalingKey"`
+	FetchesMessages                bool                `json:"fetchesMessages" yaml:"fetchesMessages"`
+	RegistrationID                 uint32              `json:"registrationId" yaml:"registrationId"`
+	Name                           string              `json:"name" yaml:"name"`
+	Video                          bool                `json:"video" yaml:"video"`
+	Voice                          bool                `json:"voice" yaml:"voice"`
+	Pin                            *string             `json:"pin" yaml:"pin"` // deprecated
+	BasicStorageCredentials        AuthCredentials     `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
+	Capabilities                   AccountCapabilities `json:"capabilities" yaml:"capabilities"`
+	DiscoverableByPhoneNumber      bool                `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
+	UnrestrictedUnidentifiedAccess bool                `json:"unrestrictedUnidentifiedAccess"`
+	UnidentifiedAccessKey          *[]byte             `json:"unidentifiedAccessKey"`
+}
+
+type UpdateAccountAttributes struct {
+	SignalingKey                   *string             `json:"signalingKey" yaml:"signalingKey"`
+	FetchesMessages                bool                `json:"fetchesMessages" yaml:"fetchesMessages"`
+	RegistrationID                 uint32              `json:"registrationId" yaml:"registrationId"`
+	Name                           string              `json:"name" yaml:"name"`
+	Pin                            *string             `json:"pin" yaml:"pin"` // deprecated
+	RegistrationLock               *string             `json:"registrationLock" yaml:"registrationLock"`
+	UnidentifiedAccessKey          *[]byte             `json:"unidentifiedAccessKey"`
+	UnrestrictedUnidentifiedAccess bool                `json:"unrestrictedUnidentifiedAccess"`
+	Capabilities                   AccountCapabilities `json:"capabilities" yaml:"capabilities"`
+	DiscoverableByPhoneNumber      bool                `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
+	Video                          bool                `json:"video" yaml:"video"`
+	Voice                          bool                `json:"voice" yaml:"voice"`
 }
 
 // AccountCapabilities describes what functions axolotl supports
 type AccountCapabilities struct {
 	UUID         bool `json:"uuid" yaml:"uuid"`
-	Gv2          bool `json:"gv2" yaml:"gv2"`
+	Gv2          bool `json:"gv2-3" yaml:"gv2"`
 	Storage      bool `json:"storage" yaml:"storage"`
-	Gv1Migration bool `json:"gv1Migration" yaml:"gv1Migration"`
+	Gv1Migration bool `json:"gv1-migration" yaml:"gv1-migration"`
 }
 
 // AuthCredentials holds the credentials for the websocket connection
@@ -233,25 +255,32 @@ type RegistrationLockFailure struct {
 // verifyCode verificates the account with signal server
 func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, *AuthCredentials) {
 	code = strings.Replace(code, "-", "", -1)
-
+	// var key []byte
+	// key = identityKey.PrivateKey.Key()[:]
+	// unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	// if err != nil {
+	// 	log.Debugln("[textsecure] verifyCode", err)
+	// }
 	vd := AccountAttributes{
 		SignalingKey:    base64.StdEncoding.EncodeToString(registrationInfo.signalingKey),
 		RegistrationID:  registrationInfo.registrationID,
 		FetchesMessages: true,
 		Voice:           false,
 		Video:           false,
+		Pin:             nil,
+		Name:            "test",
 		Capabilities: AccountCapabilities{
-			UUID:         true,
-			Gv2:          true,
-			Storage:      false,
-			Gv1Migration: false,
+			UUID:    false,
+			Gv2:     true,
+			Storage: false,
 		},
+		DiscoverableByPhoneNumber:      true,
+		UnidentifiedAccessKey:          nil,
+		UnrestrictedUnidentifiedAccess: false,
 		// Pin:             nil,
-		// UnidentifiedAccessKey:          nil,
-		// UnrestrictedUnidentifiedAccess: nil,
 	}
 	if pin != nil {
-		vd.Pin = *pin
+		vd.Pin = pin
 		vd.BasicStorageCredentials = *credentials
 	}
 	log.Debugln("[textsecure] verifyCode", vd)
@@ -308,8 +337,40 @@ func RegisterWithUPS(token string) error {
 	return nil
 }
 
+// SetAccountCapabilities lets the client decide when it's ready for new functions to support for example groupsv2
+func SetAccountCapabilities(capabilities AccountCapabilities) error {
+	// var key []byte
+	// key = identityKey.PrivateKey.Key()[:]
+	// unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	// if err != nil {
+	// 	log.Errorln("[textsecure] SetAccountCapabilities ceating unidentifiedAccessKey: ", err)
+	// 	return err
+	// }
+	attributes := UpdateAccountAttributes{
+		SignalingKey:                   nil,
+		RegistrationID:                 registrationInfo.registrationID,
+		FetchesMessages:                true,
+		Pin:                            nil,
+		Name:                           "test",
+		RegistrationLock:               nil,
+		UnidentifiedAccessKey:          nil,
+		UnrestrictedUnidentifiedAccess: true,
+		Capabilities:                   capabilities,
+		DiscoverableByPhoneNumber:      true,
+		Video:                          false,
+		Voice:                          false,
+	}
+
+	err := setAccountAttributes(&attributes)
+	if err != nil {
+		return err
+	}
+	GetProfile(config.UUID)
+	return nil
+}
+
 // SetAccountAttributes updates the account attributes
-func SetAccountAttributes(attributes *AccountAttributes) error {
+func setAccountAttributes(attributes *UpdateAccountAttributes) error {
 	log.Debugln("[textsecure] setAccountAttributes")
 	body, err := json.Marshal(attributes)
 	if err != nil {
@@ -329,6 +390,7 @@ type whoAmIResponse struct {
 	UUID string `json:"uuid"`
 }
 
+// GetMyUUID returns the uid from the current user
 func GetMyUUID() (string, error) {
 	log.Debugln("[textsecure] get my uuid")
 	resp, err := transport.Transport.Get(WHO_AM_I)
@@ -341,6 +403,8 @@ func GetMyUUID() (string, error) {
 	dec := json.NewDecoder(resp.Body)
 	var response whoAmIResponse
 	dec.Decode(&response)
+	today := time.Now().Unix() / 86400
+	GetGroupAuthCredentials(today, today+6)
 	return response.UUID, nil
 }
 
@@ -357,6 +421,62 @@ func getNewDeviceVerificationCode() (string, error) {
 	var c jsonDeviceCode
 	dec.Decode(&c)
 	return c.VerificationCode, nil
+
+}
+
+func GetGroupAuthCredentials(startDay int64, endDay int64) error {
+	log.Debugln("[textsecure] get groupCredentials", fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
+	resp, err := transport.get(fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
+	if err != nil {
+		return err
+	}
+	if resp.isError() {
+		return resp
+	}
+	dec := json.NewDecoder(resp.Body)
+	var response credentials.GroupCredentials
+	dec.Decode(&response)
+	fmt.Printf("GetGroupAuthCredentials %+v\n", response)
+	credentials.Credentials = &response
+	return nil
+}
+
+func PatchGroupV2(groupActions *signalservice.GroupChange_Actions,
+	groupsV2Authorization *groupsv2.GroupsV2Authorization) error {
+
+	out, err := proto.Marshal(groupActions)
+	if err != nil {
+		log.Errorln("Failed to encode address groupActions:", err)
+		return err
+	}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	br := bytes.NewReader(out)
+	client := &http.Client{Transport: tr}
+	req, err := http.NewRequest("PUT", SIGNAL_CDN_URL+GROUPSV2_GROUP, br)
+	if config.UserAgent != "" {
+		req.Header.Set("X-Signal-Agent", config.UserAgent)
+	}
+	//auth missing:
+	// ClientZkAuthOperations     authOperations             = groupsOperations.getAuthOperations();
+	// AuthCredential             authCredential             = authOperations.receiveAuthCredential(self, today, authCredentialResponse);
+	// AuthCredentialPresentation authCredentialPresentation = authOperations.createAuthCredentialPresentation(new SecureRandom(), groupSecretParams, authCredential);
+	req.SetBasicAuth(groupsV2Authorization.Username, groupsV2Authorization.Password)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Errorln("Failed to encode address groupActions2:", err)
+
+		return err
+	}
+	// if resp.isError() {
+	// 	log.Errorln("Failed to encode address groupActions3:", err)
+	// 	return resp
+	// }
+	log.Infoln("patch project:", resp)
+
+	return nil
+
 }
 
 type DeviceInfo struct {
@@ -406,7 +526,7 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	pm := &signalservice.ProvisionMessage{
 		IdentityKeyPublic:  identityKey.PublicKey.Serialize(),
 		IdentityKeyPrivate: identityKey.PrivateKey.Key()[:],
-		Number:             &config.Tel,
+		Uuid:               &config.UUID,
 		ProvisioningCode:   &verificationCode,
 	}
 
@@ -438,20 +558,36 @@ type Profile struct {
 	IdentityKey                    string          `json:"identityKey"`
 	Name                           string          `json:"name"`
 	Avatar                         string          `json:"avatar"`
-	UnidentifiedAccess             string          `json:"unidentifiedAccess"`
-	UnrestrictedUnidentifiedAccess bool            `json:"unrestrictedUnidentifiedAccess"`
+	UnidentifiedAccess             string          `json:"uak"`
+	UnrestrictedUnidentifiedAccess bool            `json:"uua"`
 	Capabilities                   ProfileSettings `json:"capabilities"`
 	Username                       string          `json:"username"`
 	UUID                           string          `json:"uuid"`
-	Payments                       string          `json:"payments"`
-	Credential                     string          `json:"credential"`
+	// Payments                       string          `json:"payments"`
+	// Credential                     string          `json:"credential"`
 }
 
 // ProfileSettings contains the settings for the profile
 type ProfileSettings struct {
-	UUID         bool `json:"uuid"`
-	Gv2          bool `json:"gv2"`
-	Gv1Migration bool `json:"gv1-migration"`
+	UUID    bool `json:"uuid"`
+	Gv2     bool `json:"gv2"`
+	Storage bool `json:"storage"`
+}
+
+func GetProfile(UUID string) {
+	resp, err := transport.get(fmt.Sprintf(PROFILE_PATH, UUID))
+	profile := &Profile{}
+
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&profile)
+	if err != nil {
+		log.Debugln(err)
+	} else {
+		fmt.Printf("%+v\n", profile)
+		// log.Debugln(profile)
+
+	}
+
 }
 
 // GetProfileE164 get a profile by a phone number
@@ -485,9 +621,53 @@ func GetProfileE164(tel string) (Contact, error) {
 	return c, nil
 }
 
-func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
-	log.Debugln(SIGNAL_CDN_URL + "/" + avatarUrl)
-	// resp, err := transport.CdnTransport.Get("/" + avatarUrl)
+var cdnTransport *httpTransporter
+
+func setupCDNTransporter() {
+	// setupCA()
+	cdnTransport = newHTTPTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password)
+}
+
+type RemoteAttestationRequest struct {
+	ClientPublic string
+}
+
+// {"clientPublic":"DtZ1bEvFbDPgueDL30P3gh34GLeDAWCSIIXRECU7TCk="}
+type Envelopes map[string]DiscoveryContact
+
+type ContactDiscoveryRequest struct {
+	AdressCount int
+	Commitment  string
+	Data        string
+	Iv          string
+	Mac         string
+	Envelopes   Envelopes
+}
+type DiscoveryContact struct {
+	Data      string
+	Iv        string
+	Mac       string
+	RequestId string
+}
+
+// {
+// 	"addressCount":1,
+// 	"commitment":"Bji4zKernD3XYqtkhSRB8TvrGfevrB1qKYU2tzcZDcM=",
+// 	"data":"GI+F1w5anMGNO1K2lSn5j9lHfQc+Ub+2f1pADmT54Yfw/RuexsV+Vw==",
+// 	"envelopes":{
+// 		"6a4eb498-1c62-481e-9592-025d1e901f59":{
+// 			"data":"CL3ze4lOBU+kxHE2pnFJzIX/9KsQ1n1eQpaPvnedSbk=",
+// 			"iv":"qjaUGml40FAWi3cZ",
+// 			"mac":"UifN1pOFRwPjpdrpy7SQbA==",
+// 			"requestId":"BSBm+fiFhw9Ghv88aLpa671+3OVHBxAUOe9QK7C5BMs9aB06"
+// 		}
+// 	},
+// 	"iv":"DEq9x+BLEU2V9Yjh",
+// 	"mac":"yB1qUZQ9MfQ7cdRDT6t5Lw=="
+// }
+// GetAvatar retuns an avatar for it's url from signal cdn
+func GetAvatar(avatarURL string) (io.ReadCloser, error) {
+	log.Debugln("[textsecure] get avatar from ", avatarURL)
 
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
