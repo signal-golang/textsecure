@@ -79,7 +79,7 @@ func (r *RemoteAttestation) GetAndVerifyMultiRemoteAttestation(
 	for _, remoteAttestationResponse := range multiRemoteAttestationResponse.Attestations {
 		assestations = append(assestations, validateAndBuildRemoteAttestation(remoteAttestationResponse,
 			resp.Cookies,
-			// KeyStore,
+			// KeyStore, -> Android secret iaskeystore
 			keyPair,
 			enclaveName,
 		),
@@ -99,7 +99,7 @@ func validateAndBuildRemoteAttestation(
 	keys := remoteAttestationKeys(keyPair, remoteAttestation.ServerEphemeralPublic, remoteAttestation.ServerStaticPublic)
 	requestId := getRequestId(keys, remoteAttestation)
 
-	// Quote                 quote     = new Quote(response.getQuote()); -> quote.go
+	// Quote                 quote     = new Quote(response.getQuote()); -> quote.go -> not necessary if we strip the verification
 
 	// byte[]                requestId = RemoteAttestationCipher.getRequestId(keys, response);
 

@@ -1,5 +1,6 @@
 package contactsDiscovery
 
+//  used to verify the server signature for remote attestations -> verifyServerQuote
 // public class Quote {
 
 // 	private static final long SGX_FLAGS_INITTED        = 0x0000_0000_0000_0001L;
