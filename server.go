@@ -589,6 +589,27 @@ func GetRegisteredContacts() ([]Contact, error) {
 		authCredentials.AsBasic(),
 	)
 	log.Debugln(attestations)
+	// List<String> addressBook = new ArrayList<>(e164numbers.size());
+
+	// for (String e164number : e164numbers) {
+	//   addressBook.add(e164number.substring(1));
+	// }
+
+	// List<String>      cookies  = attestations.values().iterator().next().getCookies();
+	// DiscoveryRequest  request  = ContactDiscoveryCipher.createDiscoveryRequest(addressBook, attestations);
+	// DiscoveryResponse response = this.pushServiceSocket.getContactDiscoveryRegisteredUsers(authorization, request, cookies, mrenclave);
+	// byte[]            data     = ContactDiscoveryCipher.getDiscoveryResponseData(response, attestations.values());
+
+	// HashMap<String, UUID> results         = new HashMap<>(addressBook.size());
+	// DataInputStream       uuidInputStream = new DataInputStream(new ByteArrayInputStream(data));
+
+	// for (String candidate : addressBook) {
+	//   long candidateUuidHigh = uuidInputStream.readLong();
+	//   long candidateUuidLow  = uuidInputStream.readLong();
+	//   if (candidateUuidHigh != 0 || candidateUuidLow != 0) {
+	// 	results.put('+' + candidate, new UUID(candidateUuidHigh, candidateUuidLow));
+	//   }
+	// }
 	return nil, nil
 	// contacts := make(map[string][]string)
 	// contacts["contacts"] = tokens
