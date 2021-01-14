@@ -479,12 +479,12 @@ func GetProfileE164(tel string) (Contact, error) {
 
 func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
 	log.Debugln(SIGNAL_CDN_URL + "/" + avatarUrl)
-	resp, err := transport.Transport.CdnTransport.Get("/" + avatarUrl)
+	// resp, err := transport.CdnTransport.Get("/" + avatarUrl)
 
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	c := &http.Client{Transport: customTransport}
-	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarURL, nil)
+	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarUrl, nil)
 	req.Header.Add("Host", SERVICE_REFLECTOR_HOST)
 	req.Header.Add("Content-Type", "application/octet-stream")
 	resp, err := c.Do(req)
@@ -526,7 +526,7 @@ func registerPreKeys() error {
 
 // GET /v2/keys/{number}/{device_id}?relay={relay}
 func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
-	resp, err := transport.Transport.get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
+	resp, err := transport.Transport.Get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
 	if err != nil {
 		return nil, err
 	}
@@ -582,13 +582,13 @@ func GetRegisteredContacts() ([]Contact, error) {
 
 	authCredentials, err := getCredendtails(DIRECTORY_AUTH_PATH)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get auth credentials", err)
+		return nil, fmt.Errorf("Could not get auth credentials %v", err)
 	}
 	remoteAttestation := contactsDiscovery.RemoteAttestation{}
 	attestations, err := remoteAttestation.GetAndVerifyMultiRemoteAttestation(CDS_MRENCLAVE,
 		authCredentials.AsBasic(),
 	)
-	log.Debugln(attestations)
+	log.Debugln("assestations", attestations, err)
 	// List<String> addressBook = new ArrayList<>(e164numbers.size());
 
 	// for (String e164number : e164numbers) {

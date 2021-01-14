@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	axolotl "github.com/signal-golang/textsecure/axolotl"
+	textsecureCrypto "github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/transport"
 
 	log "github.com/sirupsen/logrus"
@@ -22,18 +23,18 @@ type RemoteAttestationRequest struct {
 }
 
 type RemoteAttestationResponse struct {
-	ServerEphemeralPublic []byte
-	ServerStaticPublic    []byte
-	Quote                 []byte
-	Iv                    []byte
-	Ciphertext            []byte
-	Tag                   []byte
-	Signature             string
-	Certificates          string
-	SignatureBody         string
+	ServerEphemeralPublic []byte `json:"serverEphemeralPublic"`
+	ServerStaticPublic    []byte `json:"serverStaticPublic"`
+	Quote                 []byte `json:"quote"`
+	Iv                    []byte `json:"iv"`
+	Ciphertext            []byte `json:"ciphertext"`
+	Tag                   []byte `json:"tag"`
+	Signature             string `json:"signature"`
+	Certificates          string `json:"certificates"`
+	SignatureBody         string `json:"signatureBody"`
 }
 type MultiRemoteAttestationResponse struct {
-	Attestations []RemoteAttestationResponse
+	Attestations map[string]*RemoteAttestationResponse `json:"attestations"`
 }
 type RemoteAttestationKeys struct {
 	ClientKey []byte
@@ -44,7 +45,8 @@ func (r *RemoteAttestation) GetAndVerifyMultiRemoteAttestation(
 	// PushServiceSocket.ClientSet clientSet,
 	// KeyStore iasKeyStore,
 	enclaveName string,
-	authorization string) ([]RemoteAttestation, error) {
+	authorization string) ([]*RemoteAttestation, error) {
+	log.Debugln("[textsecure] GetAndVerifyMultiRemoteAttestation")
 
 	keyPair := axolotl.NewECKeyPair()
 	publicKey := keyPair.PublicKey.Key()
@@ -57,7 +59,6 @@ func (r *RemoteAttestation) GetAndVerifyMultiRemoteAttestation(
 		return nil, err
 	}
 
-	log.Debugln(string(body))
 	resp, err := transport.DirectoryTransport.PutJSONWithAuth(
 		fmt.Sprintf(REMOTE_ATTESTATION_REQUEST, enclaveName),
 		body,
@@ -65,40 +66,48 @@ func (r *RemoteAttestation) GetAndVerifyMultiRemoteAttestation(
 	)
 	multiRemoteAttestationResponse := &MultiRemoteAttestationResponse{}
 	dec := json.NewDecoder(resp.Body)
+	log.Debugln(resp)
 
 	err = dec.Decode(&multiRemoteAttestationResponse)
 	if err != nil {
 		return nil, err
 	}
-	log.Debugln(resp, err)
 	if len(multiRemoteAttestationResponse.Attestations) < 1 || len(multiRemoteAttestationResponse.Attestations) > 3 {
 		return nil, fmt.Errorf("Incorrect number of attestations: " + string(len(multiRemoteAttestationResponse.Attestations)))
 	}
-	assestations := []RemoteAttestation{}
+	assestations := []*RemoteAttestation{}
 
 	for _, remoteAttestationResponse := range multiRemoteAttestationResponse.Attestations {
-		assestations = append(assestations, validateAndBuildRemoteAttestation(remoteAttestationResponse,
+		assestation, err := validateAndBuildRemoteAttestation(remoteAttestationResponse,
 			resp.Cookies,
 			// KeyStore, -> Android secret iaskeystore
 			keyPair,
 			enclaveName,
-		),
 		)
+		if err != nil {
+			log.Debugln(err)
+		} else {
+			assestations = append(assestations, assestation)
+
+		}
 	}
 
-	return nil, nil
+	return assestations, nil
 }
 
 func validateAndBuildRemoteAttestation(
-	remoteAttestation RemoteAttestationResponse,
+	remoteAttestation *RemoteAttestationResponse,
 	cookies []string,
 	// keystore,
 	keyPair *axolotl.ECKeyPair,
 	enclaveName string,
-) RemoteAttestation {
+) (*RemoteAttestation, error) {
 	keys := remoteAttestationKeys(keyPair, remoteAttestation.ServerEphemeralPublic, remoteAttestation.ServerStaticPublic)
-	requestId := getRequestId(keys, remoteAttestation)
-
+	requestId, err := getRequestId(keys, remoteAttestation)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugln("[textsecure] requestId", requestId)
 	// Quote                 quote     = new Quote(response.getQuote()); -> quote.go -> not necessary if we strip the verification
 
 	// byte[]                requestId = RemoteAttestationCipher.getRequestId(keys, response);
@@ -106,16 +115,12 @@ func validateAndBuildRemoteAttestation(
 	// RemoteAttestationCipher.verifyServerQuote(quote, response.getServerStaticPublic(), mrenclave);
 
 	// RemoteAttestationCipher.verifyIasSignature(iasKeyStore, response.getCertificates(), response.getSignatureBody(), response.getSignature(), quote);
-	return RemoteAttestation{
+	return &RemoteAttestation{
 		Keys: keys,
 		// Quote:,
 		RequestId: requestId,
-	}
+	}, nil
 
-}
-func getRequestId(keys RemoteAttestationKeys, response RemoteAttestationResponse) []byte {
-	// return AESCipher.decrypt(keys.ServerKey, response.Iv, response.Ciphertext, response.Tag)
-	return []byte{}
 }
 
 // static byte[] decrypt(byte[] key, byte[] iv, byte[] ciphertext, byte[] tag) throws InvalidCiphertextException {
@@ -130,20 +135,36 @@ func getRequestId(keys RemoteAttestationKeys, response RemoteAttestationResponse
 //       throw new InvalidCiphertextException(e);
 //     }
 //   }
-func remoteAttestationKeys(keyPair *axolotl.ECKeyPair, serverPublicEphemerl []byte, serverPublicStatic []byte) RemoteAttestationKeys {
+func remoteAttestationKeys(keyPair *axolotl.ECKeyPair, serverPublicEphemarl []byte, serverPublicStatic []byte) RemoteAttestationKeys {
+
 	// public RemoteAttestationKeys(ECKeyPair keyPair, byte[] serverPublicEphemeral, byte[] serverPublicStatic) throws InvalidKeyException {
 	//     byte[] ephemeralToEphemeral = Curve.calculateAgreement(ECPublicKey.fromPublicKeyBytes(serverPublicEphemeral), keyPair.getPrivateKey());
+	//-> Curve.calculateAgreement is missing in our tool
 	//     byte[] ephemeralToStatic    = Curve.calculateAgreement(ECPublicKey.fromPublicKeyBytes(serverPublicStatic), keyPair.getPrivateKey());
-
 	//     byte[] masterSecret = ByteUtil.combine(ephemeralToEphemeral, ephemeralToStatic                          );
+	masterSecret := []byte{}
 	//     byte[] publicKeys   = ByteUtil.combine(keyPair.getPublicKey().getPublicKeyBytes(), serverPublicEphemeral, serverPublicStatic);
+	publicKeys := append(append(keyPair.PublicKey.Key()[:], serverPublicEphemarl...), serverPublicStatic...)
 
 	//     HKDFv3 generator = new HKDFv3();
+
+	// keys, err := textsecureCrypto.HKDFderiveSecrets(masterSecret, publicKeys, len()+len())
 	//     byte[] keys      = generator.deriveSecrets(masterSecret, publicKeys, null, clientKey.length + serverKey.length);
 
 	//     System.arraycopy(keys, 0, clientKey, 0, clientKey.length);
 	//     System.arraycopy(keys, clientKey.length, serverKey, 0, serverKey.length);
 
-	return RemoteAttestationKeys{}
+	return RemoteAttestationKeys{
+		ClientKey: []byte{},
+		ServerKey: []byte{},
+	}
+
+}
+
+func getRequestId(keys RemoteAttestationKeys, response *RemoteAttestationResponse) ([]byte, error) {
+	log.Debugln(keys.ServerKey)
+	return textsecureCrypto.AesgcmDecrypt(keys.ServerKey, response.Iv, append(response.Ciphertext, response.Tag...))
+
+	// return AESCipher.decrypt(keys.ServerKey, response.Iv, response.Ciphertext, response.Tag)
 
 }

@@ -1,4 +1,4 @@
-package contactssDiscovery
+package contactsDiscovery
 
 // package org.whispersystems.signalservice.internal.contacts.crypto;
 
