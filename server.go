@@ -550,40 +550,41 @@ func GetRegisteredContacts() ([]Contact, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get local contacts :%s", err)
 	}
-	tokens := make([]string, len(lc))
-	m := make(map[string]Contact)
-	// todo deduplicate contacts
-	for i, c := range lc {
-		t := telToToken(c.Tel)
-		tokens[i] = t
-		m[t] = c
-	}
+	// disable contact discovery for now
+	// tokens := make([]string, len(lc))
+	// m := make(map[string]Contact)
+	// // todo deduplicate contacts
+	// for i, c := range lc {
+	// 	t := telToToken(c.Tel)
+	// 	tokens[i] = t
+	// 	m[t] = c
+	// }
 
-	contacts := make(map[string][]string)
-	contacts["contacts"] = tokens
-	body, err := json.MarshalIndent(contacts, "", "    ")
-	if err != nil {
-		return nil, err
-	}
-	resp, err := transport.putJSON(DIRECTORY_TOKENS_PATH, body)
-	// // TODO: breaks when there is no internet
-	if resp != nil && resp.Status == 413 {
-		log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
-		return nil, errors.New("Refreshing contacts: rate limit exceeded: 413")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if resp.isError() {
-		return nil, resp
-	}
-	dec := json.NewDecoder(resp.Body)
-	var jc jsonContacts
-	dec.Decode(&jc)
-	lc = make([]Contact, len(jc.Contacts))
-	for i, c := range jc.Contacts {
-		lc[i] = m[c.Token]
-	}
+	// contacts := make(map[string][]string)
+	// contacts["contacts"] = tokens
+	// body, err := json.MarshalIndent(contacts, "", "    ")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// resp, err := transport.putJSON(DIRECTORY_TOKENS_PATH, body)
+	// // // TODO: breaks when there is no internet
+	// if resp != nil && resp.Status == 413 {
+	// 	log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
+	// 	return nil, errors.New("Refreshing contacts: rate limit exceeded: 413")
+	// }
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if resp.isError() {
+	// 	return nil, resp
+	// }
+	// dec := json.NewDecoder(resp.Body)
+	// var jc jsonContacts
+	// dec.Decode(&jc)
+	// lc = make([]Contact, len(jc.Contacts))
+	// for i, c := range jc.Contacts {
+	// 	lc[i] = m[c.Token]
+	// }
 	return lc, nil
 }
 
