@@ -466,42 +466,9 @@ type jsonContact struct {
 func GetRegisteredContacts() ([]Contact, error) {
 	lc, err := client.GetLocalContacts()
 	if err != nil {
-		return nil, fmt.Errorf("could not get local contacts :%s\n", err)
+		return nil, fmt.Errorf("could not get local contacts :%s", err)
 	}
-	tokens := make([]string, len(lc))
-	m := make(map[string]Contact)
-	for i, c := range lc {
-		t := telToToken(c.Tel)
-		tokens[i] = t
-		m[t] = c
-	}
-
-	contacts := make(map[string][]string)
-	contacts["contacts"] = tokens
-	body, err := json.MarshalIndent(contacts, "", "    ")
-	if err != nil {
-		return nil, err
-	}
-	resp, err := transport.putJSON(directoryTokensPath, body)
-	// // TODO: breaks when there is no internet
-	if resp != nil && resp.Status == 413 {
-		log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
-		return nil, errors.New("Rate limit exceeded: 413")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if resp.isError() {
-		return nil, resp
-	}
-	dec := json.NewDecoder(resp.Body)
-	var jc map[string][]jsonContact
-	dec.Decode(&jc)
-
-	lc = make([]Contact, len(jc["contacts"]))
-	for i, c := range jc["contacts"] {
-		lc[i] = m[c.Token]
-	}
+	// TODO Contact discovery changed on Signal side, so we are doing it anymore. Here should go the call to the new discovery method
 	return lc, nil
 }
 
