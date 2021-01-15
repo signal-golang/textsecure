@@ -5,6 +5,7 @@
  */
 syntax = "proto3";
 
+option go_package = ".;signalservice";
 option java_package = "org.signal.protos.resumableuploads";
 
 message ResumableUpload {

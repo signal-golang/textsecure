@@ -5,7 +5,7 @@
  */
 syntax = "proto3";
 
-option go_package = "signalservice";
+option go_package = ".;signalservice";
 option java_package        = "org.signal.storageservice.protos.groups";
 option java_multiple_files = true;
 
@@ -210,4 +210,8 @@ message GroupJoinInfo {
   AccessControl.AccessRequired addFromInviteLink    = 5;
   uint32                       revision             = 6;
   bool                         pendingAdminApproval = 7;
+}
+
+message GroupExternalCredential {
+  string token = 1;
 }
