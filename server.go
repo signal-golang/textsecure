@@ -720,6 +720,9 @@ func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, erro
 }
 
 func buildMessage(reciever string, paddedMessage []byte, devices []uint32, isSync bool) ([]jsonMessage, error) {
+	if len(reciever) == 0 {
+		return nil, fmt.Errorf("empty reciever")
+	}
 	recid := recID(reciever)
 	messages := []jsonMessage{}
 
