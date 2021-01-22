@@ -898,7 +898,7 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 
 // TODO switch to uuids
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
-	log.Debugln("[textsecure] sendSyncMessage", sm.Request)
+	log.Debugln("[textsecure] sendSyncMessage ", timestamp)
 	user := config.Tel
 	if config.UUID != "" {
 		user = config.UUID
