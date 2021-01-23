@@ -10,6 +10,8 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+
+	"github.com/signal-golang/textsecure/contactsDiscovery"
 )
 
 type QueryEnvelope struct {
@@ -38,7 +40,7 @@ type RemoteAttestationKeys struct {
 	ServerKey []byte
 }
 
-func CreateDiscoveryRequest(addressBook []string, remoteAttestations map[string]*RemoteAttestation) (*DiscoveryRequest, error) {
+func CreateDiscoveryRequest(addressBook []string, remoteAttestations map[string]*contactsDiscovery.RemoteAttestation) (*DiscoveryRequest, error) {
 	queryDataKey, err := getRandomBytes(32)
 	if err != nil {
 		return nil, err
@@ -112,7 +114,7 @@ func toLong(a []byte) int64 {
 	return int64(binary.BigEndian.Uint64(a))
 }
 
-func buildQueryEnvelopeFromAttestation(attestation *RemoteAttestation, queryDataKey []byte) (*QueryEnvelope, error) {
+func buildQueryEnvelopeFromAttestation(attestation *contactsDiscovery.RemoteAttestation, queryDataKey []byte) (*QueryEnvelope, error) {
 	return buildQueryEnvelope(attestation.RequestId, attestation.Keys.ClientKey, queryDataKey)
 }
 
@@ -162,7 +164,7 @@ func hashSha256(queryData []byte) []byte {
 	return hash[:]
 }
 
-func GetDiscoveryResponseData(response DiscoveryResponse, remoteAttestations []RemoteAttestation) ([]byte, error) {
+func GetDiscoveryResponseData(response DiscoveryResponse, remoteAttestations []contactsDiscovery.RemoteAttestation) ([]byte, error) {
 	for _, attestation := range remoteAttestations {
 		if bytes.Equal(response.RequestId, attestation.RequestId) {
 			return aesDecrypt(attestation.Keys.ServerKey, response.iv, response.data, response.mac, nil)

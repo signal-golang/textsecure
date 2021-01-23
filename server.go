@@ -589,8 +589,8 @@ func GetRegisteredContacts() ([]Contact, error) {
 	attestations, err := remoteAttestation.GetAndVerifyMultiRemoteAttestation(CDS_MRENCLAVE,
 		authCredentials.AsBasic(),
 	)
-	request := contactDiscoveryCrypto.CreateDiscoveryRequest(remoteAttestation)
-	log.Debugln("assestations", attestations, err)
+	request, err := contactDiscoveryCrypto.CreateDiscoveryRequest(tokens, attestations)
+	log.Debugln("assestations", request, err)
 	// List<String> addressBook = new ArrayList<>(e164numbers.size());
 
 	// for (String e164number : e164numbers) {
