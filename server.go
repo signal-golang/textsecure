@@ -703,6 +703,7 @@ func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
 	dec := json.NewDecoder(resp.Body)
 	k := &preKeyResponse{}
 	dec.Decode(k)
+
 	return k, nil
 }
 
@@ -884,14 +885,17 @@ func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, erro
 	}
 
 	d := pkr.Devices[0]
-
+	preKeyId := uint32(0)
+	var preKey *axolotl.ECPublicKey
 	if d.PreKey == nil {
-		return nil, fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID)
-	}
-
-	decPK, err := decodeKey(d.PreKey.PublicKey)
-	if err != nil {
-		return nil, err
+		log.Debugln(fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID))
+	} else {
+		preKeyId = d.PreKey.ID
+		decPK, err := decodeKey(d.PreKey.PublicKey)
+		preKey = axolotl.NewECPublicKey(decPK)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if d.SignedPreKey == nil {
@@ -914,8 +918,8 @@ func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, erro
 	}
 
 	pkb, err := axolotl.NewPreKeyBundle(
-		d.RegistrationID, d.DeviceID, d.PreKey.ID,
-		axolotl.NewECPublicKey(decPK), int32(d.SignedPreKey.ID), axolotl.NewECPublicKey(decSPK),
+		d.RegistrationID, d.DeviceID, preKeyId,
+		preKey, int32(d.SignedPreKey.ID), axolotl.NewECPublicKey(decSPK),
 		decSig, axolotl.NewIdentityKey(decIK))
 	if err != nil {
 		return nil, err
@@ -925,6 +929,9 @@ func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, erro
 }
 
 func buildMessage(reciever string, paddedMessage []byte, devices []uint32, isSync bool) ([]jsonMessage, error) {
+	if len(reciever) == 0 {
+		return nil, fmt.Errorf("empty reciever")
+	}
 	recid := recID(reciever)
 	messages := []jsonMessage{}
 
@@ -1100,7 +1107,7 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 
 // TODO switch to uuids
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
-	log.Debugln("[textsecure] sendSyncMessage", sm.Request.Type)
+	log.Debugln("[textsecure] sendSyncMessage ", timestamp)
 	user := config.Tel
 	if config.UUID != "" {
 		user = config.UUID
