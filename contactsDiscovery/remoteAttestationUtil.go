@@ -110,8 +110,6 @@ func validateAndBuildRemoteAttestation(
 	log.Debugln("[textsecure] requestId", requestId)
 	// Quote                 quote     = new Quote(response.getQuote()); -> quote.go -> not necessary if we strip the verification
 
-	// byte[]                requestId = RemoteAttestationCipher.getRequestId(keys, response);
-
 	// RemoteAttestationCipher.verifyServerQuote(quote, response.getServerStaticPublic(), mrenclave);
 
 	// RemoteAttestationCipher.verifyIasSignature(iasKeyStore, response.getCertificates(), response.getSignatureBody(), response.getSignature(), quote);
@@ -145,6 +143,7 @@ func remoteAttestationKeys(keyPair *axolotl.ECKeyPair, serverPublicEphemarl []by
 	masterSecret := []byte{}
 	//     byte[] publicKeys   = ByteUtil.combine(keyPair.getPublicKey().getPublicKeyBytes(), serverPublicEphemeral, serverPublicStatic);
 	publicKeys := append(append(keyPair.PublicKey.Key()[:], serverPublicEphemarl...), serverPublicStatic...)
+	log.Debugln(masterSecret, publicKeys)
 
 	//     HKDFv3 generator = new HKDFv3();
 
@@ -164,7 +163,4 @@ func remoteAttestationKeys(keyPair *axolotl.ECKeyPair, serverPublicEphemarl []by
 func getRequestId(keys RemoteAttestationKeys, response *RemoteAttestationResponse) ([]byte, error) {
 	log.Debugln(keys.ServerKey)
 	return textsecureCrypto.AesgcmDecrypt(keys.ServerKey, response.Iv, append(response.Ciphertext, response.Tag...))
-
-	// return AESCipher.decrypt(keys.ServerKey, response.Iv, response.Ciphertext, response.Tag)
-
 }

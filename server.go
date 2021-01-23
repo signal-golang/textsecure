@@ -19,6 +19,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/transport"
@@ -588,6 +589,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	attestations, err := remoteAttestation.GetAndVerifyMultiRemoteAttestation(CDS_MRENCLAVE,
 		authCredentials.AsBasic(),
 	)
+	request := contactDiscoveryCrypto.CreateDiscoveryRequest(remoteAttestation)
 	log.Debugln("assestations", attestations, err)
 	// List<String> addressBook = new ArrayList<>(e164numbers.size());
 
