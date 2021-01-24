@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/signal-golang/textsecure/rootCa"
@@ -44,7 +43,7 @@ func SetupDirectoryTransporter(Url string, tel string, password string, userAgen
 type response struct {
 	Status  int
 	Body    io.ReadCloser
-	Cookies []string
+	Cookies string
 }
 
 func (r *response) IsError() bool {
@@ -130,7 +129,7 @@ func (ht *httpTransporter) Get(url string) (*response, error) {
 		r.Body = resp.Body
 	}
 
-	log.Debugf("GET %s %d\n", url, r.Status, r)
+	log.Debugf("GET %s %d\n", url, r.Status)
 
 	return r, err
 }
@@ -170,7 +169,6 @@ func (ht *httpTransporter) Put(url string, body []byte, ct string) (*response, e
 	}
 	req.Header.Add("Content-Type", ct)
 	req.SetBasicAuth(ht.user, ht.pass)
-	log.Debugln("hey", req)
 	resp, err := ht.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -186,7 +184,6 @@ func (ht *httpTransporter) Put(url string, body []byte, ct string) (*response, e
 	return r, err
 }
 func (ht *httpTransporter) PutWithAuth(url string, body []byte, ct string, auth string) (*response, error) {
-	log.Debugln(auth)
 	br := bytes.NewReader(body)
 	req, err := http.NewRequest("PUT", ht.baseURL+url, br)
 	if err != nil {
@@ -195,35 +192,62 @@ func (ht *httpTransporter) PutWithAuth(url string, body []byte, ct string, auth 
 	if ht.userAgent != "" {
 		req.Header.Set("X-Signal-Agent", ht.userAgent)
 	}
-	log.Debugln(req.Header.Get("Authorization"))
 	req.Header.Get("Authorization")
 	req.Header.Add("Content-Type", ct)
 	req.Header.Set("Authorization", auth)
-	log.Debugln(req.Header.Get("Authorization"))
-	fmt.Printf("%+v\n", req)
 	resp, err := ht.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	cookies := resp.Header.Get("Set-Cookie")
-
 	r := &response{}
 	if resp != nil {
 		r.Status = resp.StatusCode
 		r.Body = resp.Body
-		r.Cookies = strings.Split(cookies, ";")
+		r.Cookies = cookies
 	}
 
 	log.Debugf("[textsecure] PUT %s %d\n", url, r.Status)
 
 	return r, err
 }
+func (ht *httpTransporter) PutWithAuthCookies(url string, body []byte, ct string, auth string, cookies string) (*response, error) {
+	br := bytes.NewReader(body)
+	req, err := http.NewRequest("PUT", ht.baseURL+url, br)
+	if err != nil {
+		return nil, err
+	}
+	if ht.userAgent != "" {
+		req.Header.Set("X-Signal-Agent", ht.userAgent)
+	}
 
+	req.Header.Add("Cookie", cookies)
+	req.Header.Get("Authorization")
+	req.Header.Add("Content-Type", ct)
+	req.Header.Set("Authorization", auth)
+
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+	}
+
+	log.Debugf("[textsecure] PUT with auth & cookoie %s %d \n", url, r.Status)
+
+	return r, err
+}
 func (ht *httpTransporter) PutJSON(url string, body []byte) (*response, error) {
 	return ht.Put(url, body, "application/json")
 }
 func (ht *httpTransporter) PutJSONWithAuth(url string, body []byte, auth string) (*response, error) {
 	return ht.PutWithAuth(url, body, "application/json; charset=utf-8", auth)
+}
+func (ht *httpTransporter) PutJSONWithAuthCookies(url string, body []byte, auth string, cookies string) (*response, error) {
+	return ht.PutWithAuthCookies(url, body, "application/json; charset=utf-8", auth, cookies)
 }
 func (ht *httpTransporter) PutBinary(url string, body []byte) (*response, error) {
 	return ht.Put(url, body, "application/octet-stream")

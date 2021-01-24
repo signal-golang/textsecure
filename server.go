@@ -101,6 +101,8 @@ var (
 
 	SERVER_DELIVERED_TIMESTAMP_HEADER = "X-Signal-Timestamp"
 	CDS_MRENCLAVE                     = "c98e00a4e3ff977a56afefe7362a27e4961e4f19e211febfbb19b897e6b80b15"
+
+	CONTACT_DISCOVERY = "/v1/discovery/%s"
 )
 
 // RegistrationInfo holds the data required to be identified by and
@@ -548,8 +550,7 @@ func getCredendtails(path string) (*AuthCredentials, error) {
 	dec := json.NewDecoder(resp.Body)
 	var a AuthCredentials
 	dec.Decode(&a)
-	fmt.Printf("%+v\n", a)
-	log.Debugln("[textsecure] getCredentials ", path, a)
+	log.Debugln("[textsecure] getCredentials ")
 	return &a, nil
 
 }
@@ -564,9 +565,35 @@ type jsonContacts struct {
 	Contacts []jsonContact `json:"contacts"`
 }
 
+func getContactDiscoveryRegisteredUsers(authorization string, request *contactDiscoveryCrypto.DiscoveryRequest, cookies string, mrenclave string) (*contactDiscoveryCrypto.DiscoveryResponse, error) {
+	log.Debugln("[textsecure] getContactDiscoveryRegisteredUser")
+	body, err := json.Marshal(*request)
+
+	if err != nil {
+		return nil, err
+	}
+	resp, err := transport.DirectoryTransport.PutJSONWithAuthCookies(
+		fmt.Sprintf(CONTACT_DISCOVERY, mrenclave),
+		body,
+		authorization,
+		cookies,
+	)
+	if err != nil {
+		return nil, err
+	}
+	discoveryResponse := &contactDiscoveryCrypto.DiscoveryResponse{}
+	dec := json.NewDecoder(resp.Body)
+	log.Debugln("[textsecure] GetAndVerifyMultiRemoteAttestation resp")
+	err = dec.Decode(&discoveryResponse)
+	if err != nil {
+		return nil, err
+	}
+	return discoveryResponse, nil
+	// return nil, fmt.Errorf("fail")
+}
+
 // GetRegisteredContacts returns the subset of the local contacts
 // that are also registered with the server
-
 func GetRegisteredContacts() ([]Contact, error) {
 	lc, err := client.GetLocalContacts()
 	if err != nil {
@@ -576,7 +603,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	m := make(map[string]Contact)
 	// todo deduplicate contacts
 	for i, c := range lc {
-		t := telToToken(c.Tel)
+		t := c.Tel
 		tokens[i] = t
 		m[t] = c
 	}
@@ -589,57 +616,30 @@ func GetRegisteredContacts() ([]Contact, error) {
 	attestations, err := remoteAttestation.GetAndVerifyMultiRemoteAttestation(CDS_MRENCLAVE,
 		authCredentials.AsBasic(),
 	)
+	log.Debugln("[textsecure] GetRegisteredContacts assestations")
 	request, err := contactDiscoveryCrypto.CreateDiscoveryRequest(tokens, attestations)
-	log.Debugln("assestations", request, err)
-	// List<String> addressBook = new ArrayList<>(e164numbers.size());
+	if err != nil {
+		return nil, fmt.Errorf("Could not get create createDiscoveryRequest %v", err)
+	}
+	log.Debugln("[textsecure] GetRegisteredContacts contactDiscoveryRequest")
 
-	// for (String e164number : e164numbers) {
-	//   addressBook.add(e164number.substring(1));
-	// }
+	response, err := getContactDiscoveryRegisteredUsers(authCredentials.AsBasic(), request, remoteAttestation.Cookies, CDS_MRENCLAVE)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get get ContactDiscovery %v", err)
+	}
 
-	// List<String>      cookies  = attestations.values().iterator().next().getCookies();
-	// DiscoveryRequest  request  = ContactDiscoveryCipher.createDiscoveryRequest(addressBook, attestations);
-	// DiscoveryResponse response = this.pushServiceSocket.getContactDiscoveryRegisteredUsers(authorization, request, cookies, mrenclave);
-	// byte[]            data     = ContactDiscoveryCipher.getDiscoveryResponseData(response, attestations.values());
+	responseData, err := contactDiscoveryCrypto.GetDiscoveryResponseData(*response, attestations)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get get ContactDiscovery data %v", err)
+	}
+	idToHex(responseData)
 
-	// HashMap<String, UUID> results         = new HashMap<>(addressBook.size());
-	// DataInputStream       uuidInputStream = new DataInputStream(new ByteArrayInputStream(data));
+	uuidlength := 16
+	for i, _ := range lc {
+		lc[i].UUID = idToHex(responseData[i*uuidlength : (i+1)*uuidlength])
+	}
 
-	// for (String candidate : addressBook) {
-	//   long candidateUuidHigh = uuidInputStream.readLong();
-	//   long candidateUuidLow  = uuidInputStream.readLong();
-	//   if (candidateUuidHigh != 0 || candidateUuidLow != 0) {
-	// 	results.put('+' + candidate, new UUID(candidateUuidHigh, candidateUuidLow));
-	//   }
-	// }
-	return nil, nil
-	// contacts := make(map[string][]string)
-	// contacts["contacts"] = tokens
-	// body, err := json.MarshalIndent(contacts, "", "    ")
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// // resp, err := transport.Transport.PutJSON(DIRECTORY_TOKENS_PATH, body)
-	// // // TODO: breaks when there is no internet
-	// if resp != nil && resp.Status == 413 {
-	// 	log.Println("[textsecure] Rate limit exceeded while refreshing contacts: 413")
-	// 	return nil, errors.New("Rate limit exceeded: 413")
-	// }
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if resp.IsError() {
-	// 	return nil, resp
-	// }
-	// dec := json.NewDecoder(resp.Body)
-	// var jc map[string][]jsonContact
-	// dec.Decode(&jc)
-
-	// lc = make([]Contact, len(jc["contacts"]))
-	// for i, c := range jc["contacts"] {
-	// 	lc[i] = m[c.Token]
-	// }
-	// return lc, nil
+	return lc, nil
 }
 
 // Attachment handling

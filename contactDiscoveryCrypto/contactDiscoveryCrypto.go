@@ -15,18 +15,18 @@ import (
 )
 
 type QueryEnvelope struct {
-	requestId,
-	iv,
-	data,
-	mac []byte
+	Data      []byte `json:"data"`
+	Iv        []byte `json:"iv"`
+	Mac       []byte `json:"mac"`
+	RequestId []byte `json:"requestId"`
 }
 type DiscoveryRequest struct {
-	addressCount int
-	commitment,
-	iv,
-	data,
-	mac []byte
-	envelopes map[string]*QueryEnvelope
+	AddressCount int                       `json:"addressCount"`
+	Commitment   []byte                    `json:"commitment"`
+	Data         []byte                    `json:"data"`
+	Envelopes    map[string]*QueryEnvelope `json:"envelopes"`
+	Iv           []byte                    `json:"iv"`
+	Mac          []byte                    `json:"mac"`
 }
 
 //copied from nanu_c
@@ -63,12 +63,12 @@ func CreateDiscoveryRequest(addressBook []string, remoteAttestations map[string]
 	}
 
 	return &DiscoveryRequest{
-		len(addressBook),
-		commitment,
-		encryptedQueryData.iv,
-		encryptedQueryData.data,
-		encryptedQueryData.mac,
-		envelopes}, nil
+		AddressCount: len(addressBook),
+		Commitment:   commitment,
+		Data:         encryptedQueryData.data,
+		Envelopes:    envelopes,
+		Iv:           encryptedQueryData.iv,
+		Mac:          encryptedQueryData.mac}, nil
 }
 
 func getRandomBytes(length int) ([]byte, error) {
@@ -123,7 +123,12 @@ func buildQueryEnvelope(requestId, clientKey, queryDataKey []byte) (*QueryEnvelo
 	if err != nil {
 		return nil, err
 	}
-	return &QueryEnvelope{requestId, result.iv, result.data, result.mac}, nil
+	return &QueryEnvelope{
+		Data:      result.data,
+		Mac:       result.mac,
+		Iv:        result.iv,
+		RequestId: requestId,
+	}, nil
 }
 
 type AESEncryptedResult struct {
@@ -164,10 +169,10 @@ func hashSha256(queryData []byte) []byte {
 	return hash[:]
 }
 
-func GetDiscoveryResponseData(response DiscoveryResponse, remoteAttestations []contactsDiscovery.RemoteAttestation) ([]byte, error) {
+func GetDiscoveryResponseData(response DiscoveryResponse, remoteAttestations map[string]*contactsDiscovery.RemoteAttestation) ([]byte, error) {
 	for _, attestation := range remoteAttestations {
 		if bytes.Equal(response.RequestId, attestation.RequestId) {
-			return aesDecrypt(attestation.Keys.ServerKey, response.iv, response.data, response.mac, nil)
+			return aesDecrypt(attestation.Keys.ServerKey, response.Iv, response.Data, response.Mac, nil)
 		}
 	}
 
@@ -175,10 +180,10 @@ func GetDiscoveryResponseData(response DiscoveryResponse, remoteAttestations []c
 }
 
 type DiscoveryResponse struct {
-	RequestId,
-	iv,
-	data,
-	mac []byte
+	Data      []byte `json:"data"`
+	Iv        []byte `json:"iv"`
+	Mac       []byte `json:"mac"`
+	RequestId []byte `json:"requestId"`
 }
 
 func aesDecrypt(key, nonce, data, mac, aad []byte) ([]byte, error) {
