@@ -638,6 +638,17 @@ func GetRegisteredContacts() ([]Contact, error) {
 	for i, _ := range lc {
 		lc[i].UUID = idToHex(responseData[i*uuidlength : (i+1)*uuidlength])
 	}
+	WriteContactsToPath()
+
+	for _, c := range lc {
+		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
+			contacts[c.UUID] = c
+
+		} else {
+			contacts[c.Tel] = c
+			log.Debugln("[textsecure] empty uuid for tel ", c.Tel)
+		}
+	}
 
 	return lc, nil
 }
@@ -869,6 +880,7 @@ var ErrRemoteGone = errors.New("the remote device is gone (probably reinstalled)
 var deviceLists = map[string][]uint32{}
 
 func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timestamp *uint64) (*sendMessageResponse, error) {
+
 	bm, err := buildMessage(uuid, paddedMessage, deviceLists[uuid], isSync)
 	if err != nil {
 		return nil, err
@@ -953,12 +965,21 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	var e164 *string
+	var uuid *string
+
+	if msg.destination[0] == '+' {
+		e164 = &msg.destination
+	} else {
+		uuid = &msg.destination
+	}
 
 	if resp.NeedsSync {
 		log.Debugf("[textsecure] Needs sync. destination: %s", msg.destination)
 		sm := &signalservice.SyncMessage{
 			Sent: &signalservice.SyncMessage_Sent{
-				DestinationE164: &msg.destination,
+				DestinationE164: e164,
+				DestinationUuid: uuid,
 				Timestamp:       dm.Timestamp,
 				Message:         dm,
 			},
@@ -973,14 +994,13 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 			}).Error("Failed to send sync message")
 		}
 	}
-
 	return resp.Timestamp, err
 }
 
 // TODO switch to uuids
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
-	log.Debugln("[textsecure] sendSyncMessage", sm.Request.Type)
-	user := config.Tel
+	log.Debugln("[textsecure] sendSyncMessage", timestamp)
+	user := config.Tel //TODO: switch tu uuid
 	if config.UUID != "" {
 		user = config.UUID
 	}

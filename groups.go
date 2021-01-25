@@ -51,6 +51,7 @@ func idToPath(hexid string) string {
 
 // saveGroup stores a group's state in a file.
 func saveGroup(hexid string) error {
+	log.Debugln("[textsecure] save groupv1 ", hexid)
 	b, err := yaml.Marshal(groups[hexid])
 	if err != nil {
 		return err
@@ -338,6 +339,7 @@ func sendUpdate(g *Group) error {
 func newGroup(name string, members []string) (*Group, error) {
 	id := newGroupID()
 	hexid := idToHex(id)
+	log.Debugln("[textsecure] create new group v1 ", hexid)
 	groups[hexid] = &Group{
 		ID:      id,
 		Hexid:   hexid,

@@ -43,7 +43,12 @@ var (
 // ReadContacts reads a YAML contacts file
 func loadContacts(contactsYaml *yamlContacts) {
 	for _, c := range contactsYaml.Contacts {
-		contacts[c.UUID] = c
+		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
+			contacts[c.UUID] = c
+
+		} else {
+			contacts[c.Tel] = c
+		}
 	}
 }
 
