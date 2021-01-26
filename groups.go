@@ -243,7 +243,7 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 	for _, m := range g.Members {
 		if m != config.Tel {
 			c := GetContactForTel(m)
-			if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
+			if c != nil && c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
 				m = c.UUID
 			}
 			omsg := &outgoingMessage{
