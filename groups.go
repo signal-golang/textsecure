@@ -212,6 +212,14 @@ type groupMessage struct {
 	typ     signalservice.GroupContext_Type
 }
 
+func GetContactForTel(tel string) *Contact {
+	for _, c := range contacts {
+		if c.Tel == tel {
+			return &c
+		}
+	}
+	return nil
+}
 func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
 	var ts uint64
 	var err error
@@ -234,6 +242,10 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 	timestamp := uint64(time.Now().UnixNano() / 1000000)
 	for _, m := range g.Members {
 		if m != config.Tel {
+			c := GetContactForTel(m)
+			if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
+				m = c.UUID
+			}
 			omsg := &outgoingMessage{
 				destination: m,
 				msg:         msg,
