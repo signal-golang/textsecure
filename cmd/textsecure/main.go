@@ -577,7 +577,7 @@ func main() {
 		// If "to" matches a contact name then get its phone number, otherwise assume "to" is a phone number
 		for _, c := range contacts {
 			if strings.EqualFold(c.Name, to) {
-				to = c.Tel
+				to = c.UUID
 				break
 			}
 		}

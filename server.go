@@ -600,13 +600,18 @@ func GetRegisteredContacts() ([]Contact, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get local contacts :%s", err)
 	}
-	tokens := make([]string, len(lc))
-	m := make(map[string]Contact)
+	tokensMap := map[string]*string{}
+	tokens := []string{}
+	m := []Contact{}
 	// todo deduplicate contacts
-	for i, c := range lc {
+	for _, c := range lc {
 		t := c.Tel
-		tokens[i] = t
-		m[t] = c
+		if tokensMap[t] == nil {
+			m = append(m, c)
+			tokens = append(tokens, t)
+			tokensMap[t] = &t
+		}
+
 	}
 
 	authCredentials, err := getCredendtails(DIRECTORY_AUTH_PATH)
@@ -633,15 +638,18 @@ func GetRegisteredContacts() ([]Contact, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Could not get get ContactDiscovery data %v", err)
 	}
-	idToHex(responseData)
-
 	uuidlength := 16
-	for i, _ := range lc {
-		lc[i].UUID = idToHex(responseData[i*uuidlength : (i+1)*uuidlength])
-	}
-	WriteContactsToPath()
+	ind := 0
 
-	for _, c := range lc {
+	for i := range m {
+		m[i].UUID = idToHex(responseData[ind*uuidlength : (ind+1)*uuidlength])
+		ind++
+	}
+	lc = []Contact{}
+	contacts = map[string]Contact{}
+	for _, c := range m {
+		lc = append(lc, c)
+
 		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
 			contacts[c.UUID] = c
 
@@ -650,7 +658,11 @@ func GetRegisteredContacts() ([]Contact, error) {
 			log.Debugln("[textsecure] empty uuid for tel ", c.Tel)
 		}
 	}
+	err = WriteContactsToPath()
+	if err != nil {
+		log.Debugln("[textsecure] 3", err)
 
+	}
 	return lc, nil
 }
 
