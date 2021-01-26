@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -592,10 +593,19 @@ func getContactDiscoveryRegisteredUsers(authorization string, request *contactDi
 	return discoveryResponse, nil
 	// return nil, fmt.Errorf("fail")
 }
+func idToHexUUID(id []byte) string {
+	msb := id[:8]
+	lsb := id[8:]
+	msbHex := hex.EncodeToString(msb)
+	lsbHex := hex.EncodeToString(lsb)
+	return msbHex[:8] + "-" + msbHex[8:12] + "-" + msbHex[12:] + "-" + lsbHex[:4] + "-" + lsbHex[4:]
+}
 
 // GetRegisteredContacts returns the subset of the local contacts
 // that are also registered with the server
 func GetRegisteredContacts() ([]Contact, error) {
+	log.Debugln("[textsecure] GetRegisteredContacts")
+
 	lc, err := client.GetLocalContacts()
 	if err != nil {
 		return nil, fmt.Errorf("could not get local contacts :%s", err)
@@ -642,7 +652,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	ind := 0
 
 	for i := range m {
-		m[i].UUID = idToHex(responseData[ind*uuidlength : (ind+1)*uuidlength])
+		m[i].UUID = idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
 		ind++
 	}
 	lc = []Contact{}
