@@ -370,7 +370,6 @@ func RequestGroupInfo(g *Group) error {
 	log.Debugln("[textsecure] request group update", g.Hexid)
 	for _, m := range g.Members {
 		if m != config.Tel {
-			log.Debugln(m)
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{

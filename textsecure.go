@@ -366,7 +366,8 @@ func registerDevice() error {
 	}
 	client.RegistrationDone()
 	if client.RegistrationDone != nil {
-		fmt.Println("RegistrationDone__")
+		log.Infoln("[textsecure] RegistrationDone")
+
 		client.RegistrationDone()
 	}
 	return nil

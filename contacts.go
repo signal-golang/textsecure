@@ -126,7 +126,7 @@ func updateContact(c *signalservice.ContactDetails) error {
 		InboxPosition: c.GetInboxPosition(),
 		Archived:      c.GetArchived(),
 	}
-	log.Debugln(c.GetAvatar(), buf)
+	log.Debugln("[textsecure] avatar", c.GetAvatar(), buf)
 	return WriteContactsToPath()
 }
 

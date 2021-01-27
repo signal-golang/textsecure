@@ -139,25 +139,23 @@ func requestCode(tel, method string) (string, error) {
 	log.Infoln("[textsecure] request verification code for ", tel)
 	resp, err := transport.Transport.Get(fmt.Sprintf(createAccountPath, method, tel, "android"))
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Errorln("[textsecure] requestCode", err)
 		return "", err
 	}
 	if resp.IsError() {
 		if resp.Status == 402 {
-			log.Debugln(resp.Body)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
 			newStr := buf.String()
-			fmt.Printf(newStr)
+			log.Errorln("[textsecure] requestCode", newStr)
 			defer resp.Body.Close()
 
 			return "", errors.New("Need to solve captcha")
 		} else if resp.Status == 413 {
-			log.Debugln(resp.Body)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
 			newStr := buf.String()
-			log.Debugln(newStr)
+			log.Errorln("[textsecure] requestCode", newStr)
 			defer resp.Body.Close()
 
 			return "", errors.New("Rate Limit Exeded")
@@ -255,7 +253,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 	}
 	resp, err := transport.Transport.PutJSON(fmt.Sprintf(VERIFY_ACCOUNT_CODE_PATH, code), body)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Errorln("[textsecure] verifyCode", err)
 		return err, nil
 	}
 	if resp.IsError() {
@@ -264,11 +262,9 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
 			newStr := buf.String()
-			fmt.Printf(newStr)
+			log.Errorln("[textsecure] verifyCode", newStr)
 			v := RegistrationLockFailure{}
 			err := json.Unmarshal([]byte(newStr), &v)
-			log.Debugln("v", v)
-
 			if err != nil {
 				return err, nil
 			}
@@ -455,14 +451,14 @@ func GetProfileE164(tel string) (Contact, error) {
 
 	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, tel))
 	if err != nil {
-		log.Debugln(err)
+		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
 
 	profile := &Profile{}
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(&profile)
 	if err != nil {
-		log.Debugln(err)
+		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
 	avatar, _ := GetAvatar(profile.Avatar)
 	buf := new(bytes.Buffer)
@@ -471,7 +467,7 @@ func GetProfileE164(tel string) (Contact, error) {
 	c := contacts[profile.UUID]
 	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
 	if err != nil {
-		log.Debugln(err)
+		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
 	c.Username = profile.Username
 	c.UUID = profile.UUID
@@ -800,7 +796,7 @@ func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, erro
 	preKeyId := uint32(0)
 	var preKey *axolotl.ECPublicKey
 	if d.PreKey == nil {
-		log.Debugln(fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID))
+		log.Debugln("[textsecure] makePreKeyBundle", fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID))
 	} else {
 		preKeyId = d.PreKey.ID
 		decPK, err := decodeKey(d.PreKey.PublicKey)
