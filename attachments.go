@@ -16,6 +16,7 @@ import (
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/transport"
 )
 
 // getAttachment downloads an encrypted attachment blob from the given URL
@@ -45,7 +46,7 @@ func putAttachment(url string, body []byte) ([]byte, error) {
 	req.Header.Add("Content-Type", "application/octet-stream")
 	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
 
-	client := newHTTPClient()
+	client := transport.NewHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

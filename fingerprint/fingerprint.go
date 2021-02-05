@@ -56,7 +56,7 @@ func getFingerprint(iterations int, stableIdentifier []byte, identityKeys []axol
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.BigEndian, FINGERPRINT_VERSION)
 	if err != nil {
-		fmt.Println("binary.Write failed:", err)
+		fmt.Println("[textsecure] binary.Write failed:", err)
 	}
 	version := buf.Bytes()
 	startData := append(version, publicKey...)

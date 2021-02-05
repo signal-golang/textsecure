@@ -19,6 +19,10 @@ type ECPublicKey struct {
 	key [32]byte
 }
 
+func (pk ECPublicKey) GetKey() [32]byte {
+	return pk.key
+}
+
 const djbType = 5
 
 func ensureKeyLength(key []byte) {

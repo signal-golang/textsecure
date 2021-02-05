@@ -160,6 +160,11 @@ func calculateAgreement(result, theirPub, ourPriv *[32]byte) {
 	curve25519.ScalarMult(result, ourPriv, theirPub)
 }
 
+// CalculateAgreement
+func CalculateAgreement(result, theirPub, ourPriv *[32]byte) {
+	calculateAgreement(result, theirPub, ourPriv)
+}
+
 func initializeSenderSession(ss *sessionState, version byte, parameters aliceAxolotlParameters) error {
 	ss.setSessionVersion(uint32(version))
 	ss.setLocalIdentityPublic(&parameters.OurIdentityKey.PublicKey)

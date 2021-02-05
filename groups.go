@@ -51,6 +51,7 @@ func idToPath(hexid string) string {
 
 // saveGroup stores a group's state in a file.
 func saveGroup(hexid string) error {
+	log.Debugln("[textsecure] save groupv1 ", hexid)
 	b, err := yaml.Marshal(groups[hexid])
 	if err != nil {
 		return err
@@ -211,6 +212,14 @@ type groupMessage struct {
 	typ     signalservice.GroupContext_Type
 }
 
+func GetContactForTel(tel string) *Contact {
+	for _, c := range contacts {
+		if c.Tel == tel {
+			return &c
+		}
+	}
+	return nil
+}
 func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
 	var ts uint64
 	var err error
@@ -233,6 +242,10 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 	timestamp := uint64(time.Now().UnixNano() / 1000000)
 	for _, m := range g.Members {
 		if m != config.Tel {
+			c := GetContactForTel(m)
+			if c != nil && c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
+				m = c.UUID
+			}
 			omsg := &outgoingMessage{
 				destination: m,
 				msg:         msg,
@@ -338,6 +351,7 @@ func sendUpdate(g *Group) error {
 func newGroup(name string, members []string) (*Group, error) {
 	id := newGroupID()
 	hexid := idToHex(id)
+	log.Debugln("[textsecure] create new group v1 ", hexid)
 	groups[hexid] = &Group{
 		ID:      id,
 		Hexid:   hexid,
@@ -356,7 +370,6 @@ func RequestGroupInfo(g *Group) error {
 	log.Debugln("[textsecure] request group update", g.Hexid)
 	for _, m := range g.Members {
 		if m != config.Tel {
-			log.Debugln(m)
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{

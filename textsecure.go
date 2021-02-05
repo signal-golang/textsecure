@@ -20,6 +20,8 @@ import (
 
 	"github.com/signal-golang/textsecure/axolotl"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	rootCa "github.com/signal-golang/textsecure/rootCa"
+	transport "github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -307,8 +309,10 @@ func Setup(c *Client) error {
 		return err
 	}
 	client.RegistrationDone()
-	setupTransporter()
-	setupCDNTransporter()
+	rootCa.SetupCA(config.RootCA)
+	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
+	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
+	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	config = checkUUID(config)
@@ -322,7 +326,8 @@ func registerDevice() error {
 			return errors.New("empty phone number")
 		}
 	}
-	setupTransporter()
+	rootCa.SetupCA(config.RootCA)
+	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
 	code, err := requestCode(config.Tel, config.VerificationType)
 	if err != nil {
 		return err
@@ -361,7 +366,8 @@ func registerDevice() error {
 	}
 	client.RegistrationDone()
 	if client.RegistrationDone != nil {
-		fmt.Println("RegistrationDone__")
+		log.Infoln("[textsecure] RegistrationDone")
+
 		client.RegistrationDone()
 	}
 	return nil

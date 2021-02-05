@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,7 +20,11 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
+	"github.com/signal-golang/textsecure/contactsDiscovery"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/transport"
+	"golang.org/x/text/encoding/charmap"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -28,6 +33,7 @@ var (
 	SERVICE_REFLECTOR_HOST = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
 	SIGNAL_CDN_URL         = "https://cdn.signal.org"
 	SIGNAL_CDN2_URL        = "https://cdn2.signal.org"
+	DIRECTORY_URL          = "https://api.directory.signal.org"
 
 	createAccountPath = "/v1/accounts/%s/code/%s?client=%s"
 	// CREATE_ACCOUNT_SMS_PATH   = "/v1/accounts/sms/code/%s?client=%s";
@@ -95,6 +101,9 @@ var (
 	GROUPSV2_TOKEN          = "/v1/groups/token"
 
 	SERVER_DELIVERED_TIMESTAMP_HEADER = "X-Signal-Timestamp"
+	CDS_MRENCLAVE                     = "c98e00a4e3ff977a56afefe7362a27e4961e4f19e211febfbb19b897e6b80b15"
+
+	CONTACT_DISCOVERY = "/v1/discovery/%s"
 )
 
 // RegistrationInfo holds the data required to be identified by and
@@ -128,27 +137,25 @@ var registrationInfo RegistrationInfo
 
 func requestCode(tel, method string) (string, error) {
 	log.Infoln("[textsecure] request verification code for ", tel)
-	resp, err := transport.get(fmt.Sprintf(createAccountPath, method, tel, "android"))
+	resp, err := transport.Transport.Get(fmt.Sprintf(createAccountPath, method, tel, "android"))
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Errorln("[textsecure] requestCode", err)
 		return "", err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		if resp.Status == 402 {
-			log.Debugln(resp.Body)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
 			newStr := buf.String()
-			fmt.Printf(newStr)
+			log.Errorln("[textsecure] requestCode", newStr)
 			defer resp.Body.Close()
 
 			return "", errors.New("Need to solve captcha")
 		} else if resp.Status == 413 {
-			log.Debugln(resp.Body)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
 			newStr := buf.String()
-			log.Debugln(newStr)
+			log.Errorln("[textsecure] requestCode", newStr)
 			defer resp.Body.Close()
 
 			return "", errors.New("Rate Limit Exeded")
@@ -201,6 +208,15 @@ type AuthCredentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+func (a *AuthCredentials) AsBasic() string {
+	usernameAndPassword := a.Username + ":" + a.Password
+	dec := charmap.Windows1250.NewDecoder()
+	out, _ := dec.String(usernameAndPassword)
+	encoded := base64.StdEncoding.EncodeToString([]byte(out))
+	return "Basic " + encoded
+}
+
 type RegistrationLockFailure struct {
 	TimeRemaining uint32          `json:"timeRemaining"`
 	Credentials   AuthCredentials `json:"backupCredentials"`
@@ -235,22 +251,20 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 	if err != nil {
 		return err, nil
 	}
-	resp, err := transport.putJSON(fmt.Sprintf(VERIFY_ACCOUNT_CODE_PATH, code), body)
+	resp, err := transport.Transport.PutJSON(fmt.Sprintf(VERIFY_ACCOUNT_CODE_PATH, code), body)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Errorln("[textsecure] verifyCode", err)
 		return err, nil
 	}
-	if resp.isError() {
+	if resp.IsError() {
 
 		if resp.Status == 423 {
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
 			newStr := buf.String()
-			fmt.Printf(newStr)
+			log.Errorln("[textsecure] verifyCode", newStr)
 			v := RegistrationLockFailure{}
 			err := json.Unmarshal([]byte(newStr), &v)
-			log.Debugln("v", v)
-
 			if err != nil {
 				return err, nil
 			}
@@ -276,11 +290,11 @@ func RegisterWithUPS(token string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := transport.putJSON(registerUPSAccountPath, body)
+	resp, err := transport.Transport.PutJSON(registerUPSAccountPath, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -293,11 +307,11 @@ func SetAccountAttributes(attributes *AccountAttributes) error {
 	if err != nil {
 		return err
 	}
-	resp, err := transport.putJSON(SET_ACCOUNT_ATTRIBUTES, body)
+	resp, err := transport.Transport.PutJSON(SET_ACCOUNT_ATTRIBUTES, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -309,11 +323,11 @@ type whoAmIResponse struct {
 
 func GetMyUUID() (string, error) {
 	log.Debugln("[textsecure] get my uuid")
-	resp, err := transport.get(WHO_AM_I)
+	resp, err := transport.Transport.Get(WHO_AM_I)
 	if err != nil {
 		return "", err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return "", resp
 	}
 	dec := json.NewDecoder(resp.Body)
@@ -327,7 +341,7 @@ type jsonDeviceCode struct {
 }
 
 func getNewDeviceVerificationCode() (string, error) {
-	resp, err := transport.get(provisioningCodePath)
+	resp, err := transport.Transport.Get(provisioningCodePath)
 	if err != nil {
 		return "", err
 	}
@@ -351,7 +365,7 @@ func getLinkedDevices() ([]DeviceInfo, error) {
 
 	devices := &jsonDevices{}
 
-	resp, err := transport.get(fmt.Sprintf(devicePath, ""))
+	resp, err := transport.Transport.Get(fmt.Sprintf(devicePath, ""))
 	if err != nil {
 		return devices.DeviceList, err
 	}
@@ -366,7 +380,7 @@ func getLinkedDevices() ([]DeviceInfo, error) {
 }
 
 func unlinkDevice(id int) error {
-	_, err := transport.del(fmt.Sprintf(devicePath, strconv.Itoa(id)))
+	_, err := transport.Transport.Del(fmt.Sprintf(devicePath, strconv.Itoa(id)))
 	if err != nil {
 		return err
 	}
@@ -401,11 +415,11 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	}
 
 	url := fmt.Sprintf(provisioningMessagePath, ephemeralId)
-	resp, err := transport.putJSON(url, body)
+	resp, err := transport.Transport.PutJSON(url, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -435,16 +449,16 @@ type ProfileSettings struct {
 // GetProfileE164 get a profile by a phone number
 func GetProfileE164(tel string) (Contact, error) {
 
-	resp, err := transport.get(fmt.Sprintf(PROFILE_PATH, tel))
+	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, tel))
 	if err != nil {
-		log.Debugln(err)
+		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
 
 	profile := &Profile{}
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(&profile)
 	if err != nil {
-		log.Debugln(err)
+		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
 	avatar, _ := GetAvatar(profile.Avatar)
 	buf := new(bytes.Buffer)
@@ -453,7 +467,7 @@ func GetProfileE164(tel string) (Contact, error) {
 	c := contacts[profile.UUID]
 	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
 	if err != nil {
-		log.Debugln(err)
+		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
 	c.Username = profile.Username
 	c.UUID = profile.UUID
@@ -463,21 +477,14 @@ func GetProfileE164(tel string) (Contact, error) {
 	return c, nil
 }
 
-var cdnTransport *httpTransporter
-
-func setupCDNTransporter() {
-	// setupCA()
-	cdnTransport = newHTTPTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password)
-}
-
-// GetAvatar retuns an avatar for it's url from signal cdn
-func GetAvatar(avatarURL string) (io.ReadCloser, error) {
-	log.Debugln("[textsecure] get avatar from ", avatarURL)
+func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
+	log.Debugln(SIGNAL_CDN_URL + "/" + avatarUrl)
+	// resp, err := transport.CdnTransport.Get("/" + avatarUrl)
 
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	c := &http.Client{Transport: customTransport}
-	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarURL, nil)
+	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarUrl, nil)
 	req.Header.Add("Host", SERVICE_REFLECTOR_HOST)
 	req.Header.Add("Content-Type", "application/octet-stream")
 	resp, err := c.Do(req)
@@ -507,11 +514,11 @@ func registerPreKeys() error {
 		return err
 	}
 
-	resp, err := transport.putJSON(prekeyMetadataPath, body)
+	resp, err := transport.Transport.PutJSON(prekeyMetadataPath, body)
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	return nil
@@ -519,11 +526,11 @@ func registerPreKeys() error {
 
 // GET /v2/keys/{number}/{device_id}?relay={relay}
 func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
-	resp, err := transport.get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
+	resp, err := transport.Transport.Get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
 	if err != nil {
 		return nil, err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return nil, resp
 	}
 	dec := json.NewDecoder(resp.Body)
@@ -531,6 +538,19 @@ func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
 	dec.Decode(k)
 
 	return k, nil
+}
+
+func getCredendtails(path string) (*AuthCredentials, error) {
+	resp, err := transport.Transport.Get(path)
+	if err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(resp.Body)
+	var a AuthCredentials
+	dec.Decode(&a)
+	log.Debugln("[textsecure] getCredentials ")
+	return &a, nil
+
 }
 
 // jsonContact is the data returned by the server for each registered contact
@@ -543,15 +563,112 @@ type jsonContacts struct {
 	Contacts []jsonContact `json:"contacts"`
 }
 
+func getContactDiscoveryRegisteredUsers(authorization string, request *contactDiscoveryCrypto.DiscoveryRequest, cookies string, mrenclave string) (*contactDiscoveryCrypto.DiscoveryResponse, error) {
+	log.Debugln("[textsecure] getContactDiscoveryRegisteredUser")
+	body, err := json.Marshal(*request)
+
+	if err != nil {
+		return nil, err
+	}
+	resp, err := transport.DirectoryTransport.PutJSONWithAuthCookies(
+		fmt.Sprintf(CONTACT_DISCOVERY, mrenclave),
+		body,
+		authorization,
+		cookies,
+	)
+	if err != nil {
+		return nil, err
+	}
+	discoveryResponse := &contactDiscoveryCrypto.DiscoveryResponse{}
+	dec := json.NewDecoder(resp.Body)
+	log.Debugln("[textsecure] GetAndVerifyMultiRemoteAttestation resp")
+	err = dec.Decode(&discoveryResponse)
+	if err != nil {
+		return nil, err
+	}
+	return discoveryResponse, nil
+	// return nil, fmt.Errorf("fail")
+}
+func idToHexUUID(id []byte) string {
+	msb := id[:8]
+	lsb := id[8:]
+	msbHex := hex.EncodeToString(msb)
+	lsbHex := hex.EncodeToString(lsb)
+	return msbHex[:8] + "-" + msbHex[8:12] + "-" + msbHex[12:] + "-" + lsbHex[:4] + "-" + lsbHex[4:]
+}
+
 // GetRegisteredContacts returns the subset of the local contacts
 // that are also registered with the server
-
 func GetRegisteredContacts() ([]Contact, error) {
+	log.Debugln("[textsecure] GetRegisteredContacts")
+
 	lc, err := client.GetLocalContacts()
 	if err != nil {
 		return nil, fmt.Errorf("could not get local contacts :%s", err)
 	}
-	// TODO Contact discovery changed on Signal side, so we are doing it anymore. Here should go the call to the new discovery method
+	tokensMap := map[string]*string{}
+	tokens := []string{}
+	m := []Contact{}
+	// todo deduplicate contacts
+	for _, c := range lc {
+		t := c.Tel
+		if tokensMap[t] == nil {
+			m = append(m, c)
+			tokens = append(tokens, t)
+			tokensMap[t] = &t
+		}
+
+	}
+
+	authCredentials, err := getCredendtails(DIRECTORY_AUTH_PATH)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get auth credentials %v", err)
+	}
+	remoteAttestation := contactsDiscovery.RemoteAttestation{}
+	attestations, err := remoteAttestation.GetAndVerifyMultiRemoteAttestation(CDS_MRENCLAVE,
+		authCredentials.AsBasic(),
+	)
+	log.Debugln("[textsecure] GetRegisteredContacts assestations")
+	request, err := contactDiscoveryCrypto.CreateDiscoveryRequest(tokens, attestations)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get create createDiscoveryRequest %v", err)
+	}
+	log.Debugln("[textsecure] GetRegisteredContacts contactDiscoveryRequest")
+
+	response, err := getContactDiscoveryRegisteredUsers(authCredentials.AsBasic(), request, remoteAttestation.Cookies, CDS_MRENCLAVE)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get get ContactDiscovery %v", err)
+	}
+
+	responseData, err := contactDiscoveryCrypto.GetDiscoveryResponseData(*response, attestations)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get get ContactDiscovery data %v", err)
+	}
+	uuidlength := 16
+	ind := 0
+
+	for i := range m {
+		m[i].UUID = idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
+		ind++
+	}
+	lc = []Contact{}
+	contacts = map[string]Contact{}
+	for _, c := range m {
+		lc = append(lc, c)
+
+		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
+			contacts[c.UUID] = c
+
+		} else {
+			contacts[c.Tel] = c
+			log.Debugln("[textsecure] empty uuid for tel ", c.Tel)
+		}
+	}
+	err = WriteContactsToPath()
+	if err != nil {
+		log.Debugln("[textsecure] 3", err)
+
+	}
 	return lc, nil
 }
 
@@ -564,7 +681,7 @@ type jsonAllocation struct {
 
 // GET /v1/attachments/
 func allocateAttachment() (uint64, string, error) {
-	resp, err := transport.get(allocateAttachmentPath)
+	resp, err := transport.Transport.Get(allocateAttachmentPath)
 	if err != nil {
 		return 0, "", err
 	}
@@ -679,7 +796,7 @@ func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, erro
 	preKeyId := uint32(0)
 	var preKey *axolotl.ECPublicKey
 	if d.PreKey == nil {
-		log.Debugln(fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID))
+		log.Debugln("[textsecure] makePreKeyBundle", fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID))
 	} else {
 		preKeyId = d.PreKey.ID
 		decPK, err := decodeKey(d.PreKey.PublicKey)
@@ -788,6 +905,7 @@ var ErrRemoteGone = errors.New("the remote device is gone (probably reinstalled)
 var deviceLists = map[string][]uint32{}
 
 func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timestamp *uint64) (*sendMessageResponse, error) {
+
 	bm, err := buildMessage(uuid, paddedMessage, deviceLists[uuid], isSync)
 	if err != nil {
 		return nil, err
@@ -804,7 +922,7 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.putJSON(fmt.Sprintf(MESSAGE_PATH, uuid), body)
+	resp, err := transport.Transport.PutJSON(fmt.Sprintf(MESSAGE_PATH, uuid), body)
 	if err != nil {
 		return nil, err
 	}
@@ -840,7 +958,7 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 		}
 		return buildAndSendMessage(uuid, paddedMessage, isSync, timestamp)
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return nil, resp
 	}
 
@@ -872,12 +990,21 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	var e164 *string
+	var uuid *string
+
+	if msg.destination[0] == '+' {
+		e164 = &msg.destination
+	} else {
+		uuid = &msg.destination
+	}
 
 	if resp.NeedsSync {
 		log.Debugf("[textsecure] Needs sync. destination: %s", msg.destination)
 		sm := &signalservice.SyncMessage{
 			Sent: &signalservice.SyncMessage_Sent{
-				DestinationE164: &msg.destination,
+				DestinationE164: e164,
+				DestinationUuid: uuid,
 				Timestamp:       dm.Timestamp,
 				Message:         dm,
 			},
@@ -892,14 +1019,13 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 			}).Error("Failed to send sync message")
 		}
 	}
-
 	return resp.Timestamp, err
 }
 
 // TODO switch to uuids
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
-	log.Debugln("[textsecure] sendSyncMessage ", timestamp)
-	user := config.Tel
+	log.Debugln("[textsecure] sendSyncMessage", timestamp)
+	user := config.Tel //TODO: switch tu uuid
 	if config.UUID != "" {
 		user = config.UUID
 	}
