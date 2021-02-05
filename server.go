@@ -134,13 +134,21 @@ type RegistrationInfo struct {
 var registrationInfo RegistrationInfo
 
 // Registration
+const (
+	responseNeedCaptcha int = 402;
+	responseRateLimit int = 413
+)
 
-func requestCode(tel, method string) (string, error) {
+func requestCode(tel, method, captcha string) (string,*int,error) {
 	log.Infoln("[textsecure] request verification code for ", tel)
-	resp, err := transport.Transport.Get(fmt.Sprintf(createAccountPath, method, tel, "android"))
+	path := fmt.Sprintf(createAccountPath, method, tel, "android")
+	if captcha != ""{
+		path +="&captcha="+captcha
+	}
+	resp, err := transport.Transport.Get(path)
 	if err != nil {
 		log.Errorln("[textsecure] requestCode", err)
-		return "", err
+		return "", nil, err
 	}
 	if resp.IsError() {
 		if resp.Status == 402 {
@@ -150,7 +158,7 @@ func requestCode(tel, method string) (string, error) {
 			log.Errorln("[textsecure] requestCode", newStr)
 			defer resp.Body.Close()
 
-			return "", errors.New("Need to solve captcha")
+			return "", &resp.Status, errors.New("Need to solve captcha")
 		} else if resp.Status == 413 {
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(resp.Body)
@@ -158,16 +166,16 @@ func requestCode(tel, method string) (string, error) {
 			log.Errorln("[textsecure] requestCode", newStr)
 			defer resp.Body.Close()
 
-			return "", errors.New("Rate Limit Exeded")
+			return "", &resp.Status, errors.New("Rate Limit Exeded")
 		} else {
 			log.Debugln("[textsecure] request code status", resp.Status)
 			defer resp.Body.Close()
 
-			return "", errors.New("Error, see logs")
+			return "", nil, errors.New("Error, see logs")
 		}
 	} else {
 		defer resp.Body.Close()
-		return "", nil
+		return "",nil, nil
 	}
 	// unofficial dev method, useful for development, with no telephony account needed on the server
 	// if method == "dev" {
