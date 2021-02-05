@@ -214,6 +214,7 @@ type Client struct {
 	GetVerificationCode   func() string
 	GetPin                func() string
 	GetStoragePassword    func() string
+	GetCaptchaToken		    func() string
 	GetConfig             func() (*Config, error)
 	GetLocalContacts      func() ([]Contact, error)
 	MessageHandler        func(*Message)
@@ -328,8 +329,20 @@ func registerDevice() error {
 	}
 	rootCa.SetupCA(config.RootCA)
 	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
-	code, err := requestCode(config.Tel, config.VerificationType)
-	if err != nil {
+	// try to register without token
+	code, responseCode, err := requestCode(config.Tel, config.VerificationType, "")
+	if responseCode != nil{
+		if *responseCode == responseNeedCaptcha{
+			// Need to generate a token on https://signalcaptchas.org/registration/generate.html
+			captcha := client.GetCaptchaToken()
+			code, _, err = requestCode(config.Tel, config.VerificationType, captcha)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	} else	if err != nil {
 		return err
 	}
 	if config.VerificationType != "dev" {
