@@ -334,6 +334,8 @@ func registerDevice() error {
 	if responseCode != nil{
 		if *responseCode == responseNeedCaptcha{
 			// Need to generate a token on https://signalcaptchas.org/registration/generate.html
+			log.Infoln("[textsecure] registration needs captcha")
+
 			captcha := client.GetCaptchaToken()
 			code, _, err = requestCode(config.Tel, config.VerificationType, captcha)
 			if err != nil {
