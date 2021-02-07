@@ -103,6 +103,15 @@ func readLine(prompt string) string {
 	return string(text)
 }
 
+func getCaptchaToken() string {
+	log.Infoln("1. Goto https://signalcaptchas.org/registration/generate.html")
+	log.Infoln("2. Run the interception code in the browser terminal.")
+	log.Infoln("window.onToken = function(token){alert(token);};")
+	log.Infoln("3. Solve captcha and copy the token from the alert.")
+
+	return readLine("4. Enter captcha token>")
+}
+
 func getVerificationCode() string {
 	return readLine("Enter verification code>")
 }
@@ -483,6 +492,7 @@ func main() {
 	client := &textsecure.Client{
 		GetConfig:             getConfig,
 		GetLocalContacts:      getLocalContacts,
+		getCaptchaToken: 			 getCaptchaToken,
 		GetVerificationCode:   getVerificationCode,
 		GetStoragePassword:    getStoragePassword,
 		MessageHandler:        messageHandler,
