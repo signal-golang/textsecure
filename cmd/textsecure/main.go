@@ -492,7 +492,7 @@ func main() {
 	client := &textsecure.Client{
 		GetConfig:             getConfig,
 		GetLocalContacts:      getLocalContacts,
-		getCaptchaToken: 			 getCaptchaToken,
+		GetCaptchaToken:       getCaptchaToken,
 		GetVerificationCode:   getVerificationCode,
 		GetStoragePassword:    getStoragePassword,
 		MessageHandler:        messageHandler,
