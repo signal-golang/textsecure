@@ -214,7 +214,7 @@ type Client struct {
 	GetVerificationCode   func() string
 	GetPin                func() string
 	GetStoragePassword    func() string
-	GetCaptchaToken		    func() string
+	GetCaptchaToken       func() string
 	GetConfig             func() (*Config, error)
 	GetLocalContacts      func() ([]Contact, error)
 	MessageHandler        func(*Message)
@@ -331,8 +331,8 @@ func registerDevice() error {
 	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
 	// try to register without token
 	code, responseCode, err := requestCode(config.Tel, config.VerificationType, "")
-	if responseCode != nil{
-		if *responseCode == responseNeedCaptcha{
+	if responseCode != nil {
+		if *responseCode == responseNeedCaptcha {
 			// Need to generate a token on https://signalcaptchas.org/registration/generate.html
 			log.Infoln("[textsecure] registration needs captcha")
 
@@ -344,7 +344,7 @@ func registerDevice() error {
 		} else {
 			return err
 		}
-	} else	if err != nil {
+	} else if err != nil {
 		return err
 	}
 	if config.VerificationType != "dev" {
@@ -414,13 +414,13 @@ func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) e
 	if dm := content.GetDataMessage(); dm != nil {
 		return handleDataMessage(srcE164, srcUUID, timestamp, dm)
 	} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == srcE164 {
-		return handleSyncMessage(srcUUID, timestamp, sm)
+		return handleSyncMessage(srcE164, srcUUID, timestamp, sm)
 	} else if cm := content.GetCallMessage(); cm != nil {
-		return handleCallMessage(srcUUID, timestamp, cm)
+		return handleCallMessage(srcE164, srcUUID, timestamp, cm)
 	} else if rm := content.GetReceiptMessage(); rm != nil {
-		return handleReceiptMessage(srcUUID, timestamp, rm)
+		return handleReceiptMessage(srcE164, srcUUID, timestamp, rm)
 	} else if tm := content.GetTypingMessage(); tm != nil {
-		return handleTypingMessage(srcUUID, timestamp, tm)
+		return handleTypingMessage(srcE164, srcUUID, timestamp, tm)
 	}
 
 	//FIXME get the right content
@@ -460,8 +460,8 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 		return err
 	}
 	msg := &Message{
-		sourceUUID:  srcUUID,
 		source:      src,
+		sourceUUID:  srcUUID,
 		message:     dm.GetBody(),
 		attachments: atts,
 		group:       gr,
@@ -483,12 +483,38 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 	}
 	return nil
 }
-func handleCallMessage(src string, timestamp uint64, cm *signalservice.CallMessage) error {
+func handleCallMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.CallMessage) error {
+	message := "Call "
+	if m := cm.GetAnswer(); m != nil {
+		message += "answer"
+	}
+	if m := cm.GetOffer(); m != nil {
+		message += "offer"
+	}
+	if m := cm.GetHangup(); m != nil {
+		message += "hangup"
+	}
+	if m := cm.GetBusy(); m != nil {
+		message += "busy"
+	}
+	if m := cm.GetLegacyHangup(); m != nil {
+		message += "hangup"
+	}
+	// if m := cm.GetMultiRing(); m == true {
+	// 	message += "ring "
+	// }
+	if m := cm.GetIceUpdate(); m != nil {
+		message += "ring"
+	}
+	// if m := cm.GetOpaque(); m != nil {
+	// 	message += "opaque"
+	// }
 
 	msg := &Message{
-		source:    src,
-		message:   "callMessage",
-		timestamp: timestamp,
+		source:     src,
+		sourceUUID: srcUUID,
+		message:    message,
+		timestamp:  timestamp,
 	}
 
 	if client.MessageHandler != nil {
@@ -496,12 +522,13 @@ func handleCallMessage(src string, timestamp uint64, cm *signalservice.CallMessa
 	}
 	return nil
 }
-func handleTypingMessage(src string, timestamp uint64, cm *signalservice.TypingMessage) error {
+func handleTypingMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.TypingMessage) error {
 
 	msg := &Message{
-		source:    src,
-		message:   "typingMessage",
-		timestamp: timestamp,
+		source:     src,
+		sourceUUID: srcUUID,
+		message:    "typingMessage",
+		timestamp:  timestamp,
 	}
 
 	if client.TypingMessageHandler != nil {
@@ -509,11 +536,12 @@ func handleTypingMessage(src string, timestamp uint64, cm *signalservice.TypingM
 	}
 	return nil
 }
-func handleReceiptMessage(src string, timestamp uint64, cm *signalservice.ReceiptMessage) error {
+func handleReceiptMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.ReceiptMessage) error {
 	msg := &Message{
-		source:    src,
-		message:   "sentReceiptMessage",
-		timestamp: cm.GetTimestamp()[0],
+		source:     src,
+		sourceUUID: srcUUID,
+		message:    "sentReceiptMessage",
+		timestamp:  cm.GetTimestamp()[0],
 	}
 	if *cm.Type == signalservice.ReceiptMessage_READ {
 		msg.message = "readReceiptMessage"

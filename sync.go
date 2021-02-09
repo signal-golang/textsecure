@@ -11,7 +11,7 @@ import (
 )
 
 // handleSyncMessage handles an incoming SyncMessage.
-func handleSyncMessage(src string, timestamp uint64, sm *signalservice.SyncMessage) error {
+func handleSyncMessage(src string, srcUUID string, timestamp uint64, sm *signalservice.SyncMessage) error {
 	log.Debugf("[textsecure] SyncMessage recieved at %d", timestamp)
 
 	if sm.GetSent() != nil {
