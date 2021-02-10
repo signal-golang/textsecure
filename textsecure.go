@@ -570,18 +570,29 @@ var ErrInvalidMACForMessage = errors.New("invalid MAC for incoming message")
 
 // Authenticate and decrypt a received message
 func handleReceivedMessage(msg []byte) error {
+	// decrypt signalservice envelope
 	macpos := len(msg) - 10
 	tmac := msg[macpos:]
 	aesKey := registrationInfo.signalingKey[:32]
 	macKey := registrationInfo.signalingKey[32:]
+	hasError := false
 	if !axolotl.ValidTruncMAC(msg[:macpos], tmac, macKey) {
-		return ErrInvalidMACForMessage
+		hasError = true
+		//return ErrInvalidMACForMessage
 	}
-	ciphertext := msg[1:macpos]
-	plaintext, err := axolotl.Decrypt(aesKey, ciphertext)
-	if err != nil {
-		return err
+	plaintext := []byte{}
+	var err error
+	// check if the message is using the signaling key
+	if hasError {
+		plaintext = msg
+	} else {
+		ciphertext := msg[1:macpos]
+		plaintext, err = axolotl.Decrypt(aesKey, ciphertext)
+		if err != nil {
+			return err
+		}
 	}
+
 	env := &signalservice.Envelope{}
 	err = proto.Unmarshal(plaintext, env)
 	if err != nil {
@@ -655,6 +666,10 @@ func handleReceivedMessage(msg []byte) error {
 		if err != nil {
 			return err
 		}
+	case signalservice.Envelope_UNIDENTIFIED_SENDER:
+		msg := env.GetContent()
+		return fmt.Errorf("not implemented message type unindentified sender", msg)
+
 	default:
 		return MessageTypeNotImplementedError{uint32(*env.Type)}
 	}
