@@ -8,6 +8,7 @@ import (
 
 	zkgroup "github.com/nanu-c/zkgroup"
 	credentials "github.com/signal-golang/textsecure/credentials"
+	transport "github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -69,9 +70,9 @@ type AuthCredentials struct {
 	password string `json:"password"`
 }
 
-func (a *AuthCredentials) AsBasic() String {
-	usernameAndPassword = a.username + ":" + a.password
-	encoded = base64.StdEncoding.EncodeToString(usernameAndPassword)
+func (a *AuthCredentials) AsBasic() string {
+	usernameAndPassword := a.username + ":" + a.password
+	encoded := base64.StdEncoding.EncodeToString([]byte(usernameAndPassword))
 	return "Basic " + encoded
 }
 

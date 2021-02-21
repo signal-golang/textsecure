@@ -426,11 +426,11 @@ func getNewDeviceVerificationCode() (string, error) {
 
 func GetGroupAuthCredentials(startDay int64, endDay int64) error {
 	log.Debugln("[textsecure] get groupCredentials", fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
-	resp, err := transport.get(fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
+	resp, err := transport.Transport.Get(fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
 	if err != nil {
 		return err
 	}
-	if resp.isError() {
+	if resp.IsError() {
 		return resp
 	}
 	dec := json.NewDecoder(resp.Body)
@@ -575,7 +575,7 @@ type ProfileSettings struct {
 }
 
 func GetProfile(UUID string) {
-	resp, err := transport.get(fmt.Sprintf(PROFILE_PATH, UUID))
+	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, UUID))
 	profile := &Profile{}
 
 	dec := json.NewDecoder(resp.Body)
@@ -621,14 +621,7 @@ func GetProfileE164(tel string) (Contact, error) {
 	return c, nil
 }
 
-var cdnTransport *httpTransporter
-
-func setupCDNTransporter() {
-	// setupCA()
-	cdnTransport = newHTTPTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password)
-}
-
-type RemoteAttestationRequest struct {
+	type RemoteAttestationRequest struct {
 	ClientPublic string
 }
 
@@ -672,7 +665,7 @@ func GetAvatar(avatarURL string) (io.ReadCloser, error) {
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	c := &http.Client{Transport: customTransport}
-	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarUrl, nil)
+	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarURL, nil)
 	req.Header.Add("Host", SERVICE_REFLECTOR_HOST)
 	req.Header.Add("Content-Type", "application/octet-stream")
 	resp, err := c.Do(req)

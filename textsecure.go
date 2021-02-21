@@ -22,7 +22,7 @@ import (
 	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
-	transport "github.com/signal-golang/textsecure/transport"
+	"github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
 )
 
