@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"regexp"
 
 	"github.com/golang/protobuf/proto"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -121,6 +122,11 @@ func handleSyncRequest(request *signalservice.SyncMessage_Request) error {
 	return nil
 }
 
+func isValidUUID(uuid string) bool {
+	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
+	return r.MatchString(uuid)
+}
+
 // sendContactUpdate
 func sendContactUpdate() error {
 	log.Debugf("[textsecure] Sending contact SyncMessage")
@@ -132,27 +138,30 @@ func sendContactUpdate() error {
 
 	var buf bytes.Buffer
 
-	for _, c := range lc {
-		cd := &signalservice.ContactDetails{
-			Number:      &c.Tel,
-			Uuid:        &c.UUID,
-			Name:        &c.Name,
-			Color:       &c.Color,
-			Verified:    c.Verified,
-			Blocked:     &c.Blocked,
-			ExpireTimer: &c.ExpireTimer,
+	for _, contact := range lc {
+		if isValidUUID(contact.UUID) {
+			cd := &signalservice.ContactDetails{
+				Number:      &contact.Tel,
+				Uuid:        &contact.UUID,
+				Name:        &contact.Name,
+				Color:       &contact.Color,
+				Verified:    contact.Verified,
+				Blocked:     &contact.Blocked,
+				ExpireTimer: &contact.ExpireTimer,
 
-			// TODO: handle avatars
+				// TODO: handle avatars
+			}
+
+			b, err := proto.Marshal(cd)
+			if err != nil {
+				log.Errorf("[textsecure] Failed to marshal contact details")
+				continue
+			}
+
+			buf.Write(varint32(len(b)))
+			buf.Write(b)
 		}
 
-		b, err := proto.Marshal(cd)
-		if err != nil {
-			log.Errorf("[textsecure] Failed to marshal contact details")
-			continue
-		}
-
-		buf.Write(varint32(len(b)))
-		buf.Write(b)
 	}
 
 	a, err := uploadAttachment(&buf, "application/octet-stream")
