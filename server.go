@@ -34,6 +34,7 @@ var (
 	SIGNAL_CDN_URL         = "https://cdn.signal.org"
 	SIGNAL_CDN2_URL        = "https://cdn2.signal.org"
 	DIRECTORY_URL          = "https://api.directory.signal.org"
+	STORAGE_URL            = "https://storage.signal.org"
 
 	createAccountPath = "/v1/accounts/%s/code/%s?client=%s"
 	// CREATE_ACCOUNT_SMS_PATH   = "/v1/accounts/sms/code/%s?client=%s";
@@ -100,6 +101,9 @@ var (
 	GROUPSV2_GROUP_JOIN     = "/v1/groups/join/%s"
 	GROUPSV2_TOKEN          = "/v1/groups/token"
 
+	ATTESTATION_REQUEST = "/v1/attestation/%s"
+	DISCOVERY_REQUEST   = "/v1/discovery/%s"
+
 	SERVER_DELIVERED_TIMESTAMP_HEADER = "X-Signal-Timestamp"
 	CDS_MRENCLAVE                     = "c98e00a4e3ff977a56afefe7362a27e4961e4f19e211febfbb19b897e6b80b15"
 
@@ -135,15 +139,15 @@ var registrationInfo RegistrationInfo
 
 // Registration
 const (
-	responseNeedCaptcha int = 402;
-	responseRateLimit int = 413
+	responseNeedCaptcha int = 402
+	responseRateLimit   int = 413
 )
 
-func requestCode(tel, method, captcha string) (string,*int,error) {
+func requestCode(tel, method, captcha string) (string, *int, error) {
 	log.Infoln("[textsecure] request verification code for ", tel)
 	path := fmt.Sprintf(createAccountPath, method, tel, "android")
-	if captcha != ""{
-		path +="&captcha="+captcha
+	if captcha != "" {
+		path += "&captcha=" + captcha
 	}
 	resp, err := transport.Transport.Get(path)
 	if err != nil {
@@ -175,7 +179,7 @@ func requestCode(tel, method, captcha string) (string,*int,error) {
 		}
 	} else {
 		defer resp.Body.Close()
-		return "",nil, nil
+		return "", nil, nil
 	}
 	// unofficial dev method, useful for development, with no telephony account needed on the server
 	// if method == "dev" {
@@ -329,6 +333,7 @@ type whoAmIResponse struct {
 	UUID string `json:"uuid"`
 }
 
+// GetMyUUID returns the uid from the current user
 func GetMyUUID() (string, error) {
 	log.Debugln("[textsecure] get my uuid")
 	resp, err := transport.Transport.Get(WHO_AM_I)
@@ -407,6 +412,7 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 		IdentityKeyPublic:  identityKey.PublicKey.Serialize(),
 		IdentityKeyPrivate: identityKey.PrivateKey.Key()[:],
 		Number:             &config.Tel,
+		Uuid:               &config.UUID,
 		ProvisioningCode:   &verificationCode,
 	}
 
@@ -766,7 +772,7 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	if msg.groupV2 != nil {
 		dm.GroupV2 = msg.groupV2
 	}
-
+	dm.ProfileKey = config.ProfileKey
 	dm.Flags = &msg.flags
 
 	return dm

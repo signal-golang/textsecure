@@ -19,6 +19,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/profiles"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
 	transport "github.com/signal-golang/textsecure/transport"
@@ -309,6 +310,7 @@ func Setup(c *Client) error {
 	if err != nil {
 		return err
 	}
+
 	client.RegistrationDone()
 	rootCa.SetupCA(config.RootCA)
 	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
@@ -317,6 +319,11 @@ func Setup(c *Client) error {
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	config = checkUUID(config)
+	if len(config.ProfileKey) == 0 {
+		config.ProfileKey = profiles.GenerateProfileKey()
+	}
+	profiles.UpdateProfile(config.ProfileKey, config.UUID, "nanu")
+	GetProfile(config.UUID)
 	return err
 }
 
@@ -379,6 +386,8 @@ func registerDevice() error {
 	if err != nil {
 		return err
 	}
+	config.ProfileKey = profiles.GenerateProfileKey()
+	config = checkUUID(config)
 	client.RegistrationDone()
 	if client.RegistrationDone != nil {
 		log.Infoln("[textsecure] RegistrationDone")
@@ -421,8 +430,10 @@ func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) e
 		return handleReceiptMessage(srcE164, srcUUID, timestamp, rm)
 	} else if tm := content.GetTypingMessage(); tm != nil {
 		return handleTypingMessage(srcE164, srcUUID, timestamp, tm)
+	} else if nm := content.GetNullMessage(); nm != nil {
+		log.Errorln("[textsecure] Nullmessage content received", content)
+		return nil
 	}
-
 	//FIXME get the right content
 	// log.Errorf(content)
 	log.Errorln("[textsecure] Unknown message content received", content)

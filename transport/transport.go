@@ -129,7 +129,7 @@ func (ht *httpTransporter) Get(url string) (*response, error) {
 		r.Body = resp.Body
 	}
 
-	log.Debugf("GET %s %d\n", url, r.Status)
+	log.Debugf("[textsecure] GET %s %d\n", url, r.Status)
 
 	return r, err
 }

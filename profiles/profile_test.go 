@@ -1,0 +1,41 @@
+package textsecure
+import (
+	"testing"
+	"github.com/stretchr/testify/assert"
+  "math/rand"
+)
+func TestEncryptDecrypt(t *testing.T) {
+  key := make([]byte, 32)
+  rand.Read(key)
+
+  name, err := encryptName(key,[]byte("Clement\ruval"), NAME_PADDED_LENGTH);
+  assert.Nil(t, err)
+  plaintext, err := decryptName(key, name);
+  assert.Nil(t, err)
+
+  assert.Equal(t, []byte("Clement\ruval"), plaintext);
+}
+
+func TestEmpty(t *testing.T) {
+  key := make([]byte, 32)
+  rand.Read(key)
+
+  name, err := encryptName(key, []byte(""), 26);
+  assert.Nil(t, err)
+  plaintext, err := decryptName(key, name);
+  assert.Nil(t, err)
+
+  assert.Equal(t, 0, len(plaintext));
+}
+
+var EXPECTED_RESULT = []byte{0x5a, 0x72, 0x3a, 0xce, 0xe5, 0x2c, 0x5e, 0xa0,
+  0x2b, 0x92, 0xa3, 0xa3, 0x60, 0xc0, 0x95, 0x95}
+var KEY = []byte{0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+   0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+   0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02}
+
+func TestKeyDerivation(t *testing.T) {
+  result, err := deriveAccessKeyFrom(KEY);
+  assert.Nil(t, err)
+  assert.Equal(t, EXPECTED_RESULT, result);
+}
