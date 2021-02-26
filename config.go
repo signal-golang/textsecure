@@ -30,6 +30,8 @@ type Config struct {
 	Name                      string              `yaml:"name"`
 }
 
+var configFile string
+
 // TODO: some race conditions to be solved
 func checkUUID(cfg *Config) *Config {
 	defer func(cfg *Config) *Config {
@@ -56,6 +58,7 @@ func ReadConfig(fileName string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	configFile = fileName
 
 	cfg := &Config{}
 	err = yaml.Unmarshal(b, cfg)
@@ -72,6 +75,10 @@ func WriteConfig(filename string, cfg *Config) error {
 		return err
 	}
 	return ioutil.WriteFile(filename, b, 0600)
+}
+
+func saveConfig(cfg *Config) {
+	WriteConfig(configFile, cfg)
 }
 
 // loadConfig gets the config via the client and makes sure

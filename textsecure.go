@@ -321,9 +321,9 @@ func Setup(c *Client) error {
 	config = checkUUID(config)
 	if len(config.ProfileKey) == 0 {
 		config.ProfileKey = profiles.GenerateProfileKey()
+		saveConfig(config)
 	}
 	profiles.UpdateProfile(config.ProfileKey, config.UUID, "nanu")
-	GetProfile(config.UUID)
 	return err
 }
 
