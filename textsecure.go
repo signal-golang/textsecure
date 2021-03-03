@@ -20,9 +20,10 @@ import (
 
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/profiles"
+	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
-	transport "github.com/signal-golang/textsecure/transport"
+	"github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -263,7 +264,6 @@ func setupLogging() {
 // Setup initializes the package.
 func Setup(c *Client) error {
 	var err error
-
 	client = c
 
 	config, err = loadConfig()
@@ -348,342 +348,361 @@ func registerDevice() error {
 			if err != nil {
 				return err
 			}
-		} else {
-			return err
-		}
-	} else if err != nil {
-		return err
-	}
-	if config.VerificationType != "dev" {
-		code = client.GetVerificationCode()
-	}
-	err, credentials := verifyCode(code, nil, nil)
-	if err != nil {
-		if credentials != nil {
-			log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
-			pin := client.GetPin()
-			err, credentials = verifyCode(code, &pin, credentials)
-			if err != nil {
-				log.Warnln("[textsecure] verfication failed", err.Error())
+			} else {
 				return err
 			}
-		} else {
-			log.Warnln("[textsecure] verfication failed", err.Error())
-			return err
-		}
+			} else if err != nil {
+				return err
+			}
+			if config.VerificationType != "dev" {
+				code = client.GetVerificationCode()
+			}
+			err, credentials := verifyCode(code, nil, nil)
+			if err != nil {
+				if credentials != nil {
+					log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
+					pin := client.GetPin()
+					err, credentials = verifyCode(code, &pin, credentials)
+					if err != nil {
+						log.Warnln("[textsecure] verfication failed", err.Error())
+						return err
+					}
+					} else {
+						log.Warnln("[textsecure] verfication failed", err.Error())
+						return err
+					}
 
-	}
+				}
 
-	err = generatePreKeys()
-	if err != nil {
-		return err
-	}
-	err = generatePreKeyState()
-	if err != nil {
-		return err
-	}
-	err = registerPreKeys()
-	if err != nil {
-		return err
-	}
-	config.ProfileKey = profiles.GenerateProfileKey()
-	config = checkUUID(config)
-	client.RegistrationDone()
-	if client.RegistrationDone != nil {
-		log.Infoln("[textsecure] RegistrationDone")
+				err = generatePreKeys()
+				if err != nil {
+					return err
+				}
+				err = generatePreKeyState()
+				if err != nil {
+					return err
+				}
+				err = registerPreKeys()
+				if err != nil {
+					return err
+				}
+				config.ProfileKey = profiles.GenerateProfileKey()
+				config = checkUUID(config)
+				client.RegistrationDone()
+				if client.RegistrationDone != nil {
+					log.Infoln("[textsecure] RegistrationDone")
 
-		client.RegistrationDone()
-	}
-	return nil
-}
-
-func handleReceipt(env *signalservice.Envelope) {
-	if client.ReceiptHandler != nil {
-		client.ReceiptHandler(env.GetSourceUuid(), env.GetSourceDevice(), env.GetTimestamp())
-	}
-}
-
-// recID removes the + from phone numbers
-func recID(source string) string {
-	if source[0] == '+' {
-		return source[1:]
-	}
-	return source
-}
-
-func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) error {
-	b = stripPadding(b)
-
-	content := &signalservice.Content{}
-	err := proto.Unmarshal(b, content)
-	if err != nil {
-		return err
-	}
-
-	if dm := content.GetDataMessage(); dm != nil {
-		return handleDataMessage(srcE164, srcUUID, timestamp, dm)
-	} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == srcE164 {
-		return handleSyncMessage(srcE164, srcUUID, timestamp, sm)
-	} else if cm := content.GetCallMessage(); cm != nil {
-		return handleCallMessage(srcE164, srcUUID, timestamp, cm)
-	} else if rm := content.GetReceiptMessage(); rm != nil {
-		return handleReceiptMessage(srcE164, srcUUID, timestamp, rm)
-	} else if tm := content.GetTypingMessage(); tm != nil {
-		return handleTypingMessage(srcE164, srcUUID, timestamp, tm)
-	} else if nm := content.GetNullMessage(); nm != nil {
-		log.Errorln("[textsecure] Nullmessage content received", content)
-		return nil
-	}
-	//FIXME get the right content
-	// log.Errorf(content)
-	log.Errorln("[textsecure] Unknown message content received", content)
-	return nil
-}
-
-// EndSessionFlag signals that this message resets the session
-var EndSessionFlag uint32 = 1
-
-func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
-	flags := uint32(0)
-	if dm.GetFlags() == uint32(signalservice.DataMessage_END_SESSION) {
-		flags = EndSessionFlag
-
-		textSecureStore.DeleteAllSessions(recID(src))
-		textSecureStore.DeleteAllSessions(src)
-	}
-	return flags, nil
-}
-
-// handleDataMessage handles an incoming DataMessage and calls client callbacks
-func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signalservice.DataMessage) error {
-	flags, err := handleFlags(src, dm)
-	if err != nil {
-		return err
-	}
-
-	atts, err := handleAttachments(dm)
-	if err != nil {
-		return err
-	}
-	log.Debugln("[textsecure] handleDataMessage", timestamp, *dm.Timestamp, dm.GetExpireTimer())
-	gr, err := handleGroups(src, dm)
-	if err != nil {
-		return err
-	}
-	msg := &Message{
-		source:      src,
-		sourceUUID:  srcUUID,
-		message:     dm.GetBody(),
-		attachments: atts,
-		group:       gr,
-		flags:       flags,
-		expireTimer: dm.GetExpireTimer(),
-		profileKey:  dm.GetProfileKey(),
-		timestamp:   *dm.Timestamp,
-		quote:       dm.GetQuote(),
-		contact:     dm.GetContact(),
-		preview:     dm.GetPreview(),
-		sticker:     dm.GetSticker(),
-		reaction:    dm.GetReaction(),
-		// requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
-		// isViewOnce: *dm.IsViewOnce,
-	}
-
-	if client.MessageHandler != nil {
-		client.MessageHandler(msg)
-	}
-	return nil
-}
-func handleCallMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.CallMessage) error {
-	message := "Call "
-	if m := cm.GetAnswer(); m != nil {
-		message += "answer"
-	}
-	if m := cm.GetOffer(); m != nil {
-		message += "offer"
-	}
-	if m := cm.GetHangup(); m != nil {
-		message += "hangup"
-	}
-	if m := cm.GetBusy(); m != nil {
-		message += "busy"
-	}
-	if m := cm.GetLegacyHangup(); m != nil {
-		message += "hangup"
-	}
-	// if m := cm.GetMultiRing(); m == true {
-	// 	message += "ring "
-	// }
-	if m := cm.GetIceUpdate(); m != nil {
-		message += "ring"
-	}
-	// if m := cm.GetOpaque(); m != nil {
-	// 	message += "opaque"
-	// }
-
-	msg := &Message{
-		source:     src,
-		sourceUUID: srcUUID,
-		message:    message,
-		timestamp:  timestamp,
-	}
-
-	if client.MessageHandler != nil {
-		client.MessageHandler(msg)
-	}
-	return nil
-}
-func handleTypingMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.TypingMessage) error {
-
-	msg := &Message{
-		source:     src,
-		sourceUUID: srcUUID,
-		message:    "typingMessage",
-		timestamp:  timestamp,
-	}
-
-	if client.TypingMessageHandler != nil {
-		client.TypingMessageHandler(msg)
-	}
-	return nil
-}
-func handleReceiptMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.ReceiptMessage) error {
-	msg := &Message{
-		source:     src,
-		sourceUUID: srcUUID,
-		message:    "sentReceiptMessage",
-		timestamp:  cm.GetTimestamp()[0],
-	}
-	if *cm.Type == signalservice.ReceiptMessage_READ {
-		msg.message = "readReceiptMessage"
-	}
-	if *cm.Type == signalservice.ReceiptMessage_DELIVERY {
-		msg.message = "deliveryReceiptMessage"
-	}
-	if client.ReceiptMessageHandler != nil {
-		client.ReceiptMessageHandler(msg)
-	}
-
-	return nil
-}
-
-// MessageTypeNotImplementedError is raised in the unlikely event that an unhandled protocol message type is received.
-type MessageTypeNotImplementedError struct {
-	typ uint32
-}
-
-func (err MessageTypeNotImplementedError) Error() string {
-	return fmt.Sprintf("not implemented message type %d", err.typ)
-}
-
-// ErrInvalidMACForMessage signals an incoming message with invalid MAC.
-var ErrInvalidMACForMessage = errors.New("invalid MAC for incoming message")
-
-// Authenticate and decrypt a received message
-func handleReceivedMessage(msg []byte) error {
-	// decrypt signalservice envelope
-	macpos := len(msg) - 10
-	tmac := msg[macpos:]
-	aesKey := registrationInfo.signalingKey[:32]
-	macKey := registrationInfo.signalingKey[32:]
-	hasError := false
-	if !axolotl.ValidTruncMAC(msg[:macpos], tmac, macKey) {
-		hasError = true
-		//return ErrInvalidMACForMessage
-	}
-	plaintext := []byte{}
-	var err error
-	// check if the message is using the signaling key
-	if hasError {
-		plaintext = msg
-	} else {
-		ciphertext := msg[1:macpos]
-		plaintext, err = axolotl.Decrypt(aesKey, ciphertext)
-		if err != nil {
-			return err
-		}
-	}
-
-	env := &signalservice.Envelope{}
-	err = proto.Unmarshal(plaintext, env)
-	if err != nil {
-		return err
-	}
-	recid := env.GetSourceUuid()
-
-	sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
-	switch *env.Type {
-	case signalservice.Envelope_RECEIPT:
-		handleReceipt(env)
-		return nil
-	case signalservice.Envelope_CIPHERTEXT:
-		msg := env.GetContent()
-		if msg == nil {
-			return errors.New("[textsecure] Legacy messages unsupported")
-		}
-		wm, err := axolotl.LoadWhisperMessage(msg)
-		if err != nil {
-			log.Infof("[textsecure] Incoming WhisperMessage %s.\n", err)
-			return err
-		}
-		b, err := sc.SessionDecryptWhisperMessage(wm)
-		if _, ok := err.(axolotl.DuplicateMessageError); ok {
-			log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
-			return nil
-		}
-		if _, ok := err.(axolotl.InvalidMessageError); ok {
-			// try the legacy way
-			log.Infof("[textsecure] Incoming WhisperMessage try legacy decrypting")
-
-			recid := recID(env.GetSourceE164())
-			sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
-			b, err = sc.SessionDecryptWhisperMessage(wm)
-			if _, ok := err.(axolotl.DuplicateMessageError); ok {
-				log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
+					client.RegistrationDone()
+				}
 				return nil
 			}
-		}
-		if err != nil {
-			return err
-		}
-		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
-		if err != nil {
-			return err
-		}
 
-	case signalservice.Envelope_PREKEY_BUNDLE:
-		msg := env.GetContent()
-		pkwm, err := axolotl.LoadPreKeyWhisperMessage(msg)
-		if err != nil {
-			return err
-		}
-		b, err := sc.SessionDecryptPreKeyWhisperMessage(pkwm)
-		if _, ok := err.(axolotl.DuplicateMessageError); ok {
-			log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
-			return nil
-		}
-		if _, ok := err.(axolotl.PreKeyNotFoundError); ok {
-			log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
-			return nil
-		}
-		if _, ok := err.(axolotl.InvalidMessageError); ok {
-			log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
-		if err != nil {
-			return err
-		}
-	case signalservice.Envelope_UNIDENTIFIED_SENDER:
-		msg := env.GetContent()
-		return fmt.Errorf("not implemented message type unindentified sender", msg)
+			func handleReceipt(env *signalservice.Envelope) {
+				if client.ReceiptHandler != nil {
+					client.ReceiptHandler(env.GetSourceUuid(), env.GetSourceDevice(), env.GetTimestamp())
+				}
+			}
 
-	default:
-		return MessageTypeNotImplementedError{uint32(*env.Type)}
-	}
+			// recID removes the + from phone numbers
+			func recID(source string) string {
+				if source[0] == '+' {
+					return source[1:]
+				}
+				return source
+			}
 
-	return nil
-}
+			func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) error {
+				b = stripPadding(b)
+
+				content := &signalservice.Content{}
+				err := proto.Unmarshal(b, content)
+				if err != nil {
+					return err
+				}
+
+				if dm := content.GetDataMessage(); dm != nil {
+					return handleDataMessage(srcE164, srcUUID, timestamp, dm)
+					} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == srcE164 {
+						return handleSyncMessage(srcE164, srcUUID, timestamp, sm)
+						} else if cm := content.GetCallMessage(); cm != nil {
+							return handleCallMessage(srcE164, srcUUID, timestamp, cm)
+							} else if rm := content.GetReceiptMessage(); rm != nil {
+								return handleReceiptMessage(srcE164, srcUUID, timestamp, rm)
+								} else if tm := content.GetTypingMessage(); tm != nil {
+									return handleTypingMessage(srcE164, srcUUID, timestamp, tm)
+									} else if nm := content.GetNullMessage(); nm != nil {
+										log.Errorln("[textsecure] Nullmessage content received", content)
+										return nil
+									}
+									//FIXME get the right content
+									// log.Errorf(content)
+									log.Errorln("[textsecure] Unknown message content received", content)
+									return nil
+								}
+
+								// EndSessionFlag signals that this message resets the session
+								var EndSessionFlag uint32 = 1
+
+								func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
+									flags := uint32(0)
+									if dm.GetFlags() == uint32(signalservice.DataMessage_END_SESSION) {
+										flags = EndSessionFlag
+
+										textSecureStore.DeleteAllSessions(recID(src))
+										textSecureStore.DeleteAllSessions(src)
+									}
+									return flags, nil
+								}
+
+								// handleDataMessage handles an incoming DataMessage and calls client callbacks
+								func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signalservice.DataMessage) error {
+									flags, err := handleFlags(src, dm)
+									if err != nil {
+										return err
+									}
+
+									atts, err := handleAttachments(dm)
+									if err != nil {
+										return err
+									}
+									log.Debugln("[textsecure] handleDataMessage", timestamp, *dm.Timestamp, dm.GetExpireTimer())
+									gr, err := handleGroups(src, dm)
+									if err != nil {
+										return err
+									}
+									gr2, err := groupsv2.HandleGroupsV2(src, dm)
+									if err != nil {
+										return err
+									}
+									if gr2 != nil {
+										if gr2.DecryptedGroup.PendingMembers != nil {
+											groupAction := groupsv2.CreateRequestForGroup(gr2.Hexid, gr2.DecryptedGroup.PendingMembers[0].Uuid)
+											authorization, err := groupsv2.NewGroupsV2AuthorizationForGroup(gr2.DecryptedGroup.PendingMembers[0].Uuid, gr2.Hexid)
+											if err != nil {
+												log.Errorln("[textsecure] pacth gro", err)
+												} else {
+													log.Errorln("[textsecure] Yeai", err)
+
+													PatchGroupV2(groupAction, authorization)
+												}
+
+											}
+										}
+										msg := &Message{
+											source:      src,
+											sourceUUID:  srcUUID,
+											message:     dm.GetBody(),
+											attachments: atts,
+											group:       gr,
+											groupV2:     gr2,
+											flags:       flags,
+											expireTimer: dm.GetExpireTimer(),
+											profileKey:  dm.GetProfileKey(),
+											timestamp:   *dm.Timestamp,
+											quote:       dm.GetQuote(),
+											contact:     dm.GetContact(),
+											preview:     dm.GetPreview(),
+											sticker:     dm.GetSticker(),
+											reaction:    dm.GetReaction(),
+											// requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
+											// isViewOnce: *dm.IsViewOnce,
+										}
+
+										if client.MessageHandler != nil {
+											client.MessageHandler(msg)
+										}
+										return nil
+									}
+									func handleCallMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.CallMessage) error {
+										message := "Call "
+										if m := cm.GetAnswer(); m != nil {
+											message += "answer"
+										}
+										if m := cm.GetOffer(); m != nil {
+											message += "offer"
+										}
+										if m := cm.GetHangup(); m != nil {
+											message += "hangup"
+										}
+										if m := cm.GetBusy(); m != nil {
+											message += "busy"
+										}
+										if m := cm.GetLegacyHangup(); m != nil {
+											message += "hangup"
+										}
+										// if m := cm.GetMultiRing(); m == true {
+										// 	message += "ring "
+										// }
+										if m := cm.GetIceUpdate(); m != nil {
+											message += "ring"
+										}
+										// if m := cm.GetOpaque(); m != nil {
+										// 	message += "opaque"
+										// }
+
+										msg := &Message{
+											source:     src,
+											sourceUUID: srcUUID,
+											message:    message,
+											timestamp:  timestamp,
+										}
+
+										if client.MessageHandler != nil {
+											client.MessageHandler(msg)
+										}
+										return nil
+									}
+									func handleTypingMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.TypingMessage) error {
+
+										msg := &Message{
+											source:     src,
+											sourceUUID: srcUUID,
+											message:    "typingMessage",
+											timestamp:  timestamp,
+										}
+
+										if client.TypingMessageHandler != nil {
+											client.TypingMessageHandler(msg)
+										}
+										return nil
+									}
+									func handleReceiptMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.ReceiptMessage) error {
+										msg := &Message{
+											source:     src,
+											sourceUUID: srcUUID,
+											message:    "sentReceiptMessage",
+											timestamp:  cm.GetTimestamp()[0],
+										}
+										if *cm.Type == signalservice.ReceiptMessage_READ {
+											msg.message = "readReceiptMessage"
+										}
+										if *cm.Type == signalservice.ReceiptMessage_DELIVERY {
+											msg.message = "deliveryReceiptMessage"
+										}
+										if client.ReceiptMessageHandler != nil {
+											client.ReceiptMessageHandler(msg)
+										}
+
+										return nil
+									}
+
+									// MessageTypeNotImplementedError is raised in the unlikely event that an unhandled protocol message type is received.
+									type MessageTypeNotImplementedError struct {
+										typ uint32
+									}
+
+									func (err MessageTypeNotImplementedError) Error() string {
+										return fmt.Sprintf("not implemented message type %d", err.typ)
+									}
+
+									// ErrInvalidMACForMessage signals an incoming message with invalid MAC.
+									var ErrInvalidMACForMessage = errors.New("invalid MAC for incoming message")
+
+									// Authenticate and decrypt a received message
+									func handleReceivedMessage(msg []byte) error {
+										// decrypt signalservice envelope
+										macpos := len(msg) - 10
+										tmac := msg[macpos:]
+										aesKey := registrationInfo.signalingKey[:32]
+										macKey := registrationInfo.signalingKey[32:]
+										hasError := false
+										if !axolotl.ValidTruncMAC(msg[:macpos], tmac, macKey) {
+											hasError = true
+											//return ErrInvalidMACForMessage
+										}
+										plaintext := []byte{}
+										var err error
+										// check if the message is using the signaling key
+										if hasError {
+											plaintext = msg
+											} else {
+												ciphertext := msg[1:macpos]
+												plaintext, err = axolotl.Decrypt(aesKey, ciphertext)
+												if err != nil {
+													return err
+												}
+											}
+
+											env := &signalservice.Envelope{}
+											err = proto.Unmarshal(plaintext, env)
+											if err != nil {
+												return err
+											}
+											recid := env.GetSourceUuid()
+
+											sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
+											switch *env.Type {
+											case signalservice.Envelope_RECEIPT:
+												handleReceipt(env)
+												return nil
+											case signalservice.Envelope_CIPHERTEXT:
+												msg := env.GetContent()
+												if msg == nil {
+													return errors.New("[textsecure] Legacy messages unsupported")
+												}
+												wm, err := axolotl.LoadWhisperMessage(msg)
+												if err != nil {
+													log.Infof("[textsecure] Incoming WhisperMessage %s.\n", err)
+													return err
+												}
+												b, err := sc.SessionDecryptWhisperMessage(wm)
+												if _, ok := err.(axolotl.DuplicateMessageError); ok {
+													log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
+													return nil
+												}
+												if _, ok := err.(axolotl.InvalidMessageError); ok {
+													// try the legacy way
+													log.Infof("[textsecure] Incoming WhisperMessage try legacy decrypting")
+
+													recid := recID(env.GetSourceE164())
+													sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
+													b, err = sc.SessionDecryptWhisperMessage(wm)
+													if _, ok := err.(axolotl.DuplicateMessageError); ok {
+														log.Infof("[textsecure] Incoming WhisperMessage %s. Ignoring.\n", err)
+														return nil
+													}
+												}
+												if err != nil {
+													return err
+												}
+												err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
+												if err != nil {
+													return err
+												}
+
+											case signalservice.Envelope_PREKEY_BUNDLE:
+												msg := env.GetContent()
+												pkwm, err := axolotl.LoadPreKeyWhisperMessage(msg)
+												if err != nil {
+													return err
+												}
+												b, err := sc.SessionDecryptPreKeyWhisperMessage(pkwm)
+												if _, ok := err.(axolotl.DuplicateMessageError); ok {
+													log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
+													return nil
+												}
+												if _, ok := err.(axolotl.PreKeyNotFoundError); ok {
+													log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
+													return nil
+												}
+												if _, ok := err.(axolotl.InvalidMessageError); ok {
+													log.Infof("[textsecure] Incoming PreKeyWhisperMessage %s. Ignoring.\n", err)
+													return nil
+												}
+												if err != nil {
+													return err
+												}
+												err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
+												if err != nil {
+													return err
+												}
+											case signalservice.Envelope_UNIDENTIFIED_SENDER:
+												msg := env.GetContent()
+												return fmt.Errorf("not implemented message type unindentified sender", msg)
+
+											default:
+												return MessageTypeNotImplementedError{uint32(*env.Type)}
+											}
+
+											return nil
+										}
