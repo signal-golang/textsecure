@@ -6,14 +6,11 @@ package textsecure
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -21,9 +18,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
+	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
-	"github.com/signal-golang/textsecure/credentials"
-	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/transport"
 	"golang.org/x/text/encoding/charmap"
@@ -366,7 +362,6 @@ func SetAccountCapabilities(capabilities AccountCapabilities) error {
 	if err != nil {
 		return err
 	}
-	GetProfile(config.UUID)
 	return nil
 }
 
@@ -404,8 +399,6 @@ func GetMyUUID() (string, error) {
 	dec := json.NewDecoder(resp.Body)
 	var response whoAmIResponse
 	dec.Decode(&response)
-	today := time.Now().Unix() / 86400
-	GetGroupAuthCredentials(today, today+6)
 	return response.UUID, nil
 }
 
@@ -422,61 +415,6 @@ func getNewDeviceVerificationCode() (string, error) {
 	var c jsonDeviceCode
 	dec.Decode(&c)
 	return c.VerificationCode, nil
-
-}
-
-func GetGroupAuthCredentials(startDay int64, endDay int64) error {
-	log.Debugln("[textsecure] get groupCredentials", fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
-	resp, err := transport.Transport.Get(fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
-	if err != nil {
-		return err
-	}
-	if resp.IsError() {
-		return resp
-	}
-	dec := json.NewDecoder(resp.Body)
-	var response credentials.GroupCredentials
-	dec.Decode(&response)
-	fmt.Printf("GetGroupAuthCredentials %+v\n", response)
-	credentials.Credentials = &response
-	return nil
-}
-
-func PatchGroupV2(groupActions *signalservice.GroupChange_Actions,
-	groupsV2Authorization *groupsv2.GroupsV2Authorization) error {
-
-	out, err := proto.Marshal(groupActions)
-	if err != nil {
-		log.Errorln("Failed to encode address groupActions:", err)
-		return err
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	br := bytes.NewReader(out)
-	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest("PUT", SIGNAL_CDN_URL+GROUPSV2_GROUP, br)
-	if config.UserAgent != "" {
-		req.Header.Set("X-Signal-Agent", config.UserAgent)
-	}
-	//auth missing:
-	// ClientZkAuthOperations     authOperations             = groupsOperations.getAuthOperations();
-	// AuthCredential             authCredential             = authOperations.receiveAuthCredential(self, today, authCredentialResponse);
-	// AuthCredentialPresentation authCredentialPresentation = authOperations.createAuthCredentialPresentation(new SecureRandom(), groupSecretParams, authCredential);
-	req.SetBasicAuth(groupsV2Authorization.Username, groupsV2Authorization.Password)
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Errorln("Failed to encode address groupActions2:", err)
-
-		return err
-	}
-	// if resp.isError() {
-	// 	log.Errorln("Failed to encode address groupActions3:", err)
-	// 	return resp
-	// }
-	log.Infoln("patch project:", resp)
-
-	return nil
 
 }
 
@@ -554,75 +492,7 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	return nil
 }
 
-// Profile describes the profile type
-type Profile struct {
-	IdentityKey                    string          `json:"identityKey"`
-	Name                           string          `json:"name"`
-	Avatar                         string          `json:"avatar"`
-	UnidentifiedAccess             string          `json:"uak"`
-	UnrestrictedUnidentifiedAccess bool            `json:"uua"`
-	Capabilities                   ProfileSettings `json:"capabilities"`
-	Username                       string          `json:"username"`
-	UUID                           string          `json:"uuid"`
-	// Payments                       string          `json:"payments"`
-	// Credential                     string          `json:"credential"`
-}
-
-// ProfileSettings contains the settings for the profile
-type ProfileSettings struct {
-	UUID    bool `json:"uuid"`
-	Gv2     bool `json:"gv2"`
-	Storage bool `json:"storage"`
-}
-
-func GetProfile(UUID string) {
-	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, UUID))
-	profile := &Profile{}
-
-	dec := json.NewDecoder(resp.Body)
-	err = dec.Decode(&profile)
-	if err != nil {
-		log.Debugln(err)
-	} else {
-		fmt.Printf("%+v\n", profile)
-		// log.Debugln(profile)
-
-	}
-
-}
-
-// GetProfileE164 get a profile by a phone number
-func GetProfileE164(tel string) (Contact, error) {
-
-	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, tel))
-	if err != nil {
-		log.Errorln("[textsecure] GetProfileE164 ", err)
-	}
-
-	profile := &Profile{}
-	dec := json.NewDecoder(resp.Body)
-	err = dec.Decode(&profile)
-	if err != nil {
-		log.Errorln("[textsecure] GetProfileE164 ", err)
-	}
-	avatar, _ := GetAvatar(profile.Avatar)
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(avatar)
-
-	c := contacts[profile.UUID]
-	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
-	if err != nil {
-		log.Errorln("[textsecure] GetProfileE164 ", err)
-	}
-	c.Username = profile.Username
-	c.UUID = profile.UUID
-	c.Avatar = avatarDecrypted
-	contacts[c.UUID] = c
-	WriteContactsToPath()
-	return c, nil
-}
-
-	type RemoteAttestationRequest struct {
+type RemoteAttestationRequest struct {
 	ClientPublic string
 }
 
@@ -659,34 +529,22 @@ type DiscoveryContact struct {
 // 	"iv":"DEq9x+BLEU2V9Yjh",
 // 	"mac":"yB1qUZQ9MfQ7cdRDT6t5Lw=="
 // }
-// GetAvatar retuns an avatar for it's url from signal cdn
-func GetAvatar(avatarURL string) (io.ReadCloser, error) {
-	log.Debugln("[textsecure] get avatar from ", avatarURL)
 
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	c := &http.Client{Transport: customTransport}
-	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarURL, nil)
-	req.Header.Add("Host", SERVICE_REFLECTOR_HOST)
-	req.Header.Add("Content-Type", "application/octet-stream")
-	resp, err := c.Do(req)
+// SyncContacts syncs the contacts
+func SyncContacts() error {
+	var t signalservice.SyncMessage_Request_Type
+	t = signalservice.SyncMessage_Request_CONTACTS
+	omsg := &signalservice.SyncMessage{
+		Request: &signalservice.SyncMessage_Request{
+			Type: &t,
+		},
+	}
+	_, err := sendSyncMessage(omsg, nil)
 	if err != nil {
-		log.Debugln("[textsecure] getAvatar ", err)
-
-		return nil, err
+		return err
 	}
 
-	return resp.Body, nil
-}
-
-func decryptAvatar(avatar []byte, identityKey []byte) ([]byte, error) {
-
-	l := len(avatar[:]) - 30
-	b, err := aesCtrNoPaddingDecrypt(identityKey[:16], avatar[:l])
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+	return nil
 }
 
 // PUT /v2/keys/
@@ -781,7 +639,7 @@ func idToHexUUID(id []byte) string {
 
 // GetRegisteredContacts returns the subset of the local contacts
 // that are also registered with the server
-func GetRegisteredContacts() ([]Contact, error) {
+func GetRegisteredContacts() ([]contacts.Contact, error) {
 	log.Debugln("[textsecure] GetRegisteredContacts")
 
 	lc, err := client.GetLocalContacts()
@@ -790,7 +648,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	}
 	tokensMap := map[string]*string{}
 	tokens := []string{}
-	m := []Contact{}
+	m := []contacts.Contact{}
 	// todo deduplicate contacts
 	for _, c := range lc {
 		t := c.Tel
@@ -833,20 +691,20 @@ func GetRegisteredContacts() ([]Contact, error) {
 		m[i].UUID = idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
 		ind++
 	}
-	lc = []Contact{}
-	contacts = map[string]Contact{}
+	lc = []contacts.Contact{}
+	contacts.Contacts = map[string]contacts.Contact{}
 	for _, c := range m {
 		lc = append(lc, c)
 
 		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
-			contacts[c.UUID] = c
+			contacts.Contacts[c.UUID] = c
 
 		} else {
-			contacts[c.Tel] = c
+			contacts.Contacts[c.Tel] = c
 			log.Debugln("[textsecure] empty uuid for tel ", c.Tel)
 		}
 	}
-	err = WriteContactsToPath()
+	err = contacts.WriteContactsToPath()
 	if err != nil {
 		log.Debugln("[textsecure] 3", err)
 

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	zkgroup "github.com/nanu-c/zkgroup"
-	credentials "github.com/signal-golang/textsecure/credentials"
 	transport "github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +31,7 @@ func NewGroupsV2Authorization(uuid []byte, groupSecretParams zkgroup.GroupSecret
 	publicGroupParams, err := groupSecretParams.PublicParams()
 	today := time.Now().Unix() / 86400
 
-	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(credentials.GetCredentialForRedemption(today).Credential)
+	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(GetCredentialForRedemption(today).Credential)
 	if err != nil {
 		log.Warnln("[textsecure] NewGroupsV2AuthorizationForGroup2", err.Error())
 

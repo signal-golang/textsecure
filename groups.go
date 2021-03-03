@@ -16,6 +16,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"gopkg.in/yaml.v2"
@@ -214,8 +215,8 @@ type groupMessage struct {
 	typ     signalservice.GroupContext_Type
 }
 
-func GetContactForTel(tel string) *Contact {
-	for _, c := range contacts {
+func GetContactForTel(tel string) *contacts.Contact {
+	for _, c := range contacts.Contacts {
 		if c.Tel == tel {
 			return &c
 		}

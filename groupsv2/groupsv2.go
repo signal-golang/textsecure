@@ -3,13 +3,13 @@ package groupsv2
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	zkgroup "github.com/nanu-c/zkgroup"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/transport"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
@@ -18,6 +18,7 @@ import (
 
 const ZKGROUP_SERVER_PUBLIC_PARAMS = "AMhf5ywVwITZMsff/eCyudZx9JDmkkkbV6PInzG4p8x3VqVJSFiMvnvlEKWuRob/1eaIetR31IYeAbm0NdOuHH8Qi+Rexi1wLlpzIo1gstHWBfZzy1+qHRV5A4TqPp15YzBPm0WSggW6PbSn+F4lf57VCnHF7p8SvzAA2ZZJPYJURt8X7bbg+H3i+PEjH9DXItNEqs2sNcug37xZQDLm7X0="
 const HIGHEST_KNOWN_EPOCH = 1
+const GROUPSV2_GROUP = "/v1/groups/"
 
 var (
 	groupURLHost   = "group.signal.org"
@@ -26,11 +27,14 @@ var (
 
 // GroupV2 holds group metadata.
 type GroupV2 struct {
-	MasterKey      []byte
-	Hexid          string
-	Name           string
-	Revision       uint32
-	DecryptedGroup *signalservice.DecryptedGroup
+	MasterKey       []byte
+	Hexid           string
+	Name            string
+	Revision        uint32
+	LastGroupChange *signalservice.DecryptedGroupChange
+	DecryptedGroup  *signalservice.DecryptedGroup
+	Members         []string
+	InvitedMembers  []string
 }
 
 var (
@@ -73,69 +77,87 @@ func SetupGroups(path string) error {
 	}
 	return nil
 }
+func getGroupJoinInfoFromServer(masterKey, groupLinkPassword []byte) error {
+	groupSecretParams, err := zkgroup.NewGroupSecretParams(masterKey)
+	if err != nil {
+		return err
+	}
+	log.Debugln(groupSecretParams)
+	return nil
+}
+func getAuthorizationForToday() {
+
+}
 func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error) {
 	groupContext := dm.GetGroupV2()
 	if groupContext == nil {
 		return nil, nil
 	}
-	groupChange := &signalservice.GroupChange{}
-	err := proto.Unmarshal(groupContext.GroupChange, groupChange)
-	if err != nil {
-		log.Errorln(err)
-	}
-	// verify server signature
-	zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(ZKGROUP_SERVER_PUBLIC_PARAMS)
-	serverPublicParams, err := zkgroup.NewServerPublicParams(zkGroupServerPublicParams)
-	if err != nil {
-		log.Errorln("[textsecure] [groupsv2] server public params", err)
-	} else {
-		err = serverPublicParams.VerifySignature(groupChange.GetActions(), groupChange.GetServerSignature())
-		if err != nil {
-			log.Errorln("[textsecure] [groupsv2] signature verification failed", err)
-			return nil, err
-		}
-		log.Debugln("[textsecure] [groupsv2] signature verification succesful")
-
-	}
-
+	log.Debugln("[textsecure][groupsv2] groupContext ", groupContext)
 	hexid := idToHex(groupContext.GetMasterKey())
-	// find group
+	// search for group
 	group, err := loadGroupV2(hexid)
-	log.Debugln("[textsecure][groupsv2] handle group action ", hexid)
 	if err != nil {
-		log.Errorln("[textsecure][groupsv2]1 handle groupv2", err)
+		// group not found, create group
+		log.Debugln("[textsecure][groupsv2] handle groupv2", err)
 		group = &GroupV2{
-			MasterKey:      groupContext.GetMasterKey(),
-			Hexid:          hexid,
-			Revision:       groupContext.GetRevision(),
-			DecryptedGroup: &signalservice.DecryptedGroup{},
+			MasterKey: groupContext.GetMasterKey(),
+			Hexid:     hexid,
+			Revision:  groupContext.GetRevision(),
 		}
+		// TODO: get members from server
 		groupsV2[hexid] = group
-		saveGroupV2(hexid)
+		err = saveGroupV2(hexid)
+		if err != nil {
+			log.Debugln("[textsecure][groupsv2] handle groupv2 save", err)
+		}
 
 	}
-	err = saveGroupV2(hexid)
-	if err != nil {
-		log.Debugln("[textsecure][groupsv2]2  handle groupv2 save", err)
-	}
-	groupSecrets, err := zkgroup.NewGroupSecretParams(group.MasterKey)
-	if err != nil {
-		log.Debugln("[textsecure][groupsv2] 3handle groupv2", err)
-	}
-	clientZipher := zkgroup.NewClientZkGroupCipher(groupSecrets)
-	// get group changes
+	// handle group changes
+	if len(groupContext.GroupChange) > 0 {
+		groupChange := &signalservice.GroupChange{}
+		err := proto.Unmarshal(groupContext.GroupChange, groupChange)
+		if err != nil {
+			log.Errorln(err)
+		}
+		// verify server signature
+		zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(ZKGROUP_SERVER_PUBLIC_PARAMS)
+		serverPublicParams, err := zkgroup.NewServerPublicParams(zkGroupServerPublicParams)
+		if err != nil {
+			log.Errorln("[textsecure][groupsv2] server public params", err)
+		} else {
+			if len(groupChange.GetActions()) != 0 {
+				err = serverPublicParams.VerifySignature(groupChange.GetActions(), groupChange.GetServerSignature())
+				if err != nil {
+					log.Errorln("[textsecure][groupsv2] signature verification failed", err)
+					return nil, err
+				}
+				log.Debugln("[textsecure][groupsv2] signature verification succesful")
+			}
+		}
 
-	// get group actions, maybe needs to be decrypted
-	groupActions := &signalservice.GroupChange_Actions{}
-	err = proto.Unmarshal(groupChange.Actions, groupActions)
-	if err != nil {
-		log.Errorln(err)
-	}
-	decryptedGroupChange := decryptGroupChangeActions(groupActions, clientZipher)
-	handleGroupChangesForGroup(decryptedGroupChange, hexid)
-	group.DecryptedGroup.PendingMembers = decryptedGroupChange.NewPendingMembers
+		log.Debugln("[textsecure][groupsv2] handle group action ", hexid)
 
-	fmt.Printf("decryptedGroupChange %+v\n", decryptedGroupChange)
+		groupSecrets, err := zkgroup.NewGroupSecretParams(group.MasterKey)
+		if err != nil {
+			log.Debugln("[textsecure][groupsv2] 3handle groupv2", err)
+		}
+		clientZipher := zkgroup.NewClientZkGroupCipher(groupSecrets)
+		// get group changes
+
+		// get group actions, maybe needs to be decrypted
+		groupActions := &signalservice.GroupChange_Actions{}
+		err = proto.Unmarshal(groupChange.Actions, groupActions)
+		if err != nil {
+			log.Errorln(err)
+		}
+		decryptedGroupChange := decryptGroupChangeActions(groupActions, clientZipher)
+		handleGroupChangesForGroup(decryptedGroupChange, hexid)
+		group.LastGroupChange = decryptedGroupChange
+		// group.Name = group.LastGroupChange.NewTitle.Value
+		log.Println("[textsecure][groupsv2] decryptedGroupChange %+v\n", decryptedGroupChange)
+
+	}
 	return group, nil
 }
 func handleGroupChangesForGroup(groupChange *signalservice.DecryptedGroupChange, hexid string) {
@@ -285,4 +307,49 @@ func loadGroupV2(hexid string) (*GroupV2, error) {
 // idToPath returns the path of the file for storing a group's state
 func idToPath(hexid string) string {
 	return filepath.Join(groupV2Dir, hexid)
+}
+
+// group change hanling:
+// if gr2 != nil {
+// 	if gr2.DecryptedGroup.PendingMembers != nil {
+// 		groupAction := groupsv2.CreateRequestForGroup(gr2.Hexid, gr2.DecryptedGroup.PendingMembers[0].Uuid)
+// 		authorization, err := groupsv2.NewGroupsV2AuthorizationForGroup(gr2.DecryptedGroup.PendingMembers[0].Uuid, gr2.Hexid)
+// 		if err != nil {
+// 			log.Errorln("[textsecure] pacth gro", err)
+// 		} else {
+// 			log.Errorln("[textsecure] Yeai", err)
+
+// 			PatchGroupV2(groupAction, authorization)
+// 		}
+
+// 	}
+// }
+
+func basicAuth(username, password string) string {
+	auth := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(auth))
+}
+
+func PatchGroupV2(groupActions *signalservice.GroupChange_Actions,
+	groupsV2Authorization *GroupsV2Authorization) error {
+
+	out, err := proto.Marshal(groupActions)
+	if err != nil {
+		log.Errorln("Failed to encode address groupActions:", err)
+		return err
+	}
+	resp, err := transport.CdnTransport.PutWithAuth(GROUPSV2_GROUP, out, "", "Basic "+basicAuth(groupsV2Authorization.Username, groupsV2Authorization.Password))
+	if err != nil {
+		log.Errorln("Failed to encode address groupActions2:", err)
+
+		return err
+	}
+	// if resp.isError() {
+	// 	log.Errorln("Failed to encode address groupActions3:", err)
+	// 	return resp
+	// }
+	log.Infoln("patch project:", resp)
+
+	return nil
+
 }

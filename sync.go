@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/signal-golang/textsecure/contacts"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 )
@@ -81,7 +82,7 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 	if err != nil {
 		return err
 	}
-	cs, err := handleContacts(dest, dm)
+	cs, err := contacts.HandleContacts(dest, dm)
 	if err != nil {
 		return err
 	}
