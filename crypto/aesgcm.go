@@ -7,6 +7,7 @@ import (
 
 const TAG_LENGTH_BYTES = 16
 
+// AesgcmDecrypt ...
 func AesgcmDecrypt(key, nonce, data, mac []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -20,4 +21,19 @@ func AesgcmDecrypt(key, nonce, data, mac []byte) ([]byte, error) {
 	ciphertext := append(data, mac...)
 
 	return aesgcm.Open(nil, nonce, ciphertext, nil)
+}
+
+//indirect tested by profile_cipher_test.go
+
+//AesgcmEncrypt ...
+func AesgcmEncrypt(key, nonce, input []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	return aesgcm.Seal(nil, nonce, input, nil), nil
 }
