@@ -87,3 +87,6 @@ func getCredendtails(path string) (*AuthCredentials, error) {
 	return &a, nil
 
 }
+func getGroupJoinInfo(groupSecretParams, groupLinkPassword []byte, groupsV2AuthorizationString string) {
+
+}

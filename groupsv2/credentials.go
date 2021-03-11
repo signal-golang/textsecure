@@ -3,6 +3,7 @@ package groupsv2
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	transport "github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
@@ -23,9 +24,17 @@ type GroupCredential struct {
 
 var Credentials *GroupCredentials
 
+func getToday() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond) / (1000 * 60 * 60 * 24)
+}
+
 func GetCredentialForRedemption(day int64) *GroupCredential {
 	if Credentials == nil {
-		return nil
+		today := getToday()
+		err := GetGroupAuthCredentials(today, today+7)
+		if err != nil {
+			log.Errorln("[textsecure] get groupCredentials ", err)
+		}
 	}
 	for _, credential := range Credentials.Credentials {
 		if credential.RedemptionTime == day {
@@ -33,6 +42,13 @@ func GetCredentialForRedemption(day int64) *GroupCredential {
 		}
 	}
 	return nil
+}
+
+func GetCredentialForToday() *GroupCredential {
+
+	today := getToday()
+	credential := GetCredentialForRedemption(today)
+	return credential
 }
 
 func GetGroupAuthCredentials(startDay int64, endDay int64) error {

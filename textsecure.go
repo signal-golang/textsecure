@@ -19,6 +19,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/groupsv2"
 	"github.com/signal-golang/textsecure/profiles"
@@ -218,7 +219,7 @@ type Client struct {
 	GetPin                func() string
 	GetStoragePassword    func() string
 	GetCaptchaToken       func() string
-	GetConfig             func() (*Config, error)
+	GetConfig             func() (*config.Config, error)
 	GetLocalContacts      func() ([]contacts.Contact, error)
 	MessageHandler        func(*Message)
 	TypingMessageHandler  func(*Message)
@@ -231,14 +232,13 @@ type Client struct {
 }
 
 var (
-	config *Config
 	client *Client
 )
 
 // setupLogging sets the logging verbosity level based on configuration
 // and environment variables
 func setupLogging() {
-	loglevel := config.LogLevel
+	loglevel := config.ConfigFile.LogLevel
 	if loglevel == "" {
 		loglevel = os.Getenv("TEXTSECURE_LOGLEVEL")
 	}
@@ -267,7 +267,7 @@ func Setup(c *Client) error {
 	var err error
 	client = c
 
-	config, err = loadConfig()
+	config.ConfigFile, err = loadConfig()
 	if err != nil {
 		return err
 	}
@@ -313,39 +313,40 @@ func Setup(c *Client) error {
 	}
 
 	client.RegistrationDone()
-	rootCa.SetupCA(config.RootCA)
-	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
-	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
-	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
+	rootCa.SetupCA(config.ConfigFile.RootCA)
+	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
-	config = checkUUID(config)
-	if len(config.ProfileKey) == 0 {
-		config.ProfileKey = profiles.GenerateProfileKey()
-		saveConfig(config)
+	config.ConfigFile = checkUUID(config.ConfigFile)
+	if len(config.ConfigFile.ProfileKey) == 0 {
+		config.ConfigFile.ProfileKey = profiles.GenerateProfileKey()
+		saveConfig(config.ConfigFile)
 	}
-	profiles.UpdateProfile(config.ProfileKey, config.UUID, config.Name)
+	profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
 	return err
 }
 
 func registerDevice() error {
-	if config.Tel == "" {
-		config.Tel = client.GetPhoneNumber()
-		if config.Tel == "" {
+	if config.ConfigFile.Tel == "" {
+		config.ConfigFile.Tel = client.GetPhoneNumber()
+		if config.ConfigFile.Tel == "" {
 			return errors.New("empty phone number")
 		}
 	}
-	rootCa.SetupCA(config.RootCA)
-	transport.SetupTransporter(config.Server, config.Tel, registrationInfo.password, config.UserAgent, config.ProxyServer)
+	rootCa.SetupCA(config.ConfigFile.RootCA)
+	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	// try to register without token
-	code, responseCode, err := requestCode(config.Tel, config.VerificationType, "")
+	code, responseCode, err := requestCode(config.ConfigFile.Tel, config.ConfigFile.VerificationType, "")
 	if responseCode != nil {
 		if *responseCode == responseNeedCaptcha {
 			// Need to generate a token on https://signalcaptchas.org/registration/generate.html
 			log.Infoln("[textsecure] registration needs captcha")
 
 			captcha := client.GetCaptchaToken()
-			code, _, err = requestCode(config.Tel, config.VerificationType, captcha)
+			code, _, err = requestCode(config.ConfigFile.Tel, config.ConfigFile.VerificationType, captcha)
 			if err != nil {
 				return err
 			}
@@ -355,7 +356,7 @@ func registerDevice() error {
 	} else if err != nil {
 		return err
 	}
-	if config.VerificationType != "dev" {
+	if config.ConfigFile.VerificationType != "dev" {
 		code = client.GetVerificationCode()
 	}
 	err, credentials := verifyCode(code, nil, nil)
@@ -387,8 +388,8 @@ func registerDevice() error {
 	if err != nil {
 		return err
 	}
-	config.ProfileKey = profiles.GenerateProfileKey()
-	config = checkUUID(config)
+	config.ConfigFile.ProfileKey = profiles.GenerateProfileKey()
+	config.ConfigFile = checkUUID(config.ConfigFile)
 	client.RegistrationDone()
 	if client.RegistrationDone != nil {
 		log.Infoln("[textsecure] RegistrationDone")
@@ -423,7 +424,7 @@ func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) e
 
 	if dm := content.GetDataMessage(); dm != nil {
 		return handleDataMessage(srcE164, srcUUID, timestamp, dm)
-	} else if sm := content.GetSyncMessage(); sm != nil && config.Tel == srcE164 {
+	} else if sm := content.GetSyncMessage(); sm != nil && config.ConfigFile.Tel == srcE164 {
 		return handleSyncMessage(srcE164, srcUUID, timestamp, sm)
 	} else if cm := content.GetCallMessage(); cm != nil {
 		return handleCallMessage(srcE164, srcUUID, timestamp, cm)

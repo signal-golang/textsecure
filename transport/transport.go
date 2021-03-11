@@ -40,6 +40,13 @@ func SetupDirectoryTransporter(Url string, tel string, password string, userAgen
 	DirectoryTransport = newHTTPTransporter(Url, tel, password, userAgent, proxyServer, rootCa.DirectoryCA)
 }
 
+var StorageTransport *httpTransporter
+
+func SetupStorageTransporter(Url string, tel string, password string, userAgent string, proxyServer string) {
+	// setupCA()
+	StorageTransport = newHTTPTransporter(Url, tel, password, userAgent, proxyServer, rootCa.DirectoryCA)
+}
+
 type response struct {
 	Status  int
 	Body    io.ReadCloser
@@ -133,7 +140,29 @@ func (ht *httpTransporter) Get(url string) (*response, error) {
 
 	return r, err
 }
+func (ht *httpTransporter) GetWithAuth(url string, auth string) (*response, error) {
+	req, err := http.NewRequest("GET", ht.baseURL+url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if ht.userAgent != "" {
+		req.Header.Set("X-Signal-Agent", ht.userAgent)
+	}
+	req.Header.Set("Authorization", auth)
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+	}
 
+	log.Debugf("[textsecure] GET with auth %s %d\n", url, r.Status)
+
+	return r, err
+}
 func (ht *httpTransporter) Del(url string) (*response, error) {
 	req, err := http.NewRequest("DELETE", ht.baseURL+url, nil)
 	if err != nil {
@@ -207,7 +236,7 @@ func (ht *httpTransporter) PutWithAuth(url string, body []byte, ct string, auth 
 		r.Cookies = cookies
 	}
 
-	log.Debugf("[textsecure] PUT %s %d\n", url, r.Status)
+	log.Debugf("[textsecure] PUT with auth %s %d\n", url, r.Status)
 
 	return r, err
 }

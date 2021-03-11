@@ -20,6 +20,7 @@ type QueryEnvelope struct {
 	Mac       []byte `json:"mac"`
 	RequestId []byte `json:"requestId"`
 }
+
 type DiscoveryRequest struct {
 	AddressCount int                       `json:"addressCount"`
 	Commitment   []byte                    `json:"commitment"`
@@ -29,7 +30,6 @@ type DiscoveryRequest struct {
 	Mac          []byte                    `json:"mac"`
 }
 
-//copied from nanu_c
 type RemoteAttestation struct {
 	RequestId []byte
 	Keys      RemoteAttestationKeys
@@ -91,11 +91,11 @@ func buildQueryData(addressBook []string) ([]byte, error) {
 func buildQueryDataWithNonce(addressBook []string, nonce []byte) ([]byte, error) {
 	var addressData []byte
 	for _, address := range addressBook {
-		addressId, err := parse(address)
+		addressID, err := parse(address)
 		if err != nil {
 			return nil, err
 		}
-		addressData = append(addressData, toByteArray(addressId)...)
+		addressData = append(addressData, toByteArray(addressID)...)
 	}
 	return append(nonce, addressData...), nil
 }
@@ -118,8 +118,8 @@ func buildQueryEnvelopeFromAttestation(attestation *contactsDiscovery.RemoteAtte
 	return buildQueryEnvelope(attestation.RequestId, attestation.Keys.ClientKey, queryDataKey)
 }
 
-func buildQueryEnvelope(requestId, clientKey, queryDataKey []byte) (*QueryEnvelope, error) {
-	result, err := aesEncrypt(clientKey, requestId, queryDataKey)
+func buildQueryEnvelope(requestID, clientKey, queryDataKey []byte) (*QueryEnvelope, error) {
+	result, err := aesEncrypt(clientKey, requestID, queryDataKey)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func buildQueryEnvelope(requestId, clientKey, queryDataKey []byte) (*QueryEnvelo
 		Data:      result.data,
 		Mac:       result.mac,
 		Iv:        result.iv,
-		RequestId: requestId,
+		RequestId: requestID,
 	}, nil
 }
 

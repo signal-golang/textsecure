@@ -16,6 +16,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -80,7 +81,7 @@ func loadGroup(path string) error {
 
 // RemoveGroupKey removes the group key
 func RemoveGroupKey(hexid string) error {
-	err := os.Remove(config.StorageDir + "/groups/" + hexid)
+	err := os.Remove(config.ConfigFile.StorageDir + "/groups/" + hexid)
 	if err != nil {
 		return err
 	}
@@ -90,8 +91,8 @@ func RemoveGroupKey(hexid string) error {
 
 // setupGroups reads all groups' state from storage.
 func setupGroups() error {
-	groupsv2.SetupGroups(config.StorageDir)
-	groupDir = filepath.Join(config.StorageDir, "groups")
+	groupsv2.SetupGroups(config.ConfigFile.StorageDir)
+	groupDir = filepath.Join(config.ConfigFile.StorageDir, "groups")
 	if err := os.MkdirAll(groupDir, 0700); err != nil {
 		return err
 	}
@@ -244,7 +245,7 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 	}
 	timestamp := uint64(time.Now().UnixNano() / 1000000)
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			c := GetContactForTel(m)
 			if c != nil && c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
 				m = c.UUID
@@ -325,7 +326,7 @@ func changeGroup(hexid, name string, members []string) (*Group, error) {
 	}
 
 	g.Name = name
-	g.Members = append(members, config.Tel)
+	g.Members = append(members, config.ConfigFile.Tel)
 	saveGroup(hexid)
 
 	return g, nil
@@ -333,7 +334,7 @@ func changeGroup(hexid, name string, members []string) (*Group, error) {
 
 func sendUpdate(g *Group) error {
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{
@@ -359,7 +360,7 @@ func newGroup(name string, members []string) (*Group, error) {
 		ID:      id,
 		Hexid:   hexid,
 		Name:    name,
-		Members: append(members, config.Tel),
+		Members: append(members, config.ConfigFile.Tel),
 	}
 	err := saveGroup(hexid)
 	if err != nil {
@@ -372,7 +373,7 @@ func newGroup(name string, members []string) (*Group, error) {
 func RequestGroupInfo(g *Group) error {
 	log.Debugln("[textsecure] request group update", g.Hexid)
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{
@@ -388,7 +389,7 @@ func RequestGroupInfo(g *Group) error {
 	}
 	if len(g.Members) == 0 {
 		omsg := &outgoingMessage{
-			destination: config.Tel,
+			destination: config.ConfigFile.Tel,
 			group: &groupMessage{
 				id:  g.ID,
 				typ: signalservice.GroupContext_REQUEST_INFO,
@@ -448,7 +449,7 @@ func LeaveGroup(hexid string) error {
 	}
 
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{

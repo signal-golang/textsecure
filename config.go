@@ -7,34 +7,15 @@ import (
 	"io/ioutil"
 
 	"github.com/go-yaml/yaml"
+	"github.com/signal-golang/textsecure/config"
 	log "github.com/sirupsen/logrus"
 )
-
-// Config holds application configuration settings
-type Config struct {
-	Tel                       string              `yaml:"tel"` // Our telephone number
-	UUID                      string              `yaml:"uuid" default:"notset"`
-	Server                    string              `yaml:"server"`                    // The TextSecure server URL
-	RootCA                    string              `yaml:"rootCA"`                    // The TLS signing certificate of the server we connect to
-	ProxyServer               string              `yaml:"proxy"`                     // HTTP Proxy URL if one is being used
-	VerificationType          string              `yaml:"verificationType"`          // Code verification method during registration (SMS/VOICE/DEV)
-	StorageDir                string              `yaml:"storageDir"`                // Directory for the persistent storage
-	UnencryptedStorage        bool                `yaml:"unencryptedStorage"`        // Whether to store plaintext keys and session state (only for development)
-	StoragePassword           string              `yaml:"storagePassword"`           // Password to the storage
-	LogLevel                  string              `yaml:"loglevel"`                  // Verbosity of the logging messages
-	UserAgent                 string              `yaml:"userAgent"`                 // Override for the default HTTP User Agent header field
-	AlwaysTrustPeerID         bool                `yaml:"alwaysTrustPeerID"`         // Workaround until proper handling of peer reregistering with new ID.
-	AccountCapabilities       AccountCapabilities `yaml:"accountCapabilities"`       // Account Attrributes are used in order to track the support of different function for signal
-	DiscoverableByPhoneNumber bool                `yaml:"discoverableByPhoneNumber"` // If the user should be found by his phone number
-	ProfileKey                []byte              `yaml:"profileKey"`                // The profile key is used in many places to encrypt the avatar, name etc and also in groupsv2 context
-	Name                      string              `yaml:"name"`
-}
 
 var configFile string
 
 // TODO: some race conditions to be solved
-func checkUUID(cfg *Config) *Config {
-	defer func(cfg *Config) *Config {
+func checkUUID(cfg *config.Config) *config.Config {
+	defer func(cfg *config.Config) *config.Config {
 		log.Debugln("[textsecure] missing my uuid defer")
 		recover()
 		UUID, err := GetMyUUID()
@@ -53,14 +34,14 @@ func checkUUID(cfg *Config) *Config {
 }
 
 // ReadConfig reads a YAML config file
-func ReadConfig(fileName string) (*Config, error) {
+func ReadConfig(fileName string) (*config.Config, error) {
 	b, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, err
 	}
 	configFile = fileName
 
-	cfg := &Config{}
+	cfg := &config.Config{}
 	err = yaml.Unmarshal(b, cfg)
 	if err != nil {
 		return nil, err
@@ -69,7 +50,7 @@ func ReadConfig(fileName string) (*Config, error) {
 }
 
 // WriteConfig saves a config to a file
-func WriteConfig(filename string, cfg *Config) error {
+func WriteConfig(filename string, cfg *config.Config) error {
 	b, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
@@ -77,13 +58,13 @@ func WriteConfig(filename string, cfg *Config) error {
 	return ioutil.WriteFile(filename, b, 0600)
 }
 
-func saveConfig(cfg *Config) {
+func saveConfig(cfg *config.Config) {
 	WriteConfig(configFile, cfg)
 }
 
 // loadConfig gets the config via the client and makes sure
 // that for unset values sane defaults are used
-func loadConfig() (*Config, error) {
+func loadConfig() (*config.Config, error) {
 	cfg, err := client.GetConfig()
 
 	if err != nil {

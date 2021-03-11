@@ -17,6 +17,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
@@ -193,41 +194,33 @@ func requestCode(tel, method, captcha string) (string, *int, error) {
 
 // AccountAttributes describes what features are supported
 type AccountAttributes struct {
-	SignalingKey                   string              `json:"signalingKey" yaml:"signalingKey"`
-	FetchesMessages                bool                `json:"fetchesMessages" yaml:"fetchesMessages"`
-	RegistrationID                 uint32              `json:"registrationId" yaml:"registrationId"`
-	Name                           string              `json:"name" yaml:"name"`
-	Video                          bool                `json:"video" yaml:"video"`
-	Voice                          bool                `json:"voice" yaml:"voice"`
-	Pin                            *string             `json:"pin" yaml:"pin"` // deprecated
-	BasicStorageCredentials        AuthCredentials     `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
-	Capabilities                   AccountCapabilities `json:"capabilities" yaml:"capabilities"`
-	DiscoverableByPhoneNumber      bool                `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
-	UnrestrictedUnidentifiedAccess bool                `json:"unrestrictedUnidentifiedAccess"`
-	UnidentifiedAccessKey          *[]byte             `json:"unidentifiedAccessKey"`
+	SignalingKey                   string                     `json:"signalingKey" yaml:"signalingKey"`
+	FetchesMessages                bool                       `json:"fetchesMessages" yaml:"fetchesMessages"`
+	RegistrationID                 uint32                     `json:"registrationId" yaml:"registrationId"`
+	Name                           string                     `json:"name" yaml:"name"`
+	Video                          bool                       `json:"video" yaml:"video"`
+	Voice                          bool                       `json:"voice" yaml:"voice"`
+	Pin                            *string                    `json:"pin" yaml:"pin"` // deprecated
+	BasicStorageCredentials        AuthCredentials            `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
+	Capabilities                   config.AccountCapabilities `json:"capabilities" yaml:"capabilities"`
+	DiscoverableByPhoneNumber      bool                       `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
+	UnrestrictedUnidentifiedAccess bool                       `json:"unrestrictedUnidentifiedAccess"`
+	UnidentifiedAccessKey          *[]byte                    `json:"unidentifiedAccessKey"`
 }
 
 type UpdateAccountAttributes struct {
-	SignalingKey                   *string             `json:"signalingKey" yaml:"signalingKey"`
-	FetchesMessages                bool                `json:"fetchesMessages" yaml:"fetchesMessages"`
-	RegistrationID                 uint32              `json:"registrationId" yaml:"registrationId"`
-	Name                           string              `json:"name" yaml:"name"`
-	Pin                            *string             `json:"pin" yaml:"pin"` // deprecated
-	RegistrationLock               *string             `json:"registrationLock" yaml:"registrationLock"`
-	UnidentifiedAccessKey          *[]byte             `json:"unidentifiedAccessKey"`
-	UnrestrictedUnidentifiedAccess bool                `json:"unrestrictedUnidentifiedAccess"`
-	Capabilities                   AccountCapabilities `json:"capabilities" yaml:"capabilities"`
-	DiscoverableByPhoneNumber      bool                `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
-	Video                          bool                `json:"video" yaml:"video"`
-	Voice                          bool                `json:"voice" yaml:"voice"`
-}
-
-// AccountCapabilities describes what functions axolotl supports
-type AccountCapabilities struct {
-	UUID         bool `json:"uuid" yaml:"uuid"`
-	Gv2          bool `json:"gv2-3" yaml:"gv2"`
-	Storage      bool `json:"storage" yaml:"storage"`
-	Gv1Migration bool `json:"gv1-migration" yaml:"gv1-migration"`
+	SignalingKey                   *string                    `json:"signalingKey" yaml:"signalingKey"`
+	FetchesMessages                bool                       `json:"fetchesMessages" yaml:"fetchesMessages"`
+	RegistrationID                 uint32                     `json:"registrationId" yaml:"registrationId"`
+	Name                           string                     `json:"name" yaml:"name"`
+	Pin                            *string                    `json:"pin" yaml:"pin"` // deprecated
+	RegistrationLock               *string                    `json:"registrationLock" yaml:"registrationLock"`
+	UnidentifiedAccessKey          *[]byte                    `json:"unidentifiedAccessKey"`
+	UnrestrictedUnidentifiedAccess bool                       `json:"unrestrictedUnidentifiedAccess"`
+	Capabilities                   config.AccountCapabilities `json:"capabilities" yaml:"capabilities"`
+	DiscoverableByPhoneNumber      bool                       `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
+	Video                          bool                       `json:"video" yaml:"video"`
+	Voice                          bool                       `json:"voice" yaml:"voice"`
 }
 
 // AuthCredentials holds the credentials for the websocket connection
@@ -266,7 +259,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 		Video:           false,
 		Pin:             nil,
 		Name:            "test",
-		Capabilities: AccountCapabilities{
+		Capabilities: config.AccountCapabilities{
 			UUID:    false,
 			Gv2:     true,
 			Storage: false,
@@ -307,7 +300,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 			return resp, nil
 		}
 	}
-	config.AccountCapabilities = vd.Capabilities
+	config.ConfigFile.AccountCapabilities = vd.Capabilities
 	return nil, nil
 }
 
@@ -335,7 +328,7 @@ func RegisterWithUPS(token string) error {
 }
 
 // SetAccountCapabilities lets the client decide when it's ready for new functions to support for example groupsv2
-func SetAccountCapabilities(capabilities AccountCapabilities) error {
+func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 	// var key []byte
 	// key = identityKey.PrivateKey.Key()[:]
 	// unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
@@ -465,7 +458,7 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	pm := &signalservice.ProvisionMessage{
 		IdentityKeyPublic:  identityKey.PublicKey.Serialize(),
 		IdentityKeyPrivate: identityKey.PrivateKey.Key()[:],
-		Uuid:               &config.UUID,
+		Uuid:               &config.ConfigFile.UUID,
 		ProvisioningCode:   &verificationCode,
 	}
 
@@ -798,7 +791,7 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	if msg.groupV2 != nil {
 		dm.GroupV2 = msg.groupV2
 	}
-	dm.ProfileKey = config.ProfileKey
+	dm.ProfileKey = config.ConfigFile.ProfileKey
 	dm.Flags = &msg.flags
 
 	return dm
@@ -1065,9 +1058,9 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 // TODO switch to uuids
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
 	log.Debugln("[textsecure] sendSyncMessage", timestamp)
-	user := config.Tel //TODO: switch tu uuid
-	if config.UUID != "" {
-		user = config.UUID
+	user := config.ConfigFile.Tel //TODO: switch tu uuid
+	if config.ConfigFile.UUID != "" {
+		user = config.ConfigFile.UUID
 	}
 	if _, ok := deviceLists[user]; !ok {
 		deviceLists[user] = []uint32{1}

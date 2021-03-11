@@ -41,5 +41,3 @@ require (
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20210104141923-aac4ce9116a7 // indirect
 )
-
-replace github.com/github.com/nanu-c/zkgroup v0.7.7 => /home/nanu/go/src/github.com/github.com/nanu-c/zkgroup1
