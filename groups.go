@@ -19,6 +19,7 @@ import (
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/groupsv2"
+	groupsV2 "github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"gopkg.in/yaml.v2"
 )
@@ -224,13 +225,53 @@ func GetContactForTel(tel string) *contacts.Contact {
 	}
 	return nil
 }
+func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
+	var ts uint64
+	var err error
+	g := groupsV2.FindGroup(hexid)
+	if g == nil {
+		log.Infoln("[textsecure] sendGroupv2Helper unknown group id")
+		return 0, UnknownGroupIDError{hexid}
+	}
+	if len(g.DecryptedGroup.Members) == 0 {
+		return 0, fmt.Errorf("[textsecure] sendGroupV2Helper empty members list")
+	}
+	timestamp := uint64(time.Now().UnixNano() / 1000000)
+	groupsV2Context := &signalservice.GroupContextV2{
+		MasterKey: g.MasterKey,
+		Revision:  &g.DecryptedGroup.Revision,
+	}
+	for _, m := range g.DecryptedGroup.Members {
+		omsg := &outgoingMessage{
+			destination: idToHexUUID(m.Uuid),
+			msg:         msg,
+			attachment:  a,
+			expireTimer: timer,
+			timestamp:   &timestamp,
+			groupV2:     groupsV2Context,
+		}
+		ts, err = sendMessage(omsg)
+		if err != nil {
+			log.Errorln("[textsecure] sendGroupV2Helper", err, omsg.destination)
+			return 0, err
+		}
+		log.Debugln("[textsecure] sendGroupHelper message to group sent", omsg.destination)
+	}
+	return ts, nil
+}
+
 func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
 	var ts uint64
 	var err error
 	g, ok := groups[hexid]
 	if !ok {
 		log.Infoln("[textsecure] sendGroupHelper unknown group id")
-		return 0, UnknownGroupIDError{hexid}
+		ts, err = sendGroupV2Helper(hexid, msg, a, timer)
+		if err != nil {
+			return 0, UnknownGroupIDError{hexid}
+		}
+		return ts, nil
+
 	}
 	// if len is 0 smth is obviously wrong
 	if len(g.Members) == 0 {

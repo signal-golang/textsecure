@@ -10,7 +10,7 @@ import (
 
 func createGroupContextForGroup(hexid string) *signalservice.GroupContextV2 {
 	var revision uint32
-	revision = groupsV2[hexid].Revision + 1
+	revision = groupsV2[hexid].GroupContext.Revision + 1
 	return &signalservice.GroupContextV2{
 		MasterKey: groupsV2[hexid].MasterKey,
 		Revision:  &revision,

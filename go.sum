@@ -62,6 +62,8 @@ github.com/mibk/dupl v1.0.0/go.mod h1:pCr4pNxxIbFGvtyCOi0c7LVjmV6duhKWV+ex5vh38M
 github.com/mozilla/tls-observatory v0.0.0-20200317151703-4fa42e1c2dee/go.mod h1:SrKMQvPiws7F7iqYp8/TX+IhxCYhzr6N/1yb8cwHsGk=
 github.com/nanu-c/zkgroup v0.7.16 h1:BRozu0uP2VzHW5cXhSreEfdK1g6wsMqwB2JOmSdbHgk=
 github.com/nanu-c/zkgroup v0.7.16/go.mod h1:6c1LFh8Neuzl2qF51yPsH4sdvXFeEdfucfITI4Jbu7o=
+github.com/nanu-c/zkgroup v0.7.17 h1:phyQDldLT9Fett9VQkTGOU7Lb+OJk3EPQNWS0X89Y7Y=
+github.com/nanu-c/zkgroup v0.7.17/go.mod h1:6c1LFh8Neuzl2qF51yPsH4sdvXFeEdfucfITI4Jbu7o=
 github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d/go.mod h1:o96djdrsSGy3AWPyBgZMAGfxZNfgntdJG+11KU4QvbU=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=

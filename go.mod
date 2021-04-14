@@ -19,7 +19,7 @@ require (
 	github.com/mdempsky/maligned v0.0.0-20201101000000-d73c43cb16d0 // indirect
 	github.com/mdempsky/unconvert v0.0.0-20200228143138-95ecdbfc0b5f // indirect
 	github.com/mibk/dupl v1.0.0 // indirect
-	github.com/nanu-c/zkgroup v0.7.16
+	github.com/nanu-c/zkgroup v0.7.17
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/opennota/check v0.0.0-20180911053232-0c771f5545ff // indirect
 	github.com/pieterbork/ed25519 v0.0.0-20200301051623-f19b832d0d2e // indirect
