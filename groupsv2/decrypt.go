@@ -19,7 +19,7 @@ func (g *GroupV2) decryptGroupFromServer(group *signalservice.Group) error {
 	return err
 }
 func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
-	log.Debugln("[a]", g.cipher)
+	log.Debugln("[textsecure][groupsv2] decrypt group")
 	if g.cipher == nil {
 		groupSecretParams, err := zkgroup.NewGroupSecretParams(g.MasterKey)
 		if err != nil {
@@ -49,16 +49,12 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 		return nil, err
 	}
 
-	decryptedGroup.Title = strings.Replace(strings.TrimSpace(string(title)), "\x03", "", -1)
-	// if err != nil {
-	// 	return err
-	// }
+	decryptedGroup.Title = strings.Replace(strings.Replace(strings.TrimSpace(string(title)), "\x03", "", -1), "\x02", "", -1)
 	decryptedGroup.Revision = g.GroupContext.Revision
 	decryptedGroup.Avatar = g.GroupContext.GetAvatar()
 	decryptedGroup.AccessControl = g.GroupContext.GetAccessControl()
 	decryptedGroup.Members = decryptedMembers
 
-	log.Debugln("[decrypt]", decryptedGroup)
 	return decryptedGroup, nil
 }
 

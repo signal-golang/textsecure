@@ -52,7 +52,7 @@ func GetCredentialForToday() *GroupCredential {
 }
 
 func GetGroupAuthCredentials(startDay int64, endDay int64) error {
-	log.Debugln("[textsecure] get groupCredentials", fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
+	log.Debugln("[textsecure][groupsv2] get groupCredentials", fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
 	resp, err := transport.Transport.Get(fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
 	if err != nil {
 		return err

@@ -154,17 +154,17 @@ func (g *GroupV2) queryGroupChangeFromServer() (*signalservice.Group, error) {
 	err = proto.Unmarshal(buf.Bytes(), group)
 	g.cipher = zkgroup.NewClientZkGroupCipher(groupSecretParams)
 
-	log.Debugln("[textsecure][groupsv2] queryGroupChangeFromServer group", group)
+	log.Debugln("[textsecure][groupsv2] queryGroupChangeFromServer group")
 	return group, nil
 
 }
 func (g *GroupV2) updateGroupFromServer(masterKey []byte, revision uint32, signedGroupChange []byte) error {
 	log.Debugln("[textsecure][groupsv2] update group from server", len(signedGroupChange))
-	groupSecretParams, err := zkgroup.NewGroupSecretParams(masterKey)
+	// groupSecretParams, err := zkgroup.NewGroupSecretParams(masterKey)
 
-	if err != nil {
-		return err
-	}
+	// if err != nil {
+	// 	return err
+	// }
 	// same wake lock that no one else handles the group
 	hexid := idToHex(masterKey)
 	group := &GroupV2{
@@ -173,10 +173,10 @@ func (g *GroupV2) updateGroupFromServer(masterKey []byte, revision uint32, signe
 	if groupsV2[hexid] != nil {
 		group = groupsV2[hexid]
 	}
-	decryptedGroupChange, err := getDecryptedGroupChange(signedGroupChange, groupSecretParams)
-	if err != nil {
-		return err
-	}
+	// decryptedGroupChange, err := getDecryptedGroupChange(signedGroupChange, groupSecretParams)
+	// if err != nil {
+	// 	return err
+	// }
 	groupFromServer, err := group.queryGroupChangeFromServer()
 	if err != nil {
 		return err
@@ -190,7 +190,7 @@ func (g *GroupV2) updateGroupFromServer(masterKey []byte, revision uint32, signe
 	}
 	groupsV2[hexid] = group
 	saveGroupV2(hexid)
-	log.Debugln("[textsecure][groupsv2] update group from server", group, decryptedGroupChange)
+	log.Debugln("[textsecure][groupsv2] update group from server")
 
 	return nil
 }
@@ -265,10 +265,6 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 		}
 		decryptedGroupChange := decryptGroupChangeActions(groupActions, clientZipher)
 		handleGroupChangesForGroup(decryptedGroupChange, hexid)
-		// group.GroupLastGroupChange = decryptedGroupChange
-		// group.Name = group.LastGroupChange.NewTitle.Value
-		log.Println("[textsecure][groupsv2] decryptedGroupChange %+v\n", decryptedGroupChange)
-
 	}
 	return group, nil
 }
