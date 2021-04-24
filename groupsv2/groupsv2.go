@@ -36,6 +36,7 @@ type GroupV2 struct {
 	GroupContext   signalservice.Group
 	cipher         *zkgroup.ClientZkGroupCipher
 	DecryptedGroup *signalservice.DecryptedGroup
+	GroupAction    *signalservice.DecryptedGroupChange
 }
 
 var (
@@ -184,13 +185,12 @@ func (g *GroupV2) updateGroupFromServer(masterKey []byte, revision uint32, signe
 	err = group.decryptGroupFromServer(groupFromServer)
 	if err != nil {
 		log.Debugln("[textsecure][groupsv2] decryptGroupFromServer", err)
-	}
-	if err != nil {
 		return err
 	}
 	groupsV2[hexid] = group
 	saveGroupV2(hexid)
 	log.Debugln("[textsecure][groupsv2] update group from server")
+	g = group
 
 	return nil
 }
@@ -252,7 +252,7 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 
 		groupSecrets, err := zkgroup.NewGroupSecretParams(group.MasterKey)
 		if err != nil {
-			log.Debugln("[textsecure][groupsv2] 3handle groupv2", err)
+			log.Errorln("[textsecure][groupsv2] handle groupv2", err)
 		}
 		clientZipher := zkgroup.NewClientZkGroupCipher(groupSecrets)
 		// get group changes
@@ -265,6 +265,12 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 		}
 		decryptedGroupChange := decryptGroupChangeActions(groupActions, clientZipher)
 		handleGroupChangesForGroup(decryptedGroupChange, hexid)
+		group.updateGroupFromServer(group.MasterKey, group.GroupContext.Revision, groupContext.GetGroupChange())
+		if decryptedGroupChange != nil {
+			group.GroupAction = decryptedGroupChange
+		} else {
+			group.GroupAction = nil
+		}
 	}
 	return group, nil
 }
