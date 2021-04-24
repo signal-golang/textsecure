@@ -229,6 +229,7 @@ type Client struct {
 	SyncReadHandler       func(string, uint64)
 	SyncSentHandler       func(*Message, uint64)
 	RegistrationDone      func()
+	GetUsername           func() string
 }
 
 var (
@@ -321,11 +322,21 @@ func Setup(c *Client) error {
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	config.ConfigFile = checkUUID(config.ConfigFile)
+	profileChanged := false
+	// check for a profileKey
 	if len(config.ConfigFile.ProfileKey) == 0 {
 		config.ConfigFile.ProfileKey = profiles.GenerateProfileKey()
 		saveConfig(config.ConfigFile)
+		profileChanged = true
 	}
-	profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
+	// check if a username is set
+	if config.ConfigFile.Name == "" {
+		config.ConfigFile.Name = client.GetUsername()
+		saveConfig(config.ConfigFile)
+	}
+	if profileChanged {
+		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
+	}
 	return err
 }
 
