@@ -49,7 +49,7 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 		return nil, err
 	}
 
-	decryptedGroup.Title = strings.Replace(strings.Replace(strings.TrimSpace(string(title)), "\x03", "", -1), "\x02", "", -1)
+	decryptedGroup.Title = strings.Replace(strings.Replace(strings.Replace(strings.Replace(strings.TrimSpace(string(title)), "\x02", "", -1), "\x03", "", -1), "\x04", "", -1), "\x05", "", -1)
 	decryptedGroup.Revision = g.GroupContext.Revision
 	decryptedGroup.Avatar = g.GroupContext.GetAvatar()
 	decryptedGroup.AccessControl = g.GroupContext.GetAccessControl()

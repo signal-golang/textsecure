@@ -15,22 +15,23 @@ var configFile string
 
 // TODO: some race conditions to be solved
 func checkUUID(cfg *config.Config) *config.Config {
-	defer func(cfg *config.Config) *config.Config {
-		log.Debugln("[textsecure] missing my uuid defer")
-		recover()
-		UUID, err := GetMyUUID()
-		if err != nil {
-			log.Debugln("[textsecure] missing my uuid", err)
+	if len(cfg.UUID) != 36 {
+		log.Debugln(cfg.UUID)
+		defer func(cfg *config.Config) *config.Config {
+			recover()
+			UUID, err := GetMyUUID()
+			if err != nil {
+				log.Debugln("[textsecure] missing my uuid", err)
+				return cfg
+			}
+			cfg.UUID = UUID
 			return cfg
+		}(cfg)
+		if cfg.UUID == "notset" {
+			log.Debugln("[textsecure] missing my uuid notset")
 		}
-		cfg.UUID = UUID
-		return cfg
-	}(cfg)
-	if cfg.UUID == "notset" {
-		log.Debugln("[textsecure] missing my uuid notset")
 	}
 	return cfg
-
 }
 
 // ReadConfig reads a YAML config file
