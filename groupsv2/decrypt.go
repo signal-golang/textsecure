@@ -2,6 +2,7 @@ package groupsv2
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/nanu-c/zkgroup"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -48,8 +49,13 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	decryptedGroup.Title = strings.Replace(strings.Replace(strings.Replace(strings.Replace(strings.TrimSpace(string(title)), "\x02", "", -1), "\x03", "", -1), "\x04", "", -1), "\x05", "", -1)
+	cleanTitle := strings.Map(func(r rune) rune {
+		if unicode.IsGraphic(r) {
+			return r
+		}
+		return -1
+	}, string(title))
+	decryptedGroup.Title = cleanTitle
 	decryptedGroup.Revision = g.GroupContext.Revision
 	decryptedGroup.Avatar = g.GroupContext.GetAvatar()
 	decryptedGroup.AccessControl = g.GroupContext.GetAccessControl()
