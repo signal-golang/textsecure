@@ -159,17 +159,11 @@ func (g *GroupV2) queryGroupChangeFromServer() (*signalservice.Group, error) {
 	return group, nil
 
 }
-func (g *GroupV2) updateGroupFromServer(masterKey []byte, revision uint32, signedGroupChange []byte) error {
-	log.Debugln("[textsecure][groupsv2] update group from server", len(signedGroupChange))
-	// groupSecretParams, err := zkgroup.NewGroupSecretParams(masterKey)
-
-	// if err != nil {
-	// 	return err
-	// }
-	// same wake lock that no one else handles the group
-	hexid := idToHex(masterKey)
+func (g *GroupV2) UpdateGroupFromServer() error {
+	log.Debugln("[textsecure][groupsv2] update group from server")
+	hexid := idToHex(g.MasterKey)
 	group := &GroupV2{
-		MasterKey: masterKey,
+		MasterKey: g.MasterKey,
 	}
 	if groupsV2[hexid] != nil {
 		group = groupsV2[hexid]
@@ -217,13 +211,13 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 		if err != nil {
 			log.Error("[textsecure][groupsv2] handle groupv2 save", err)
 		}
-		err = group.updateGroupFromServer(group.MasterKey, group.GroupContext.Revision, groupContext.GetGroupChange())
+		err = group.UpdateGroupFromServer()
 		if err != nil {
 			log.Error("[textsecure][groupsv2] error updating group change from server", err)
 		}
 		// TODO only update group on wrong revision
 	} else if string(group.GroupContext.Title) == "" {
-		err = group.updateGroupFromServer(group.MasterKey, group.GroupContext.Revision, groupContext.GetGroupChange())
+		err = group.UpdateGroupFromServer()
 	}
 	// handle group changes
 	if len(groupContext.GroupChange) > 0 {
@@ -265,12 +259,15 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 		}
 		decryptedGroupChange := decryptGroupChangeActions(groupActions, clientZipher)
 		handleGroupChangesForGroup(decryptedGroupChange, hexid)
-		group.updateGroupFromServer(group.MasterKey, group.GroupContext.Revision, groupContext.GetGroupChange())
+		group.UpdateGroupFromServer()
 		if decryptedGroupChange != nil {
 			group.GroupAction = decryptedGroupChange
 		} else {
 			group.GroupAction = nil
 		}
+	} else if group.DecryptedGroup.Revision != groupContext.GetRevision() {
+		log.Debugln("[textsecure][groupsv2] outdated group, update")
+		group.UpdateGroupFromServer()
 	}
 	return group, nil
 }

@@ -233,6 +233,12 @@ func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, 
 		log.Infoln("[textsecure] sendGroupv2Helper unknown group id")
 		return 0, UnknownGroupIDError{hexid}
 	}
+	if g.DecryptedGroup == nil {
+		err = g.UpdateGroupFromServer()
+		if err != nil {
+			return 0, err
+		}
+	}
 	if len(g.DecryptedGroup.Members) == 0 {
 		return 0, fmt.Errorf("[textsecure] sendGroupV2Helper empty members list")
 	}
