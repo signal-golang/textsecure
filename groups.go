@@ -229,9 +229,13 @@ func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, 
 	var ts uint64
 	var err error
 	g := groupsV2.FindGroup(hexid)
+	g.CheckJoinStatus()
 	if g == nil {
 		log.Infoln("[textsecure] sendGroupv2Helper unknown group id")
 		return 0, UnknownGroupIDError{hexid}
+	}
+	if g.JoinStatus != groupsV2.GroupV2JoinsStatusMember {
+		return 0, fmt.Errorf("Sending messages to a invited group is not allowed.")
 	}
 	if g.DecryptedGroup == nil {
 		err = g.UpdateGroupFromServer()
@@ -261,7 +265,7 @@ func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, 
 			log.Errorln("[textsecure] sendGroupV2Helper", err, omsg.destination)
 			return 0, err
 		}
-		log.Debugln("[textsecure] sendGroupHelper message to group sent", omsg.destination)
+		log.Debugln("[textsecure] sendGroupV2Helper message to group sent", omsg.destination)
 	}
 	return ts, nil
 }

@@ -7,7 +7,7 @@ import (
 )
 
 // todo handle group join requests via link
-func (g *GroupV2) checkJoinStatus() error {
+func (g *GroupV2) CheckJoinStatus() error {
 	found := false
 	if g.DecryptedGroup != nil {
 		for _, m := range g.DecryptedGroup.Members {

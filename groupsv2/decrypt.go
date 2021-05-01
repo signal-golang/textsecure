@@ -17,7 +17,7 @@ func (g *GroupV2) decryptGroupFromServer(group *signalservice.Group) error {
 	decryptedGroup, err := newGroup.decryptGroup()
 	g.GroupContext = newGroup.GroupContext
 	g.DecryptedGroup = decryptedGroup
-	g.checkJoinStatus()
+	g.CheckJoinStatus()
 	return err
 }
 func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
