@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func decryptGroupJoinInfo(groupJoinInfo *signalservice.GroupJoinInfo, groupSecretParams zkgroup.GroupSecretParams) (*signalservice.DecryptedGroupJoinInfo, error) {
+func (g *GroupV2) decryptGroupJoinInfo(groupJoinInfo *signalservice.GroupJoinInfo, groupSecretParams zkgroup.GroupSecretParams) (*signalservice.DecryptedGroupJoinInfo, error) {
 	decryptedGroupJoinInfo := new(signalservice.DecryptedGroupJoinInfo)
 	clientZkGroupCipher := zkgroup.NewClientZkGroupCipher(groupSecretParams)
 	title, err := clientZkGroupCipher.DecryptBlob(groupJoinInfo.GetTitle())
@@ -18,8 +18,7 @@ func decryptGroupJoinInfo(groupJoinInfo *signalservice.GroupJoinInfo, groupSecre
 	return decryptedGroupJoinInfo, nil
 }
 
-func getDecryptedGroupChange(change []byte, groupSecretParams zkgroup.GroupSecretParams) (*signalservice.DecryptedGroupChange, error) {
-	clientZkGroupCipher := zkgroup.NewClientZkGroupCipher(groupSecretParams)
+func (g *GroupV2) getDecryptedGroupChange(change []byte, groupSecretParams zkgroup.GroupSecretParams) (*signalservice.DecryptedGroupChange, error) {
 
 	groupChange := &signalservice.GroupChange{}
 	err := proto.Unmarshal(change, groupChange)
@@ -31,16 +30,21 @@ func getDecryptedGroupChange(change []byte, groupSecretParams zkgroup.GroupSecre
 	if err != nil {
 		return nil, err
 	}
-	decryptedGroupChange := decryptGroupChangeActions(groupChangeActions, clientZkGroupCipher)
+	decryptedGroupChange := g.decryptGroupChangeActions(groupChangeActions)
 
 	return decryptedGroupChange, nil
 }
 
-func decryptGroupChangeActions(groupActions *signalservice.GroupChange_Actions,
-	clientCipher *zkgroup.ClientZkGroupCipher) *signalservice.DecryptedGroupChange {
+// todo error handling
+// todo decryption of everything
+func (g *GroupV2) decryptGroupChangeActions(groupActions *signalservice.GroupChange_Actions) *signalservice.DecryptedGroupChange {
+	err := g.checkCipher()
+	if err != nil {
+		return nil
+	}
 	decryptedGroupChange := &signalservice.DecryptedGroupChange{}
 	if groupActions.SourceUuid != nil {
-		uuid, err := clientCipher.DecryptUUID(groupActions.SourceUuid)
+		uuid, err := g.cipher.DecryptUUID(groupActions.SourceUuid)
 		log.Debugln("[textsecure][groupsv2] SourceUuid", idToHex(uuid), err)
 	}
 	log.Debugln("[textsecure][groupsv2] Revision", groupActions.Revision)
@@ -49,7 +53,7 @@ func decryptGroupChangeActions(groupActions *signalservice.GroupChange_Actions,
 	}
 	if groupActions.DeleteMembers != nil {
 		log.Debugln("[textsecure][groupsv2] DeleteMembers")
-		decryptDeletePendingMembers(groupActions.DeletePendingMembers, clientCipher)
+		g.decryptDeletePendingMembers(groupActions.DeletePendingMembers)
 	}
 	if groupActions.ModifyMemberRoles != nil {
 		log.Debugln("[textsecure][groupsv2] ModifyMemberRoles")
@@ -59,7 +63,7 @@ func decryptGroupChangeActions(groupActions *signalservice.GroupChange_Actions,
 	}
 	if groupActions.AddPendingMembers != nil {
 		log.Debugln("[textsecure][groupsv2] AddPendingMembers")
-		decryptedGroupChange.NewPendingMembers = decryptPendingMembers(groupActions.AddPendingMembers, clientCipher)
+		decryptedGroupChange.NewPendingMembers = g.decryptPendingMembers(groupActions.AddPendingMembers)
 	}
 	if groupActions.DeletePendingMembers != nil {
 		log.Debugln("[textsecure][groupsv2] DeletePendingMembers")

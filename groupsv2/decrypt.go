@@ -17,6 +17,7 @@ func (g *GroupV2) decryptGroupFromServer(group *signalservice.Group) error {
 	decryptedGroup, err := newGroup.decryptGroup()
 	g.GroupContext = newGroup.GroupContext
 	g.DecryptedGroup = decryptedGroup
+	g.checkJoinStatus()
 	return err
 }
 func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
@@ -60,7 +61,6 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 	decryptedGroup.Avatar = g.GroupContext.GetAvatar()
 	decryptedGroup.AccessControl = g.GroupContext.GetAccessControl()
 	decryptedGroup.Members = decryptedMembers
-
 	return decryptedGroup, nil
 }
 
@@ -109,4 +109,45 @@ func (g *GroupV2) decryptMember(member *signalservice.Member) (*signalservice.De
 
 func (g *GroupV2) decryptUUID(uuid []byte) ([]byte, error) {
 	return g.cipher.DecryptUUID(uuid)
+}
+
+func (g *GroupV2) decryptPendingMembers(pendingMembers []*signalservice.GroupChange_Actions_AddPendingMemberAction) []*signalservice.DecryptedPendingMember {
+	var decryptedPendingMembers []*signalservice.DecryptedPendingMember
+	for _, pendingMember := range pendingMembers {
+		added := pendingMember.GetAdded()
+		member := added.GetMember()
+		uuidCipherText := member.GetUserId()
+		uuid, err := g.cipher.DecryptUUID(uuidCipherText)
+		if err != nil {
+			log.Errorln(err)
+		}
+		addedByUuid, err := g.cipher.DecryptUUID(added.GetAddedByUserId())
+		if err != nil {
+			log.Errorln(err)
+		}
+		log.Debugln("[textsecure][groupsv2] pendingMember", idToHex(uuid))
+		decryptedPendingMembers = append(decryptedPendingMembers,
+			&signalservice.DecryptedPendingMember{
+				Uuid:           uuid,
+				Role:           member.GetRole(),
+				AddedByUuid:    addedByUuid,
+				UuidCipherText: uuidCipherText,
+				Timestamp:      added.GetTimestamp(),
+			},
+		)
+	}
+	return decryptedPendingMembers
+}
+func (g *GroupV2) decryptDeletePendingMembers(deletedPendingMembers []*signalservice.GroupChange_Actions_DeletePendingMemberAction,
+) []*signalservice.DecryptedPendingMember {
+	for _, deletedPendingMember := range deletedPendingMembers {
+
+		uuid, err := g.cipher.DecryptUUID(deletedPendingMember.DeletedUserId)
+		if err != nil {
+			log.Errorln(err)
+		}
+		log.Debugln("[textsecure][groupsv2] deletePendingMember", idToHex(uuid))
+
+	}
+	return nil
 }

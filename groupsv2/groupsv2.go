@@ -24,9 +24,18 @@ const HIGHEST_KNOWN_EPOCH = 1
 const GROUPSV2_GROUP = "/v1/groups/"
 const GROUPSV2_GROUP_JOIN = "/v1/groups/join/%s"
 
+const (
+	GroupV2JoinsStatusMember  = 0
+	GroupV2JoinsStatusInvite  = 1
+	GroupV2JoinsStatusRequest = 2
+	GroupV2JoinsStatusRemoved = 3
+)
+
 var (
 	groupURLHost   = "group.signal.org"
 	groupURLPrefix = "https://" + groupURLHost + "/#"
+	groupV2Dir     string
+	groupsV2       = map[string]*GroupV2{}
 )
 
 // GroupV2 holds group metadata.
@@ -37,12 +46,8 @@ type GroupV2 struct {
 	cipher         *zkgroup.ClientZkGroupCipher
 	DecryptedGroup *signalservice.DecryptedGroup
 	GroupAction    *signalservice.DecryptedGroupChange
+	JoinStatus     int
 }
-
-var (
-	groupV2Dir string
-	groupsV2   = map[string]*GroupV2{}
-)
 
 // idToHex returns the hex representation of the group id byte-slice
 // to be used as both keys in the map and for naming the files.
@@ -118,7 +123,7 @@ func (g *GroupV2) getGroupJoinInfoFromServer(masterKey, groupLinkPassword []byte
 	if err != nil {
 		return nil, err
 	}
-	decryptedGroupJoinInfo, err := decryptGroupJoinInfo(groupJoinInfo, groupSecretParams)
+	decryptedGroupJoinInfo, err := g.decryptGroupJoinInfo(groupJoinInfo, groupSecretParams)
 	if err != nil {
 		return nil, err
 	}
@@ -244,11 +249,9 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 
 		log.Debugln("[textsecure][groupsv2] handle group action ", hexid)
 
-		groupSecrets, err := zkgroup.NewGroupSecretParams(group.MasterKey)
 		if err != nil {
 			log.Errorln("[textsecure][groupsv2] handle groupv2", err)
 		}
-		clientZipher := zkgroup.NewClientZkGroupCipher(groupSecrets)
 		// get group changes
 
 		// get group actions, maybe needs to be decrypted
@@ -257,7 +260,7 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 		if err != nil {
 			log.Errorln(err)
 		}
-		decryptedGroupChange := decryptGroupChangeActions(groupActions, clientZipher)
+		decryptedGroupChange := group.decryptGroupChangeActions(groupActions)
 		handleGroupChangesForGroup(decryptedGroupChange, hexid)
 		group.UpdateGroupFromServer()
 		if decryptedGroupChange != nil {
@@ -279,47 +282,6 @@ func handleGroupChangesForGroup(groupChange *signalservice.DecryptedGroupChange,
 	// 	}
 	// }
 
-}
-func decryptPendingMembers(pendingMembers []*signalservice.GroupChange_Actions_AddPendingMemberAction,
-	clientCipher *zkgroup.ClientZkGroupCipher) []*signalservice.DecryptedPendingMember {
-	var decryptedPendingMembers []*signalservice.DecryptedPendingMember
-	for _, pendingMember := range pendingMembers {
-		added := pendingMember.GetAdded()
-		member := added.GetMember()
-		uuidCipherText := member.GetUserId()
-		uuid, err := clientCipher.DecryptUUID(uuidCipherText)
-		if err != nil {
-			log.Errorln(err)
-		}
-		addedByUuid, err := clientCipher.DecryptUUID(added.GetAddedByUserId())
-		if err != nil {
-			log.Errorln(err)
-		}
-		log.Debugln("[textsecure][groupsv2] pendingMember", idToHex(uuid))
-		decryptedPendingMembers = append(decryptedPendingMembers,
-			&signalservice.DecryptedPendingMember{
-				Uuid:           uuid,
-				Role:           member.GetRole(),
-				AddedByUuid:    addedByUuid,
-				UuidCipherText: uuidCipherText,
-				Timestamp:      added.GetTimestamp(),
-			},
-		)
-	}
-	return decryptedPendingMembers
-}
-func decryptDeletePendingMembers(deletedPendingMembers []*signalservice.GroupChange_Actions_DeletePendingMemberAction,
-	clientCipher *zkgroup.ClientZkGroupCipher) []*signalservice.DecryptedPendingMember {
-	for _, deletedPendingMember := range deletedPendingMembers {
-
-		uuid, err := clientCipher.DecryptUUID(deletedPendingMember.DeletedUserId)
-		if err != nil {
-			log.Errorln(err)
-		}
-		log.Debugln("[textsecure][groupsv2] deletePendingMember", idToHex(uuid))
-
-	}
-	return nil
 }
 
 func decryptUuidOrUnknown(uuidCipherTex []byte) *[]byte {
