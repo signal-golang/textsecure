@@ -82,6 +82,10 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 	if err != nil {
 		return err
 	}
+	grV2, err := handleGroupsV2(dest, dm)
+	if err != nil {
+		return err
+	}
 	cs, err := contacts.HandleContacts(dest, dm)
 	if err != nil {
 		return err
@@ -92,6 +96,7 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 		message:     dm.GetBody(),
 		attachments: atts,
 		group:       gr,
+		groupV2:     grV2,
 		contact:     cs,
 		flags:       flags,
 		expireTimer: dm.GetExpireTimer(),

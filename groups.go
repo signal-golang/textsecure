@@ -210,6 +210,19 @@ func handleGroups(src string, dm *signalservice.DataMessage) (*Group, error) {
 	return groups[hexid], nil
 }
 
+// handleGroups is the main entry point for handling the group metadata on messages.
+func handleGroupsV2(src string, dm *signalservice.DataMessage) (*groupsv2.GroupV2, error) {
+	gr := dm.GetGroupV2()
+	if gr == nil {
+		return nil, nil
+	}
+	hexid := idToHex(gr.GetMasterKey())
+	log.Debugln("[textsecure] handle groupv2", hexid)
+	// TODO handle group changes
+
+	return groupsv2.FindGroup(hexid), nil
+}
+
 type groupMessage struct {
 	id      []byte
 	name    string
