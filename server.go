@@ -460,6 +460,7 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 		IdentityKeyPrivate: identityKey.PrivateKey.Key()[:],
 		Uuid:               &config.ConfigFile.UUID,
 		ProvisioningCode:   &verificationCode,
+		Number:             &config.ConfigFile.Tel,
 	}
 
 	ciphertext, err := provisioningCipher(pm, theirPublicKey)
