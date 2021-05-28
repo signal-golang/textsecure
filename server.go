@@ -6,21 +6,20 @@ package textsecure
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
+	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/transport"
@@ -195,24 +194,33 @@ func requestCode(tel, method, captcha string) (string, *int, error) {
 
 // AccountAttributes describes what features are supported
 type AccountAttributes struct {
-	SignalingKey            string              `json:"signalingKey" yaml:"signalingKey"`
-	RegistrationID          uint32              `json:"registrationId" yaml:"registrationId"`
-	FetchesMessages         bool                `json:"fetchesMessages" yaml:"fetchesMessages"`
-	Video                   bool                `json:"video" yaml:"video"`
-	Voice                   bool                `json:"voice" yaml:"voice"`
-	Pin                     string              `json:"pin" yaml:"pin"` // deprecated
-	BasicStorageCredentials AuthCredentials     `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
-	Capabilities            AccountCapabilities `json:"capabilities" yaml:"capabilities"`
-	// UnidentifiedAccessKey          *byte `json:"unidentifiedAccessKey"`
-	// UnrestrictedUnidentifiedAccess *bool `json:"unrestrictedUnidentifiedAccess"`
+	SignalingKey                   string                     `json:"signalingKey" yaml:"signalingKey"`
+	FetchesMessages                bool                       `json:"fetchesMessages" yaml:"fetchesMessages"`
+	RegistrationID                 uint32                     `json:"registrationId" yaml:"registrationId"`
+	Name                           string                     `json:"name" yaml:"name"`
+	Video                          bool                       `json:"video" yaml:"video"`
+	Voice                          bool                       `json:"voice" yaml:"voice"`
+	Pin                            *string                    `json:"pin" yaml:"pin"` // deprecated
+	BasicStorageCredentials        AuthCredentials            `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
+	Capabilities                   config.AccountCapabilities `json:"capabilities" yaml:"capabilities"`
+	DiscoverableByPhoneNumber      bool                       `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
+	UnrestrictedUnidentifiedAccess bool                       `json:"unrestrictedUnidentifiedAccess"`
+	UnidentifiedAccessKey          *[]byte                    `json:"unidentifiedAccessKey"`
 }
 
-// AccountCapabilities describes what functions axolotl supports
-type AccountCapabilities struct {
-	UUID         bool `json:"uuid" yaml:"uuid"`
-	Gv2          bool `json:"gv2" yaml:"gv2"`
-	Storage      bool `json:"storage" yaml:"storage"`
-	Gv1Migration bool `json:"gv1Migration" yaml:"gv1Migration"`
+type UpdateAccountAttributes struct {
+	SignalingKey                   *string                    `json:"signalingKey" yaml:"signalingKey"`
+	FetchesMessages                bool                       `json:"fetchesMessages" yaml:"fetchesMessages"`
+	RegistrationID                 uint32                     `json:"registrationId" yaml:"registrationId"`
+	Name                           string                     `json:"name" yaml:"name"`
+	Pin                            *string                    `json:"pin" yaml:"pin"` // deprecated
+	RegistrationLock               *string                    `json:"registrationLock" yaml:"registrationLock"`
+	UnidentifiedAccessKey          *[]byte                    `json:"unidentifiedAccessKey"`
+	UnrestrictedUnidentifiedAccess bool                       `json:"unrestrictedUnidentifiedAccess"`
+	Capabilities                   config.AccountCapabilities `json:"capabilities" yaml:"capabilities"`
+	DiscoverableByPhoneNumber      bool                       `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
+	Video                          bool                       `json:"video" yaml:"video"`
+	Voice                          bool                       `json:"voice" yaml:"voice"`
 }
 
 // AuthCredentials holds the credentials for the websocket connection
@@ -237,25 +245,32 @@ type RegistrationLockFailure struct {
 // verifyCode verificates the account with signal server
 func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, *AuthCredentials) {
 	code = strings.Replace(code, "-", "", -1)
-
+	// var key []byte
+	// key = identityKey.PrivateKey.Key()[:]
+	// unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	// if err != nil {
+	// 	log.Debugln("[textsecure] verifyCode", err)
+	// }
 	vd := AccountAttributes{
 		SignalingKey:    base64.StdEncoding.EncodeToString(registrationInfo.signalingKey),
 		RegistrationID:  registrationInfo.registrationID,
 		FetchesMessages: true,
 		Voice:           false,
 		Video:           false,
-		Capabilities: AccountCapabilities{
-			UUID:         true,
-			Gv2:          true,
-			Storage:      false,
-			Gv1Migration: false,
+		Pin:             nil,
+		Name:            "test",
+		Capabilities: config.AccountCapabilities{
+			UUID:    false,
+			Gv2:     true,
+			Storage: false,
 		},
+		DiscoverableByPhoneNumber:      true,
+		UnidentifiedAccessKey:          nil,
+		UnrestrictedUnidentifiedAccess: false,
 		// Pin:             nil,
-		// UnidentifiedAccessKey:          nil,
-		// UnrestrictedUnidentifiedAccess: nil,
 	}
 	if pin != nil {
-		vd.Pin = *pin
+		vd.Pin = pin
 		vd.BasicStorageCredentials = *credentials
 	}
 	log.Debugln("[textsecure] verifyCode", vd)
@@ -285,7 +300,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 			return resp, nil
 		}
 	}
-	config.AccountCapabilities = vd.Capabilities
+	config.ConfigFile.AccountCapabilities = vd.Capabilities
 	return nil, nil
 }
 
@@ -312,8 +327,39 @@ func RegisterWithUPS(token string) error {
 	return nil
 }
 
+// SetAccountCapabilities lets the client decide when it's ready for new functions to support for example groupsv2
+func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
+	// var key []byte
+	// key = identityKey.PrivateKey.Key()[:]
+	// unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	// if err != nil {
+	// 	log.Errorln("[textsecure] SetAccountCapabilities ceating unidentifiedAccessKey: ", err)
+	// 	return err
+	// }
+	attributes := UpdateAccountAttributes{
+		SignalingKey:                   nil,
+		RegistrationID:                 registrationInfo.registrationID,
+		FetchesMessages:                true,
+		Pin:                            nil,
+		Name:                           "test",
+		RegistrationLock:               nil,
+		UnidentifiedAccessKey:          nil,
+		UnrestrictedUnidentifiedAccess: true,
+		Capabilities:                   capabilities,
+		DiscoverableByPhoneNumber:      true,
+		Video:                          false,
+		Voice:                          false,
+	}
+
+	err := setAccountAttributes(&attributes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // SetAccountAttributes updates the account attributes
-func SetAccountAttributes(attributes *AccountAttributes) error {
+func setAccountAttributes(attributes *UpdateAccountAttributes) error {
 	log.Debugln("[textsecure] setAccountAttributes")
 	body, err := json.Marshal(attributes)
 	if err != nil {
@@ -362,6 +408,7 @@ func getNewDeviceVerificationCode() (string, error) {
 	var c jsonDeviceCode
 	dec.Decode(&c)
 	return c.VerificationCode, nil
+
 }
 
 type DeviceInfo struct {
@@ -411,9 +458,9 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	pm := &signalservice.ProvisionMessage{
 		IdentityKeyPublic:  identityKey.PublicKey.Serialize(),
 		IdentityKeyPrivate: identityKey.PrivateKey.Key()[:],
-		Number:             &config.Tel,
-		Uuid:               &config.UUID,
+		Uuid:               &config.ConfigFile.UUID,
 		ProvisioningCode:   &verificationCode,
+		Number:             &config.ConfigFile.Tel,
 	}
 
 	ciphertext, err := provisioningCipher(pm, theirPublicKey)
@@ -439,86 +486,59 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	return nil
 }
 
-// Profile describes the profile type
-type Profile struct {
-	IdentityKey                    string          `json:"identityKey"`
-	Name                           string          `json:"name"`
-	Avatar                         string          `json:"avatar"`
-	UnidentifiedAccess             string          `json:"unidentifiedAccess"`
-	UnrestrictedUnidentifiedAccess bool            `json:"unrestrictedUnidentifiedAccess"`
-	Capabilities                   ProfileSettings `json:"capabilities"`
-	Username                       string          `json:"username"`
-	UUID                           string          `json:"uuid"`
-	Payments                       string          `json:"payments"`
-	Credential                     string          `json:"credential"`
+type RemoteAttestationRequest struct {
+	ClientPublic string
 }
 
-// ProfileSettings contains the settings for the profile
-type ProfileSettings struct {
-	UUID         bool `json:"uuid"`
-	Gv2          bool `json:"gv2"`
-	Gv1Migration bool `json:"gv1-migration"`
+// {"clientPublic":"DtZ1bEvFbDPgueDL30P3gh34GLeDAWCSIIXRECU7TCk="}
+type Envelopes map[string]DiscoveryContact
+
+type ContactDiscoveryRequest struct {
+	AdressCount int
+	Commitment  string
+	Data        string
+	Iv          string
+	Mac         string
+	Envelopes   Envelopes
+}
+type DiscoveryContact struct {
+	Data      string
+	Iv        string
+	Mac       string
+	RequestId string
 }
 
-// GetProfileE164 get a profile by a phone number
-func GetProfileE164(tel string) (Contact, error) {
+// {
+// 	"addressCount":1,
+// 	"commitment":"Bji4zKernD3XYqtkhSRB8TvrGfevrB1qKYU2tzcZDcM=",
+// 	"data":"GI+F1w5anMGNO1K2lSn5j9lHfQc+Ub+2f1pADmT54Yfw/RuexsV+Vw==",
+// 	"envelopes":{
+// 		"6a4eb498-1c62-481e-9592-025d1e901f59":{
+// 			"data":"CL3ze4lOBU+kxHE2pnFJzIX/9KsQ1n1eQpaPvnedSbk=",
+// 			"iv":"qjaUGml40FAWi3cZ",
+// 			"mac":"UifN1pOFRwPjpdrpy7SQbA==",
+// 			"requestId":"BSBm+fiFhw9Ghv88aLpa671+3OVHBxAUOe9QK7C5BMs9aB06"
+// 		}
+// 	},
+// 	"iv":"DEq9x+BLEU2V9Yjh",
+// 	"mac":"yB1qUZQ9MfQ7cdRDT6t5Lw=="
+// }
 
-	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, tel))
+// SyncContacts syncs the contacts
+func SyncContacts() error {
+	var t signalservice.SyncMessage_Request_Type
+	t = signalservice.SyncMessage_Request_CONTACTS
+	omsg := &signalservice.SyncMessage{
+		Request: &signalservice.SyncMessage_Request{
+			Type: &t,
+		},
+	}
+	_, err := sendSyncMessage(omsg, nil)
 	if err != nil {
-		log.Errorln("[textsecure] GetProfileE164 ", err)
+		return err
 	}
 
-	profile := &Profile{}
-	dec := json.NewDecoder(resp.Body)
-	err = dec.Decode(&profile)
-	if err != nil {
-		log.Errorln("[textsecure] GetProfileE164 ", err)
-	}
-	avatar, _ := GetAvatar(profile.Avatar)
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(avatar)
-
-	c := contacts[profile.UUID]
-	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
-	if err != nil {
-		log.Errorln("[textsecure] GetProfileE164 ", err)
-	}
-	c.Username = profile.Username
-	c.UUID = profile.UUID
-	c.Avatar = avatarDecrypted
-	contacts[c.UUID] = c
-	WriteContactsToPath()
-	return c, nil
-}
-
-func GetAvatar(avatarUrl string) (io.ReadCloser, error) {
-	log.Debugln(SIGNAL_CDN_URL + "/" + avatarUrl)
-	// resp, err := transport.CdnTransport.Get("/" + avatarUrl)
-
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	c := &http.Client{Transport: customTransport}
-	req, err := http.NewRequest("GET", SIGNAL_CDN_URL+"/"+avatarUrl, nil)
-	req.Header.Add("Host", SERVICE_REFLECTOR_HOST)
-	req.Header.Add("Content-Type", "application/octet-stream")
-	resp, err := c.Do(req)
-	if err != nil {
-		log.Debugln("[textsecure] getAvatar ", err)
-
-		return nil, err
-	}
-
-	return resp.Body, nil
-}
-
-func decryptAvatar(avatar []byte, identityKey []byte) ([]byte, error) {
-
-	l := len(avatar[:]) - 30
-	b, err := aesCtrNoPaddingDecrypt(identityKey[:16], avatar[:l])
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+	return nil
 }
 
 // PUT /v2/keys/
@@ -613,7 +633,7 @@ func idToHexUUID(id []byte) string {
 
 // GetRegisteredContacts returns the subset of the local contacts
 // that are also registered with the server
-func GetRegisteredContacts() ([]Contact, error) {
+func GetRegisteredContacts() ([]contacts.Contact, error) {
 	log.Debugln("[textsecure] GetRegisteredContacts")
 
 	lc, err := client.GetLocalContacts()
@@ -622,7 +642,7 @@ func GetRegisteredContacts() ([]Contact, error) {
 	}
 	tokensMap := map[string]*string{}
 	tokens := []string{}
-	m := []Contact{}
+	m := []contacts.Contact{}
 	// todo deduplicate contacts
 	for _, c := range lc {
 		t := c.Tel
@@ -665,20 +685,20 @@ func GetRegisteredContacts() ([]Contact, error) {
 		m[i].UUID = idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
 		ind++
 	}
-	lc = []Contact{}
-	contacts = map[string]Contact{}
+	lc = []contacts.Contact{}
+	contacts.Contacts = map[string]contacts.Contact{}
 	for _, c := range m {
 		lc = append(lc, c)
 
 		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
-			contacts[c.UUID] = c
+			contacts.Contacts[c.UUID] = c
 
 		} else {
-			contacts[c.Tel] = c
+			contacts.Contacts[c.Tel] = c
 			log.Debugln("[textsecure] empty uuid for tel ", c.Tel)
 		}
 	}
-	err = WriteContactsToPath()
+	err = contacts.WriteContactsToPath()
 	if err != nil {
 		log.Debugln("[textsecure] 3", err)
 
@@ -772,7 +792,7 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	if msg.groupV2 != nil {
 		dm.GroupV2 = msg.groupV2
 	}
-	dm.ProfileKey = config.ProfileKey
+	dm.ProfileKey = config.ConfigFile.ProfileKey
 	dm.Flags = &msg.flags
 
 	return dm
@@ -1039,9 +1059,9 @@ func sendMessage(msg *outgoingMessage) (uint64, error) {
 // TODO switch to uuids
 func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
 	log.Debugln("[textsecure] sendSyncMessage", timestamp)
-	user := config.Tel //TODO: switch tu uuid
-	if config.UUID != "" {
-		user = config.UUID
+	user := config.ConfigFile.Tel //TODO: switch tu uuid
+	if config.ConfigFile.UUID != "" {
+		user = config.ConfigFile.UUID
 	}
 	if _, ok := deviceLists[user]; !ok {
 		deviceLists[user] = []uint32{1}

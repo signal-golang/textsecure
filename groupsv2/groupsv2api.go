@@ -7,7 +7,7 @@ import (
 	"time"
 
 	zkgroup "github.com/nanu-c/zkgroup"
-	credentials "github.com/signal-golang/textsecure/credentials"
+	transport "github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -31,7 +31,7 @@ func NewGroupsV2Authorization(uuid []byte, groupSecretParams zkgroup.GroupSecret
 	publicGroupParams, err := groupSecretParams.PublicParams()
 	today := time.Now().Unix() / 86400
 
-	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(credentials.GetCredentialForRedemption(today).Credential)
+	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(GetCredentialForRedemption(today).Credential)
 	if err != nil {
 		log.Warnln("[textsecure] NewGroupsV2AuthorizationForGroup2", err.Error())
 
@@ -69,9 +69,9 @@ type AuthCredentials struct {
 	password string `json:"password"`
 }
 
-func (a *AuthCredentials) AsBasic() String {
-	usernameAndPassword = a.username + ":" + a.password
-	encoded = base64.StdEncoding.EncodeToString(usernameAndPassword)
+func (a *AuthCredentials) AsBasic() string {
+	usernameAndPassword := a.username + ":" + a.password
+	encoded := base64.StdEncoding.EncodeToString([]byte(usernameAndPassword))
 	return "Basic " + encoded
 }
 
@@ -85,5 +85,8 @@ func getCredendtails(path string) (*AuthCredentials, error) {
 	dec.Decode(&a)
 
 	return &a, nil
+
+}
+func getGroupJoinInfo(groupSecretParams, groupLinkPassword []byte, groupsV2AuthorizationString string) {
 
 }

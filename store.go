@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/fingerprint"
 	"golang.org/x/crypto/pbkdf2"
 
@@ -212,7 +213,7 @@ func (s *store) SaveIdentity(id string, key *axolotl.IdentityKey) error {
 }
 
 func (s *store) IsTrustedIdentity(id string, key *axolotl.IdentityKey) bool {
-	if config.AlwaysTrustPeerID {
+	if config.ConfigFile.AlwaysTrustPeerID {
 		// Workaround until we handle peer reregistering situations
 		// more securely and with a better UI.
 		return true
@@ -259,7 +260,7 @@ func ContactIdentityKey(id string) ([]byte, error) {
 
 func GetFingerprint(remoteIdentifier string) ([]string, []byte, error) {
 
-	localIdentifier := config.Tel
+	localIdentifier := config.ConfigFile.Tel
 	localIdentityKey := MyIdentityKey()
 
 	remoteIdentityKey, err := ContactIdentityKey(remoteIdentifier)
@@ -455,14 +456,14 @@ func setupStore() error {
 	var err error
 
 	password := ""
-	if !config.UnencryptedStorage {
-		password = config.StoragePassword
+	if !config.ConfigFile.UnencryptedStorage {
+		password = config.ConfigFile.StoragePassword
 		if password == "" {
 			password = client.GetStoragePassword()
 		}
 	}
 
-	textSecureStore, err = newStore(password, config.StorageDir)
+	textSecureStore, err = newStore(password, config.ConfigFile.StorageDir)
 	if err != nil {
 		return err
 	}

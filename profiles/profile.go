@@ -1,6 +1,7 @@
 package profiles
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +9,10 @@ import (
 
 	zkgroup "github.com/nanu-c/zkgroup"
 	uuidUtil "github.com/satori/go.uuid"
+	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/transport"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -18,7 +21,7 @@ const (
 )
 
 // Profile ...
-type Profile struct {
+type ProfileSettings struct {
 	Version    string `json:"version"`
 	Name       []byte `json:"name"`
 	Avatar     bool   `json:"avatar"`
@@ -40,7 +43,7 @@ func uuidToByte(id string) []byte {
 func UpdateProfile(profileKey []byte, uuid, name string) error {
 	uuidByte := uuidToByte(uuid)
 
-	profile := Profile{}
+	profile := ProfileSettings{}
 	version, err := zkgroup.ProfileKeyGetProfileKeyVersion(profileKey, uuidByte)
 	if err != nil {
 		return err
@@ -57,15 +60,16 @@ func UpdateProfile(profileKey []byte, uuid, name string) error {
 	profile.Commitment = commitment
 	profile.Name = nameCiphertext
 	profile.Avatar = false
-	writeProfile(profile)
+	err = writeOwnProfile(profile)
 	if err != nil {
 		return err
 	}
+	GetProfile(uuid, profileKey)
 	return nil
 }
 
 // WriteProfile ...
-func writeProfile(profile Profile) error {
+func writeOwnProfile(profile ProfileSettings) error {
 	// String response = makeServiceRequest(String.format(PROFILE_PATH, ""), "PUT", requestBody);
 	body, err := json.Marshal(profile)
 	if err != nil {
@@ -113,4 +117,65 @@ func decryptName(key, nonceAndCiphertext []byte) ([]byte, error) {
 
 func getCommitment(profileKey, uuid []byte) ([]byte, error) {
 	return zkgroup.ProfileKeyGetCommitment(profileKey, uuid)
+}
+
+// Profile describes the profile type
+type Profile struct {
+	IdentityKey                    string          `json:"identityKey"`
+	Name                           string          `json:"name"`
+	Avatar                         string          `json:"avatar"`
+	UnidentifiedAccess             string          `json:"uak"`
+	UnrestrictedUnidentifiedAccess bool            `json:"uua"`
+	Capabilities                   ProfileSettings `json:"capabilities"`
+	Username                       string          `json:"username"`
+	UUID                           string          `json:"uuid"`
+	// Payments                       string          `json:"payments"`
+	// Credential                     string          `json:"credential"`
+}
+
+func GetProfile(UUID string, profileKey []byte) {
+	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, UUID))
+	profile := &Profile{}
+
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&profile)
+	if err != nil {
+		log.Debugln(err)
+	} else {
+		fmt.Printf("%+v\n", profile)
+		name, err := decryptName(profileKey, []byte(profile.Name))
+		log.Debugln(name, err)
+	}
+
+}
+
+// GetProfileE164 get a profile by a phone number
+func GetProfileE164(tel string) (contacts.Contact, error) {
+
+	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, tel))
+	if err != nil {
+		log.Errorln("[textsecure] GetProfileE164 ", err)
+	}
+
+	profile := &Profile{}
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&profile)
+	if err != nil {
+		log.Errorln("[textsecure] GetProfileE164 ", err)
+	}
+	avatar, _ := GetAvatar(profile.Avatar)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(avatar)
+
+	c := contacts.Contacts[profile.UUID]
+	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
+	if err != nil {
+		log.Errorln("[textsecure] GetProfileE164 ", err)
+	}
+	c.Username = profile.Username
+	c.UUID = profile.UUID
+	c.Avatar = avatarDecrypted
+	contacts.Contacts[c.UUID] = c
+	contacts.WriteContactsToPath()
+	return c, nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
+	"github.com/signal-golang/textsecure/config"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
 	log "github.com/sirupsen/logrus"
@@ -143,7 +144,7 @@ func StartListening() error {
 	var err error
 
 	wsconn = &Conn{send: make(chan []byte, 256)}
-	err = wsconn.connect(config.Server+websocketPath, config.UUID, registrationInfo.password)
+	err = wsconn.connect(config.ConfigFile.Server+websocketPath, config.ConfigFile.UUID, registrationInfo.password)
 	if err != nil {
 		log.Errorf(err.Error())
 		return err

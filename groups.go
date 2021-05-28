@@ -1,6 +1,6 @@
 // Copyright (c) 2014 Canonical Ltd.
 // Licensed under the GPLv3, see the COPYING file for details.
-
+// Groups v1 only working with tel numbers
 package textsecure
 
 import (
@@ -16,6 +16,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/signal-golang/textsecure/config"
+	"github.com/signal-golang/textsecure/contacts"
+	"github.com/signal-golang/textsecure/groupsv2"
+	groupsV2 "github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"gopkg.in/yaml.v2"
 )
@@ -78,7 +82,7 @@ func loadGroup(path string) error {
 
 // RemoveGroupKey removes the group key
 func RemoveGroupKey(hexid string) error {
-	err := os.Remove(config.StorageDir + "/groups/" + hexid)
+	err := os.Remove(config.ConfigFile.StorageDir + "/groups/" + hexid)
 	if err != nil {
 		return err
 	}
@@ -88,7 +92,8 @@ func RemoveGroupKey(hexid string) error {
 
 // setupGroups reads all groups' state from storage.
 func setupGroups() error {
-	groupDir = filepath.Join(config.StorageDir, "groups")
+	groupsv2.SetupGroups(config.ConfigFile.StorageDir)
+	groupDir = filepath.Join(config.ConfigFile.StorageDir, "groups")
 	if err := os.MkdirAll(groupDir, 0700); err != nil {
 		return err
 	}
@@ -205,6 +210,19 @@ func handleGroups(src string, dm *signalservice.DataMessage) (*Group, error) {
 	return groups[hexid], nil
 }
 
+// handleGroups is the main entry point for handling the group metadata on messages.
+func handleGroupsV2(src string, dm *signalservice.DataMessage) (*groupsv2.GroupV2, error) {
+	gr := dm.GetGroupV2()
+	if gr == nil {
+		return nil, nil
+	}
+	hexid := idToHex(gr.GetMasterKey())
+	log.Debugln("[textsecure] handle groupv2", hexid)
+	// TODO handle group changes
+
+	return groupsv2.FindGroup(hexid), nil
+}
+
 type groupMessage struct {
 	id      []byte
 	name    string
@@ -212,21 +230,71 @@ type groupMessage struct {
 	typ     signalservice.GroupContext_Type
 }
 
-func GetContactForTel(tel string) *Contact {
-	for _, c := range contacts {
+func GetContactForTel(tel string) *contacts.Contact {
+	for _, c := range contacts.Contacts {
 		if c.Tel == tel {
 			return &c
 		}
 	}
 	return nil
 }
+func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
+	var ts uint64
+	var err error
+	g := groupsV2.FindGroup(hexid)
+	g.CheckJoinStatus()
+	if g == nil {
+		log.Infoln("[textsecure] sendGroupv2Helper unknown group id")
+		return 0, UnknownGroupIDError{hexid}
+	}
+	if g.JoinStatus != groupsV2.GroupV2JoinsStatusMember {
+		return 0, fmt.Errorf("Sending messages to a invited group is not allowed.")
+	}
+	if g.DecryptedGroup == nil {
+		err = g.UpdateGroupFromServer()
+		if err != nil {
+			return 0, err
+		}
+	}
+	if len(g.DecryptedGroup.Members) == 0 {
+		return 0, fmt.Errorf("[textsecure] sendGroupV2Helper empty members list")
+	}
+	timestamp := uint64(time.Now().UnixNano() / 1000000)
+	groupsV2Context := &signalservice.GroupContextV2{
+		MasterKey: g.MasterKey,
+		Revision:  &g.DecryptedGroup.Revision,
+	}
+	for _, m := range g.DecryptedGroup.Members {
+		omsg := &outgoingMessage{
+			destination: idToHexUUID(m.Uuid),
+			msg:         msg,
+			attachment:  a,
+			expireTimer: timer,
+			timestamp:   &timestamp,
+			groupV2:     groupsV2Context,
+		}
+		ts, err = sendMessage(omsg)
+		if err != nil {
+			log.Errorln("[textsecure] sendGroupV2Helper", err, omsg.destination)
+			return 0, err
+		}
+		log.Debugln("[textsecure] sendGroupV2Helper message to group sent", omsg.destination)
+	}
+	return ts, nil
+}
+
 func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
 	var ts uint64
 	var err error
 	g, ok := groups[hexid]
 	if !ok {
 		log.Infoln("[textsecure] sendGroupHelper unknown group id")
-		return 0, UnknownGroupIDError{hexid}
+		ts, err = sendGroupV2Helper(hexid, msg, a, timer)
+		if err != nil {
+			return 0, UnknownGroupIDError{hexid}
+		}
+		return ts, nil
+
 	}
 	// if len is 0 smth is obviously wrong
 	if len(g.Members) == 0 {
@@ -241,7 +309,7 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 	}
 	timestamp := uint64(time.Now().UnixNano() / 1000000)
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			c := GetContactForTel(m)
 			if c != nil && c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
 				m = c.UUID
@@ -322,7 +390,7 @@ func changeGroup(hexid, name string, members []string) (*Group, error) {
 	}
 
 	g.Name = name
-	g.Members = append(members, config.Tel)
+	g.Members = append(members, config.ConfigFile.Tel)
 	saveGroup(hexid)
 
 	return g, nil
@@ -330,7 +398,7 @@ func changeGroup(hexid, name string, members []string) (*Group, error) {
 
 func sendUpdate(g *Group) error {
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{
@@ -356,7 +424,7 @@ func newGroup(name string, members []string) (*Group, error) {
 		ID:      id,
 		Hexid:   hexid,
 		Name:    name,
-		Members: append(members, config.Tel),
+		Members: append(members, config.ConfigFile.Tel),
 	}
 	err := saveGroup(hexid)
 	if err != nil {
@@ -369,7 +437,7 @@ func newGroup(name string, members []string) (*Group, error) {
 func RequestGroupInfo(g *Group) error {
 	log.Debugln("[textsecure] request group update", g.Hexid)
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{
@@ -385,7 +453,7 @@ func RequestGroupInfo(g *Group) error {
 	}
 	if len(g.Members) == 0 {
 		omsg := &outgoingMessage{
-			destination: config.Tel,
+			destination: config.ConfigFile.Tel,
 			group: &groupMessage{
 				id:  g.ID,
 				typ: signalservice.GroupContext_REQUEST_INFO,
@@ -445,7 +513,7 @@ func LeaveGroup(hexid string) error {
 	}
 
 	for _, m := range g.Members {
-		if m != config.Tel {
+		if m != config.ConfigFile.Tel {
 			omsg := &outgoingMessage{
 				destination: m,
 				group: &groupMessage{

@@ -21,6 +21,8 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/signal-golang/textsecure"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/config"
+	"github.com/signal-golang/textsecure/contacts"
 	"golang.org/x/crypto/ssh/terminal"
 
 	log "github.com/sirupsen/logrus"
@@ -126,12 +128,14 @@ func getStoragePassword() string {
 	return string(password)
 }
 
-func getConfig() (*textsecure.Config, error) {
+func getConfig() (*config.Config, error) {
 	return textsecure.ReadConfig(configDir + "/config.yml")
 }
-
-func getLocalContacts() ([]textsecure.Contact, error) {
-	return textsecure.ReadContacts(configDir + "/contacts.yml")
+func getUsername() string {
+	return readLine("A username is missing please enter one>")
+}
+func getLocalContacts() ([]contacts.Contact, error) {
+	return contacts.ReadContacts(configDir + "/contacts.yml")
 }
 
 func sendMessageToRedis(rmsg RedisMessage) {
@@ -498,6 +502,7 @@ func main() {
 		MessageHandler:        messageHandler,
 		ReceiptMessageHandler: receiptMessageHandler,
 		RegistrationDone:      registrationDone,
+		GetUsername:           getUsername,
 	}
 	err := textsecure.Setup(client)
 	if err != nil {

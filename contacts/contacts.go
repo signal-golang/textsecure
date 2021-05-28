@@ -1,11 +1,9 @@
 // Copyright (c) 2014 Canonical Ltd.
 // Licensed under the GPLv3, see the COPYING file for details.
 
-package textsecure
+package contacts
 
 import (
-	"bytes"
-	"io"
 	"io/ioutil"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -37,17 +35,17 @@ type yamlContacts struct {
 
 var (
 	contactsFile string
-	contacts     = map[string]Contact{}
+	Contacts     = map[string]Contact{}
 )
 
-// ReadContacts reads a YAML contacts file
-func loadContacts(contactsYaml *yamlContacts) {
+// LoadContacts reads a YAML contacts file
+func LoadContacts(contactsYaml *yamlContacts) {
 	for _, c := range contactsYaml.Contacts {
 		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
-			contacts[c.UUID] = c
+			Contacts[c.UUID] = c
 
 		} else {
-			contacts[c.Tel] = c
+			Contacts[c.Tel] = c
 		}
 	}
 }
@@ -66,7 +64,7 @@ func ReadContacts(fileName string) ([]Contact, error) {
 	if err != nil {
 		return nil, err
 	}
-	loadContacts(contactsYaml)
+	LoadContacts(contactsYaml)
 	return contactsYaml.Contacts, nil
 }
 
@@ -91,7 +89,7 @@ func WriteContactsToPath() error {
 }
 func contactsToYaml() *yamlContacts {
 	c := &yamlContacts{}
-	for _, co := range contacts {
+	for _, co := range Contacts {
 		c.Contacts = append(c.Contacts, co)
 	}
 	return c
@@ -100,24 +98,25 @@ func contactsToYaml() *yamlContacts {
 func updateContact(c *signalservice.ContactDetails) error {
 	log.Debugln("[textsecure] updateContact ", c.GetUuid())
 
-	var r io.Reader
-	av := c.GetAvatar()
-	buf := new(bytes.Buffer)
-	if av != nil {
-		att, err := handleProfileAvatar(av, c.GetProfileKey())
-		if err != nil {
-			return err
-		}
-		r = att.R
-		buf.ReadFrom(r)
-	}
-	avatar, _ := ioutil.ReadAll(buf)
+	// var r io.Reader
+	// av := c.GetAvatar()
+	// buf := new(bytes.Buffer)
+	// if av != nil {
+	// 	att, err := handleProfileAvatar(av, c.GetProfileKey())
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	r = att.R
+	// 	buf.ReadFrom(r)
+	// }
+	// avatar, _ := ioutil.ReadAll(buf)
 
-	contacts[c.GetUuid()] = Contact{
-		Tel:           c.GetNumber(),
-		UUID:          c.GetUuid(),
-		Name:          c.GetName(),
-		Avatar:        avatar,
+	Contacts[c.GetUuid()] = Contact{
+		Tel:  c.GetNumber(),
+		UUID: c.GetUuid(),
+		Name: c.GetName(),
+		// Avatar:        avatar,
+		Avatar:        nil,
 		Color:         c.GetColor(),
 		Verified:      c.GetVerified(),
 		ProfileKey:    c.GetProfileKey(),
@@ -126,11 +125,11 @@ func updateContact(c *signalservice.ContactDetails) error {
 		InboxPosition: c.GetInboxPosition(),
 		Archived:      c.GetArchived(),
 	}
-	log.Debugln("[textsecure] avatar", c.GetAvatar(), buf)
+	log.Debugln("[textsecure] avatar", c.GetAvatar())
 	return WriteContactsToPath()
 }
 
-func handleContacts(src string, dm *signalservice.DataMessage) ([]*signalservice.DataMessage_Contact, error) {
+func HandleContacts(src string, dm *signalservice.DataMessage) ([]*signalservice.DataMessage_Contact, error) {
 	cs := dm.GetContact()
 	if cs == nil {
 		return nil, nil
@@ -141,21 +140,4 @@ func handleContacts(src string, dm *signalservice.DataMessage) ([]*signalservice
 		log.Debugln("[textsecure] handle Contact", c.GetName())
 	}
 	return nil, nil
-}
-
-// SyncContacts syncs the contacts
-func SyncContacts() error {
-	var t signalservice.SyncMessage_Request_Type
-	t = signalservice.SyncMessage_Request_CONTACTS
-	omsg := &signalservice.SyncMessage{
-		Request: &signalservice.SyncMessage_Request{
-			Type: &t,
-		},
-	}
-	_, err := sendSyncMessage(omsg, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
