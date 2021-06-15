@@ -101,7 +101,7 @@ func buildQueryDataWithNonce(addressBook []string, nonce []byte) ([]byte, error)
 }
 
 func parse(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 0)
+	return strconv.ParseInt(s, 10, 64)
 }
 
 func toByteArray(i int64) []byte {
