@@ -265,7 +265,7 @@ func (ht *httpTransporter) PutWithAuthCookies(url string, body []byte, ct string
 		r.Body = resp.Body
 	}
 
-	log.Debugf("[textsecure] PUT with auth & cookoie %s %d \n", url, r.Status)
+	log.Debugf("[textsecure] PUT with auth & cookie %s %d \n", url, r.Status)
 
 	return r, err
 }

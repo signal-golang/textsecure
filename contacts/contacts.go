@@ -4,6 +4,7 @@
 package contacts
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -140,4 +141,14 @@ func HandleContacts(src string, dm *signalservice.DataMessage) ([]*signalservice
 		log.Debugln("[textsecure] handle Contact", c.GetName())
 	}
 	return nil, nil
+}
+
+func UpdateProfileKey(src string, profileKey []byte) error {
+	log.Println("[textsecure] update profile key", src)
+	if contact, ok := Contacts[src]; ok {
+		contact.ProfileKey = profileKey
+		Contacts[src] = contact
+		return WriteContactsToPath()
+	}
+	return fmt.Errorf("Contact to update not found")
 }
