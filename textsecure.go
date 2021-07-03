@@ -456,6 +456,9 @@ func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) e
 // EndSessionFlag signals that this message resets the session
 var EndSessionFlag uint32 = 1
 
+// ProfileKeyUpdatedFlag signals that this message updates the profile key
+var ProfileKeyUpdatedFlag = signalservice.DataMessage_PROFILE_KEY_UPDATE
+
 func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
 	flags := uint32(0)
 	if dm.GetFlags() == uint32(signalservice.DataMessage_END_SESSION) {
@@ -464,12 +467,19 @@ func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
 		textSecureStore.DeleteAllSessions(recID(src))
 		textSecureStore.DeleteAllSessions(src)
 	}
+	if dm.GetFlags() == uint32(signalservice.DataMessage_PROFILE_KEY_UPDATE) {
+		err := contacts.UpdateProfileKey(src, dm.GetProfileKey())
+		if err != nil {
+			return 0, err
+		}
+		flags = uint32(signalservice.DataMessage_PROFILE_KEY_UPDATE)
+	}
 	return flags, nil
 }
 
 // handleDataMessage handles an incoming DataMessage and calls client callbacks
 func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signalservice.DataMessage) error {
-	flags, err := handleFlags(src, dm)
+	flags, err := handleFlags(srcUUID, dm)
 	if err != nil {
 		return err
 	}
