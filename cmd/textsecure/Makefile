@@ -24,20 +24,20 @@ else
 	exit 1
 endif
 ifeq ($(uname_s), Linux)
-ifeq ($(shell uname --hardware-platform), x86_64)
+ifeq ($(shell uname --machine), x86_64)
 	@echo "get zkgroup $(PLATFORM)"
 	go get -d github.com/nanu-c/zkgroup
 	&& git submodule update \
 	&& cd lib/zkgroup \
 	&& cargo build --release --verbose
-	mv libzkgroup.so libzkgroup_linux_amd64.so
-else ifeq ($(shell uname --hardware-platform), aarch64)
+	mv libzkgroup.so libzkgroup_linux_x86_64.so
+else ifeq ($(shell uname --machine), aarch64)
 	@echo "get zkgroup $(PLATFORM)"
 	go get -d github.com/nanu-c/zkgroup
 	&& git submodule update \
 	&& cd lib/zkgroup \
 	&& cargo build --release --verbose
-	mv libzkgroup.so libzkgroup_linux_arm64.so
+	mv libzkgroup.so libzkgroup_linux_aarch64.so
 else 
 	@echo architecture not supported
 	exit 1
@@ -72,12 +72,12 @@ endif
 
 install-zkgroup:
 ifeq ($(uname_s), Linux)
-ifeq ($(shell uname --hardware-platform), x86_64)
+ifeq ($(shell uname --machine), x86_64)
 	@echo "install libzkgroup to /usr/lib"
-	cp ./libzkgroup_linux_amd64.so /usr/lib/
-else ifeq ($(shell uname --hardware-platform), aarch64)
+	cp ./libzkgroup_linux_x86_64.so /usr/lib/
+else ifeq ($(shell uname --machine), aarch64)
 	@echo "install libzkgroup to /usr/lib"
-	cp ./libzkgroup_linux_arm64.so  /usr/lib/
+	cp ./libzkgroup_linux_aarch64.so  /usr/lib/
 
 else 
 	@echo architecture not supported
