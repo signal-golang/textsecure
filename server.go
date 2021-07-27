@@ -245,12 +245,11 @@ type RegistrationLockFailure struct {
 // verifyCode verificates the account with signal server
 func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, *AuthCredentials) {
 	code = strings.Replace(code, "-", "", -1)
-	// var key []byte
-	// key = identityKey.PrivateKey.Key()[:]
-	// unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
-	// if err != nil {
-	// 	log.Debugln("[textsecure] verifyCode", err)
-	// }
+	key := identityKey.PrivateKey.Key()[:]
+	unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	if err != nil {
+		log.Debugln("[textsecure] verifyCode", err)
+	}
 	vd := AccountAttributes{
 		SignalingKey:    base64.StdEncoding.EncodeToString(registrationInfo.signalingKey),
 		RegistrationID:  registrationInfo.registrationID,
@@ -265,7 +264,7 @@ func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, 
 			Storage: false,
 		},
 		DiscoverableByPhoneNumber:      true,
-		UnidentifiedAccessKey:          nil,
+		UnidentifiedAccessKey:          &unidentifiedAccessKey,
 		UnrestrictedUnidentifiedAccess: false,
 		// Pin:             nil,
 	}
@@ -329,13 +328,12 @@ func RegisterWithUPS(token string) error {
 
 // SetAccountCapabilities lets the client decide when it's ready for new functions to support for example groupsv2
 func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
-	// var key []byte
-	// key = identityKey.PrivateKey.Key()[:]
-	// unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
-	// if err != nil {
-	// 	log.Errorln("[textsecure] SetAccountCapabilities ceating unidentifiedAccessKey: ", err)
-	// 	return err
-	// }
+	key := identityKey.PrivateKey.Key()[:]
+	unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	if err != nil {
+		log.Errorln("[textsecure] SetAccountCapabilities ceating unidentifiedAccessKey: ", err)
+		return err
+	}
 	attributes := UpdateAccountAttributes{
 		SignalingKey:                   nil,
 		RegistrationID:                 registrationInfo.registrationID,
@@ -343,7 +341,7 @@ func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 		Pin:                            nil,
 		Name:                           config.ConfigFile.Name,
 		RegistrationLock:               nil,
-		UnidentifiedAccessKey:          nil,
+		UnidentifiedAccessKey:          &unidentifiedAccessKey,
 		UnrestrictedUnidentifiedAccess: true,
 		Capabilities:                   capabilities,
 		DiscoverableByPhoneNumber:      true,
@@ -351,7 +349,7 @@ func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 		Voice:                          false,
 	}
 
-	err := setAccountAttributes(&attributes)
+	err = setAccountAttributes(&attributes)
 	if err != nil {
 		return err
 	}
