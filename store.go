@@ -38,6 +38,8 @@ type store struct {
 	macKey      []byte
 }
 
+var lastResortPreKeyID uint32 = 0xFFFFFF
+
 func newStore(password, path string) (*store, error) {
 	ts := &store{
 		preKeysDir:       filepath.Join(path, "prekeys"),

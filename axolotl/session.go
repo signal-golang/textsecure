@@ -32,7 +32,7 @@ func (ss *sessionState) getAliceBaseKey() []byte {
 }
 
 func (ss *sessionState) setSessionVersion(version uint32) {
-	ss.SS.SessionVersion = &version
+	ss.SS.SessionVersion = version
 }
 
 func (ss *sessionState) getSessionVersion() uint32 {
@@ -44,7 +44,7 @@ func (ss *sessionState) getSessionVersion() uint32 {
 }
 
 func (ss *sessionState) setPreviousCounter(pc uint32) {
-	ss.SS.PreviousCounter = &pc
+	ss.SS.PreviousCounter = pc
 }
 
 func (ss *sessionState) getPreviousCounter() uint32 {
@@ -76,19 +76,19 @@ func (ss *sessionState) getRootKey() *rootKey {
 }
 
 func (ss *sessionState) setLocalRegistrationID(id uint32) {
-	ss.SS.LocalRegistrationId = &id
+	ss.SS.LocalRegistrationId = id
 }
 
 func (ss *sessionState) getLocalRegistrationID() uint32 {
-	return *ss.SS.LocalRegistrationId
+	return ss.SS.LocalRegistrationId
 }
 
 func (ss *sessionState) setRemoteRegistrationID(id uint32) {
-	ss.SS.RemoteRegistrationId = &id
+	ss.SS.RemoteRegistrationId = id
 }
 
 func (ss *sessionState) getRemoteRegistrationID() uint32 {
-	return *ss.SS.RemoteRegistrationId
+	return ss.SS.RemoteRegistrationId
 }
 
 func (ss *sessionState) getSenderRatchetKey() *ECPublicKey {
@@ -124,20 +124,20 @@ func (ss *sessionState) getReceiverChainKey(senderEphemeral *ECPublicKey) *chain
 	if rc == nil {
 		return nil
 	}
-	return newChainKey(rc.GetChainKey().Key, *rc.GetChainKey().Index)
+	return newChainKey(rc.GetChainKey().Key, rc.GetChainKey().Index)
 
 }
 
 func (ss *sessionState) setReceiverChainKey(senderEphemeral *ECPublicKey, chainKey *chainKey) {
 	rc, _ := ss.getReceiverChain(senderEphemeral)
 	rc.ChainKey = &protobuf.SessionStructure_Chain_ChainKey{
-		Index: &chainKey.Index,
+		Index: chainKey.Index,
 		Key:   chainKey.Key[:],
 	}
 }
 
 func (ss *sessionState) addReceiverChain(senderRatchetKey *ECPublicKey, chainKey *chainKey) {
-	ck := &protobuf.SessionStructure_Chain_ChainKey{Index: &chainKey.Index,
+	ck := &protobuf.SessionStructure_Chain_ChainKey{Index: chainKey.Index,
 		Key: chainKey.Key[:],
 	}
 
@@ -155,7 +155,7 @@ func (ss *sessionState) setSenderChain(kp *ECKeyPair, ck *chainKey) {
 		SenderRatchetKey:        kp.PublicKey.Key()[:],
 		SenderRatchetKeyPrivate: kp.PrivateKey.Key()[:],
 		ChainKey: &protobuf.SessionStructure_Chain_ChainKey{
-			Index: &ck.Index,
+			Index: ck.Index,
 			Key:   ck.Key[:],
 		},
 	}
@@ -163,12 +163,12 @@ func (ss *sessionState) setSenderChain(kp *ECKeyPair, ck *chainKey) {
 
 func (ss *sessionState) getSenderChainKey() *chainKey {
 	ssck := ss.SS.GetSenderChain().GetChainKey()
-	return newChainKey(ssck.Key, *ssck.Index)
+	return newChainKey(ssck.Key, ssck.Index)
 }
 
 func (ss *sessionState) setSenderChainKey(ck *chainKey) {
 	ss.SS.SenderChain.ChainKey = &protobuf.SessionStructure_Chain_ChainKey{
-		Index: &ck.Index,
+		Index: ck.Index,
 		Key:   ck.Key[:],
 	}
 }
@@ -206,7 +206,7 @@ func (ss *sessionState) setMessageKeys(senderEphemeral *ECPublicKey, mk *message
 		CipherKey: mk.CipherKey,
 		MacKey:    mk.MacKey,
 		Iv:        mk.Iv,
-		Index:     &mk.Index,
+		Index:     mk.Index,
 	}
 
 	rc.MessageKeys = append(rc.MessageKeys, sscmk)
@@ -226,8 +226,8 @@ func (ss *sessionState) getUnacknowledgedPreKeyMessageItems() *unacknowledgedPre
 	preKeyID := uint32(0)
 	ppk := ss.SS.GetPendingPreKey()
 
-	if ppk.PreKeyId != nil {
-		preKeyID = *ppk.PreKeyId
+	if ppk.PreKeyId != 0 {
+		preKeyID = ppk.PreKeyId
 	}
 
 	return &unacknowledgedPreKeyMessageItem{preKeyID, ppk.GetSignedPreKeyId(), NewECPublicKey(ppk.GetBaseKey()[1:])}
@@ -235,11 +235,11 @@ func (ss *sessionState) getUnacknowledgedPreKeyMessageItems() *unacknowledgedPre
 
 func (ss *sessionState) setUnacknowledgedPreKeyMessage(preKeyID uint32, signedPreKeyID int32, ourBaseKey *ECPublicKey) {
 	ssppk := &protobuf.SessionStructure_PendingPreKey{
-		SignedPreKeyId: &signedPreKeyID,
+		SignedPreKeyId: signedPreKeyID,
 		BaseKey:        ourBaseKey.Serialize(),
 	}
 	if preKeyID != 0 {
-		ssppk.PreKeyId = &preKeyID
+		ssppk.PreKeyId = preKeyID
 	}
 	ss.SS.PendingPreKey = ssppk
 }

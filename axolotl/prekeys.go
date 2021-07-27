@@ -6,8 +6,8 @@ package axolotl
 // PreKey and SignedPreKey support
 
 import (
-	protobuf "github.com/signal-golang/textsecure/axolotl/protobuf"
 	"github.com/golang/protobuf/proto"
+	protobuf "github.com/signal-golang/textsecure/axolotl/protobuf"
 )
 
 var maxValue uint32 = 0xFFFFFF
@@ -21,7 +21,7 @@ type PreKeyRecord struct {
 func NewPreKeyRecord(id uint32, kp *ECKeyPair) *PreKeyRecord {
 	pkr := &PreKeyRecord{
 		&protobuf.PreKeyRecordStructure{
-			Id:         &id,
+			Id:         id,
 			PublicKey:  kp.PublicKey.Key()[:],
 			PrivateKey: kp.PrivateKey.Key()[:],
 		},
@@ -79,10 +79,10 @@ type SignedPreKeyRecord struct {
 func NewSignedPreKeyRecord(id uint32, timestamp uint64, kp *ECKeyPair, signature []byte) *SignedPreKeyRecord {
 	return &SignedPreKeyRecord{
 		&protobuf.SignedPreKeyRecordStructure{
-			Id:         &id,
+			Id:         id,
 			PublicKey:  kp.PublicKey.Key()[:],
 			PrivateKey: kp.PrivateKey.Key()[:],
-			Timestamp:  &timestamp,
+			Timestamp:  timestamp,
 			Signature:  signature,
 		},
 	}

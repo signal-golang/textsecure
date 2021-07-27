@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// GetAvatar retuns an avatar for it's url from signal cdn
+// GetAvatar returns an avatar for it's url from signal cdn
 func GetAvatar(avatarURL string) (io.ReadCloser, error) {
 	log.Debugln("[textsecure] get avatar from ", avatarURL)
 

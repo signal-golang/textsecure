@@ -1,15 +1,21 @@
-package textsecure;
+syntax = "proto2";
 
-option java_package = "org.whispersystems.libsignal.fingerprint";
-option java_outer_classname = "FingerprintProtos";
+//
+// Copyright 2020 Signal Messenger, LLC.
+// SPDX-License-Identifier: AGPL-3.0-only
+//
+
+package signal.proto.fingerprint;
+
+option go_package = ".;textsecure";
 
 message LogicalFingerprint {
   optional bytes content = 1;
-//  optional bytes identifier = 2;
+  // bytes identifier = 2;
 }
 
 message CombinedFingerprints {
-  optional uint32             version           = 1;
-  optional LogicalFingerprint localFingerprint  = 2;
-  optional LogicalFingerprint remoteFingerprint = 3;
+  optional uint32             version            = 1;
+  optional LogicalFingerprint local_fingerprint  = 2;
+  optional LogicalFingerprint remote_fingerprint = 3;
 }
