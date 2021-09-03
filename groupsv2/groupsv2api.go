@@ -28,8 +28,12 @@ func NewGroupsV2AuthorizationForGroup(uuid []byte, hexid string) (*GroupsV2Autho
 func NewGroupsV2Authorization(uuid []byte, groupSecretParams zkgroup.GroupSecretParams) (*GroupsV2Authorization, error) {
 	publicGroupParams, err := groupSecretParams.PublicParams()
 	today := time.Now().Unix() / 86400
+	credential, err := GetCredentialForRedemption(today)
+	if err != nil {
+		return nil, err
 
-	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(GetCredentialForRedemption(today).Credential)
+	}
+	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(credential.Credential)
 	if err != nil {
 		log.Warnln("[textsecure] NewGroupsV2AuthorizationForGroup2", err.Error())
 

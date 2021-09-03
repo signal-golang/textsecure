@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -51,7 +50,6 @@ func CheckCertificate(certificate []byte) error {
 		log.Fatalln("Failed to parse sender certificate:", err)
 		return err
 	}
-	fmt.Printf("sendercert %+v\n", senderCertificate)
 	if *senderCertificate.Expires < uint64(time.Now().Unix()) {
 		log.Errorln("Certificate expired")
 		return errors.New("certificate expired")

@@ -28,27 +28,31 @@ func getToday() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond) / (1000 * 60 * 60 * 24)
 }
 
-func GetCredentialForRedemption(day int64) *GroupCredential {
+func GetCredentialForRedemption(day int64) (*GroupCredential, error) {
 	if Credentials == nil {
 		today := getToday()
 		err := GetGroupAuthCredentials(today, today+7)
 		if err != nil {
 			log.Errorln("[textsecure] get groupCredentials ", err)
+			return nil, err
 		}
 	}
 	for _, credential := range Credentials.Credentials {
 		if credential.RedemptionTime == day {
-			return &credential
+			return &credential, nil
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("failed to get group credentials")
 }
 
-func GetCredentialForToday() *GroupCredential {
+func GetCredentialForToday() (*GroupCredential, error) {
 
 	today := getToday()
-	credential := GetCredentialForRedemption(today)
-	return credential
+	credential, err := GetCredentialForRedemption(today)
+	if err != nil {
+		return nil, err
+	}
+	return credential, nil
 }
 
 func GetGroupAuthCredentials(startDay int64, endDay int64) error {
