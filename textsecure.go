@@ -5,7 +5,6 @@
 package textsecure
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -21,11 +20,12 @@ import (
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
-	"github.com/signal-golang/textsecure/groupsv2"
+	"github.com/signal-golang/textsecure/helpers"
 	"github.com/signal-golang/textsecure/profiles"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
 	"github.com/signal-golang/textsecure/transport"
+	"github.com/signal-golang/textsecure/unidentifiedAccess"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,7 +33,7 @@ import (
 func generatePassword() string {
 	b := make([]byte, 16)
 	randBytes(b[:])
-	return base64EncWithoutPadding(b)
+	return helpers.Base64EncWithoutPadding(b)
 }
 
 // Generate a random 14 bit integer
@@ -49,22 +49,8 @@ func generateSignalingKey() []byte {
 	return b
 }
 
-// Base64-encodes without padding the result
-func base64EncWithoutPadding(b []byte) string {
-	s := base64.StdEncoding.EncodeToString(b)
-	return strings.TrimRight(s, "=")
-}
-
-// Base64-decodes a non-padded string
-func base64DecodeNonPadded(s string) ([]byte, error) {
-	if len(s)%4 != 0 {
-		s = s + strings.Repeat("=", 4-len(s)%4)
-	}
-	return base64.StdEncoding.DecodeString(s)
-}
-
 func encodeKey(key []byte) string {
-	return base64EncWithoutPadding(append([]byte{5}, key[:]...))
+	return helpers.Base64EncWithoutPadding(append([]byte{5}, key[:]...))
 }
 
 // ErrBadPublicKey is raised when a given public key is not in the
@@ -72,7 +58,7 @@ func encodeKey(key []byte) string {
 var ErrBadPublicKey = errors.New("public key not formatted correctly")
 
 func decodeKey(s string) ([]byte, error) {
-	b, err := base64DecodeNonPadded(s)
+	b, err := helpers.Base64DecodeNonPadded(s)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +69,7 @@ func decodeKey(s string) ([]byte, error) {
 }
 
 func decodeSignature(s string) ([]byte, error) {
-	b, err := base64DecodeNonPadded(s)
+	b, err := helpers.Base64DecodeNonPadded(s)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +323,35 @@ func Setup(c *Client) error {
 	if profileChanged {
 		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
 	}
+
+	// check for unidentified access
+	if len(config.ConfigFile.Certificate) == 0 {
+		err = renewSenderCertificate()
+		if err != nil {
+			return err
+		}
+	} else {
+		err := unidentifiedAccess.CheckCertificate(config.ConfigFile.Certificate)
+		if err != nil {
+			err = renewSenderCertificate()
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return err
+}
+func renewSenderCertificate() error {
+	log.Infoln("Get new uidentified sender certificate")
+	cert, err := transport.GetSenderCertificate()
+	if err != nil {
+		return err
+	}
+	config.ConfigFile.Certificate = cert.Certificate
+	saveConfig(config.ConfigFile)
+	log.Debug(fmt.Sprintf("[textsecure] Sender certificate: %s", cert))
+	return nil
+
 }
 
 func registerDevice() error {
@@ -424,35 +438,6 @@ func recID(source string) string {
 	return source
 }
 
-func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) error {
-	b = stripPadding(b)
-
-	content := &signalservice.Content{}
-	err := proto.Unmarshal(b, content)
-	if err != nil {
-		return err
-	}
-
-	if dm := content.GetDataMessage(); dm != nil {
-		return handleDataMessage(srcE164, srcUUID, timestamp, dm)
-	} else if sm := content.GetSyncMessage(); sm != nil && config.ConfigFile.Tel == srcE164 {
-		return handleSyncMessage(srcE164, srcUUID, timestamp, sm)
-	} else if cm := content.GetCallMessage(); cm != nil {
-		return handleCallMessage(srcE164, srcUUID, timestamp, cm)
-	} else if rm := content.GetReceiptMessage(); rm != nil {
-		return handleReceiptMessage(srcE164, srcUUID, timestamp, rm)
-	} else if tm := content.GetTypingMessage(); tm != nil {
-		return handleTypingMessage(srcE164, srcUUID, timestamp, tm)
-	} else if nm := content.GetNullMessage(); nm != nil {
-		log.Errorln("[textsecure] Nullmessage content received", content)
-		return nil
-	}
-	//FIXME get the right content
-	// log.Errorf(content)
-	log.Errorln("[textsecure] Unknown message content received", content)
-	return nil
-}
-
 // EndSessionFlag signals that this message resets the session
 var EndSessionFlag uint32 = 1
 
@@ -475,124 +460,6 @@ func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
 		flags = uint32(signalservice.DataMessage_PROFILE_KEY_UPDATE)
 	}
 	return flags, nil
-}
-
-// handleDataMessage handles an incoming DataMessage and calls client callbacks
-func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signalservice.DataMessage) error {
-	flags, err := handleFlags(srcUUID, dm)
-	if err != nil {
-		return err
-	}
-
-	atts, err := handleAttachments(dm)
-	if err != nil {
-		return err
-	}
-	log.Debugln("[textsecure] handleDataMessage", timestamp, *dm.Timestamp, dm.GetExpireTimer())
-	gr, err := handleGroups(src, dm)
-	if err != nil {
-		return err
-	}
-	gr2, err := groupsv2.HandleGroupsV2(src, dm)
-	if err != nil {
-		return err
-	}
-	msg := &Message{
-		source:      src,
-		sourceUUID:  srcUUID,
-		message:     dm.GetBody(),
-		attachments: atts,
-		group:       gr,
-		groupV2:     gr2,
-		flags:       flags,
-		expireTimer: dm.GetExpireTimer(),
-		profileKey:  dm.GetProfileKey(),
-		timestamp:   *dm.Timestamp,
-		quote:       dm.GetQuote(),
-		contact:     dm.GetContact(),
-		preview:     dm.GetPreview(),
-		sticker:     dm.GetSticker(),
-		reaction:    dm.GetReaction(),
-		// requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
-		// isViewOnce: *dm.IsViewOnce,
-	}
-
-	if client.MessageHandler != nil {
-		client.MessageHandler(msg)
-	}
-	return nil
-}
-func handleCallMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.CallMessage) error {
-	message := "Call "
-	if m := cm.GetAnswer(); m != nil {
-		message += "answer"
-	}
-	if m := cm.GetOffer(); m != nil {
-		message += "offer"
-	}
-	if m := cm.GetHangup(); m != nil {
-		message += "hangup"
-	}
-	if m := cm.GetBusy(); m != nil {
-		message += "busy"
-	}
-	if m := cm.GetLegacyHangup(); m != nil {
-		message += "hangup"
-	}
-	// if m := cm.GetMultiRing(); m == true {
-	// 	message += "ring "
-	// }
-	if m := cm.GetIceUpdate(); m != nil {
-		message += "ring"
-	}
-	// if m := cm.GetOpaque(); m != nil {
-	// 	message += "opaque"
-	// }
-
-	msg := &Message{
-		source:     src,
-		sourceUUID: srcUUID,
-		message:    message,
-		timestamp:  timestamp,
-	}
-
-	if client.MessageHandler != nil {
-		client.MessageHandler(msg)
-	}
-	return nil
-}
-func handleTypingMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.TypingMessage) error {
-
-	msg := &Message{
-		source:     src,
-		sourceUUID: srcUUID,
-		message:    "typingMessage",
-		timestamp:  timestamp,
-	}
-
-	if client.TypingMessageHandler != nil {
-		client.TypingMessageHandler(msg)
-	}
-	return nil
-}
-func handleReceiptMessage(src string, srcUUID string, timestamp uint64, cm *signalservice.ReceiptMessage) error {
-	msg := &Message{
-		source:     src,
-		sourceUUID: srcUUID,
-		message:    "sentReceiptMessage",
-		timestamp:  cm.GetTimestamp()[0],
-	}
-	if *cm.Type == signalservice.ReceiptMessage_READ {
-		msg.message = "readReceiptMessage"
-	}
-	if *cm.Type == signalservice.ReceiptMessage_DELIVERY {
-		msg.message = "deliveryReceiptMessage"
-	}
-	if client.ReceiptMessageHandler != nil {
-		client.ReceiptMessageHandler(msg)
-	}
-
-	return nil
 }
 
 // MessageTypeNotImplementedError is raised in the unlikely event that an unhandled protocol message type is received.
@@ -706,8 +573,13 @@ func handleReceivedMessage(msg []byte) error {
 			return err
 		}
 	case signalservice.Envelope_UNIDENTIFIED_SENDER:
+
 		msg := env.GetContent()
-		return fmt.Errorf("not implemented message type unindentified sender", msg)
+		str := string(msg)
+
+		fmt.Println(str) // uint64 in string format
+
+		return fmt.Errorf("not implemented message type unindentified sender %v", msg)
 
 	default:
 		return MessageTypeNotImplementedError{uint32(*env.Type)}

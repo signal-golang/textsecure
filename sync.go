@@ -7,8 +7,10 @@ import (
 	"regexp"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/unidentifiedAccess"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -16,39 +18,52 @@ import (
 func handleSyncMessage(src string, srcUUID string, timestamp uint64, sm *signalservice.SyncMessage) error {
 	log.Debugf("[textsecure] SyncMessage recieved at %d", timestamp)
 
-	if sm.GetSent() != nil {
-		log.Debugln("[textsecure] SyncMessage getSent")
-		return handleSyncSent(sm.GetSent(), timestamp)
-	} else if sm.GetContacts() != nil {
-		log.Debugln("[textsecure] SyncMessage contacts")
+	if sm.GetContacts() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled contacts")
 		return nil
 	} else if sm.GetGroups() != nil {
 		log.Debugln("[textsecure] SyncMessage groups")
 		return nil
-	} else if sm.GetRequest() != nil {
-		log.Debugln("[textsecure] SyncMessage getRequest")
-		return handleSyncRequest(sm.GetRequest())
 	} else if sm.GetRead() != nil {
 		log.Debugln("[textsecure] SyncMessage getRead")
 		return handleSyncRead(sm.GetRead())
+	} else if sm.GetViewed() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled getViewed")
+		return nil
+	} else if sm.GetViewOnceOpen() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetViewOnceOpen")
+		return nil
+	} else if sm.GetViewOnceOpen() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetBlockedList")
+		return nil
 	} else if sm.GetBlocked() != nil {
 		log.Debugln("[textsecure] SyncMessage blocked")
 		return nil
+	} else if sm.GetConfiguration() != nil {
+		log.Debugln("[textsecure] SyncMessage unahndled configuration")
+		return nil
+	} else if sm.GetSent() != nil {
+		log.Debugln("[textsecure] SyncMessage getSent")
+		return handleSyncSent(sm.GetSent(), timestamp)
+	} else if sm.GetStickerPackOperation() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetStickerPackOperation")
+		return nil
+	} else if sm.GetRequest() != nil {
+		log.Debugln("[textsecure] SyncMessage getRequest")
+		return handleSyncRequest(sm.GetRequest())
+
 	} else if sm.GetVerified() != nil {
 		log.Debugln("[textsecure] SyncMessage verified")
-		return nil
-	} else if sm.GetConfiguration() != nil {
-		log.Debugln("[textsecure] SyncMessage configuration")
-		return nil
+		unidentifiedAccess, err := unidentifiedAccess.GetAccessForSync(config.ConfigFile.ProfileKey, config.ConfigFile.Certificate)
+		if err != nil {
+			return err
+		}
+		return sendVerifiedMessage(sm.GetVerified(), unidentifiedAccess)
+
 	} else if sm.GetPadding() != nil {
 		log.Debugln("[textsecure] SyncMessage padding")
 		return nil
-	} else if sm.GetStickerPackOperation() != nil {
-		log.Debugln("[textsecure] SyncMessage GetStickerPackOperation")
-		return nil
-	} else if sm.GetViewOnceOpen() != nil {
-		log.Debugln("[textsecure] SyncMessage GetViewOnceOpen")
-		return nil
+
 	} else if sm.GetFetchLatest() != nil {
 		log.Debugln("[textsecure] SyncMessage GetFetchLatest")
 		return nil

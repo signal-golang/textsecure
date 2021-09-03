@@ -18,6 +18,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/helpers"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/curve25519"
@@ -57,7 +58,7 @@ func verifyMAC(key, b, mac []byte) bool {
 // telToToken calculates a truncated SHA1 hash of a phone number, to be used for contact discovery
 func telToToken(tel string) string {
 	s := sha1.Sum([]byte(tel))
-	return base64EncWithoutPadding(s[:10])
+	return helpers.Base64EncWithoutPadding(s[:10])
 }
 
 // aesEncrypt encrypts the given plaintext under the given key in AES-CBC mode

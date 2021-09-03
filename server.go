@@ -15,15 +15,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/unidentifiedAccess"
+
 	"github.com/signal-golang/textsecure/transport"
-	"golang.org/x/text/encoding/charmap"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -79,8 +79,8 @@ var (
 	PROFILE_PATH          = "/v1/profile/%s"
 	PROFILE_USERNAME_PATH = "/v1/profile/username/%s"
 
-	SENDER_CERTIFICATE_PATH         = "/v1/certificate/delivery?includeUuid=true"
-	SENDER_CERTIFICATE_NO_E164_PATH = "/v1/certificate/delivery?includeUuid=true&includeE164=false"
+	SENDER_CERTIFICATE_PATH         = "/v1/certificate/delivery"
+	SENDER_CERTIFICATE_NO_E164_PATH = "/v1/certificate/delivery?includeE164=false"
 
 	KBS_AUTH_PATH = "/v1/backup/auth"
 
@@ -169,7 +169,7 @@ func requestCode(tel, method, captcha string) (string, *int, error) {
 			log.Errorln("[textsecure] requestCode", newStr)
 			defer resp.Body.Close()
 
-			return "", &resp.Status, errors.New("Rate Limit Exeded")
+			return "", &resp.Status, errors.New("Rate limit exeded")
 		} else {
 			log.Debugln("[textsecure] request code status", resp.Status)
 			defer resp.Body.Close()
@@ -201,7 +201,7 @@ type AccountAttributes struct {
 	Video                          bool                       `json:"video" yaml:"video"`
 	Voice                          bool                       `json:"voice" yaml:"voice"`
 	Pin                            *string                    `json:"pin" yaml:"pin"` // deprecated
-	BasicStorageCredentials        AuthCredentials            `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
+	BasicStorageCredentials        transport.AuthCredentials  `json:"basicStorageCredentials" yaml:"basicStorageCredentials"`
 	Capabilities                   config.AccountCapabilities `json:"capabilities" yaml:"capabilities"`
 	DiscoverableByPhoneNumber      bool                       `json:"discoverableByPhoneNumber" yaml:"discoverableByPhoneNumber"`
 	UnrestrictedUnidentifiedAccess bool                       `json:"unrestrictedUnidentifiedAccess"`
@@ -223,30 +223,16 @@ type UpdateAccountAttributes struct {
 	Voice                          bool                       `json:"voice" yaml:"voice"`
 }
 
-// AuthCredentials holds the credentials for the websocket connection
-type AuthCredentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-func (a *AuthCredentials) AsBasic() string {
-	usernameAndPassword := a.Username + ":" + a.Password
-	dec := charmap.Windows1250.NewDecoder()
-	out, _ := dec.String(usernameAndPassword)
-	encoded := base64.StdEncoding.EncodeToString([]byte(out))
-	return "Basic " + encoded
-}
-
 type RegistrationLockFailure struct {
-	TimeRemaining uint32          `json:"timeRemaining"`
-	Credentials   AuthCredentials `json:"backupCredentials"`
+	TimeRemaining uint32                    `json:"timeRemaining"`
+	Credentials   transport.AuthCredentials `json:"backupCredentials"`
 }
 
 // verifyCode verificates the account with signal server
-func verifyCode(code string, pin *string, credentials *AuthCredentials) (error, *AuthCredentials) {
+func verifyCode(code string, pin *string, credentials *transport.AuthCredentials) (error, *transport.AuthCredentials) {
 	code = strings.Replace(code, "-", "", -1)
 	key := identityKey.PrivateKey.Key()[:]
-	unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	unidentifiedAccessKey, err := unidentifiedAccess.DeriveAccessKeyFrom(key)
 	if err != nil {
 		log.Debugln("[textsecure] verifyCode", err)
 	}
@@ -329,7 +315,7 @@ func RegisterWithUPS(token string) error {
 // SetAccountCapabilities lets the client decide when it's ready for new functions to support for example groupsv2
 func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 	key := identityKey.PrivateKey.Key()[:]
-	unidentifiedAccessKey, err := deriveAccessKeyFrom(key)
+	unidentifiedAccessKey, err := unidentifiedAccess.DeriveAccessKeyFrom(key)
 	if err != nil {
 		log.Errorln("[textsecure] SetAccountCapabilities ceating unidentifiedAccessKey: ", err)
 		return err
@@ -506,22 +492,6 @@ type DiscoveryContact struct {
 	RequestId string
 }
 
-// {
-// 	"addressCount":1,
-// 	"commitment":"Bji4zKernD3XYqtkhSRB8TvrGfevrB1qKYU2tzcZDcM=",
-// 	"data":"GI+F1w5anMGNO1K2lSn5j9lHfQc+Ub+2f1pADmT54Yfw/RuexsV+Vw==",
-// 	"envelopes":{
-// 		"6a4eb498-1c62-481e-9592-025d1e901f59":{
-// 			"data":"CL3ze4lOBU+kxHE2pnFJzIX/9KsQ1n1eQpaPvnedSbk=",
-// 			"iv":"qjaUGml40FAWi3cZ",
-// 			"mac":"UifN1pOFRwPjpdrpy7SQbA==",
-// 			"requestId":"BSBm+fiFhw9Ghv88aLpa671+3OVHBxAUOe9QK7C5BMs9aB06"
-// 		}
-// 	},
-// 	"iv":"DEq9x+BLEU2V9Yjh",
-// 	"mac":"yB1qUZQ9MfQ7cdRDT6t5Lw=="
-// }
-
 // SyncContacts syncs the contacts
 func SyncContacts() error {
 	var t signalservice.SyncMessage_Request_Type
@@ -558,6 +528,7 @@ func registerPreKeys() error {
 
 // GET /v2/keys/{number}/{device_id}?relay={relay}
 func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
+	log.Debugln("getPreKeys", UUID, deviceID)
 	resp, err := transport.Transport.Get(fmt.Sprintf(prekeyDevicePath, UUID, deviceID))
 	if err != nil {
 		return nil, err
@@ -570,19 +541,6 @@ func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
 	dec.Decode(k)
 
 	return k, nil
-}
-
-func getCredendtails(path string) (*AuthCredentials, error) {
-	resp, err := transport.Transport.Get(path)
-	if err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(resp.Body)
-	var a AuthCredentials
-	dec.Decode(&a)
-	log.Debugln("[textsecure] getCredentials ")
-	return &a, nil
-
 }
 
 // jsonContact is the data returned by the server for each registered contact
@@ -652,7 +610,7 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 
 	}
 
-	authCredentials, err := getCredendtails(DIRECTORY_AUTH_PATH)
+	authCredentials, err := transport.GetCredendtails(DIRECTORY_AUTH_PATH)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get auth credentials %v", err)
 	}
@@ -709,29 +667,6 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 type jsonAllocation struct {
 	ID       uint64 `json:"id"`
 	Location string `json:"location"`
-}
-
-// GET /v1/attachments/
-func allocateAttachment() (uint64, string, error) {
-	resp, err := transport.Transport.Get(allocateAttachmentPath)
-	if err != nil {
-		return 0, "", err
-	}
-	dec := json.NewDecoder(resp.Body)
-	var a jsonAllocation
-	dec.Decode(&a)
-	return a.ID, a.Location, nil
-}
-
-func getAttachmentLocation(id uint64, key string, cdnNumber uint32) (string, error) {
-	cdn := SIGNAL_CDN_URL
-	if cdnNumber == 2 {
-		cdn = SIGNAL_CDN2_URL
-	}
-	if id != 0 {
-		return cdn + fmt.Sprintf(ATTACHMENT_ID_DOWNLOAD_PATH, id), nil
-	}
-	return cdn + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
 }
 
 func getProfileLocation(profilePath string) (string, error) {
@@ -814,67 +749,12 @@ func stripPadding(msg []byte) []byte {
 	return msg
 }
 
-func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, error) {
-	pkr, err := getPreKeys(UUID, strconv.Itoa(int(deviceID)))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(pkr.Devices) != 1 {
-		return nil, fmt.Errorf("no prekeys for contact %s, device %d", UUID, deviceID)
-	}
-
-	d := pkr.Devices[0]
-	preKeyId := uint32(0)
-	var preKey *axolotl.ECPublicKey
-	if d.PreKey == nil {
-		log.Debugln("[textsecure] makePreKeyBundle", fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID))
-	} else {
-		preKeyId = d.PreKey.ID
-		decPK, err := decodeKey(d.PreKey.PublicKey)
-		preKey = axolotl.NewECPublicKey(decPK)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if d.SignedPreKey == nil {
-		return nil, fmt.Errorf("no signed prekey for contact %s, device %d", UUID, deviceID)
-	}
-
-	decSPK, err := decodeKey(d.SignedPreKey.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	decSig, err := decodeSignature(d.SignedPreKey.Signature)
-	if err != nil {
-		return nil, err
-	}
-
-	decIK, err := decodeKey(pkr.IdentityKey)
-	if err != nil {
-		return nil, err
-	}
-
-	pkb, err := axolotl.NewPreKeyBundle(
-		d.RegistrationID, d.DeviceID, preKeyId,
-		preKey, int32(d.SignedPreKey.ID), axolotl.NewECPublicKey(decSPK),
-		decSig, axolotl.NewIdentityKey(decIK))
-	if err != nil {
-		return nil, err
-	}
-
-	return pkb, nil
-}
-
 func buildMessage(reciever string, paddedMessage []byte, devices []uint32, isSync bool) ([]jsonMessage, error) {
 	if len(reciever) == 0 {
 		return nil, fmt.Errorf("empty reciever")
 	}
 	recid := recID(reciever)
 	messages := []jsonMessage{}
-
 	for _, devid := range devices {
 		if !textSecureStore.ContainsSession(recid, devid) {
 			pkb, err := makePreKeyBundle(reciever, devid)
@@ -954,7 +834,11 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.Transport.PutJSON(fmt.Sprintf(MESSAGE_PATH, uuid), body)
+	unidentifiedAccessKeyPair, err := unidentifiedAccess.GetAccessForUUID(contacts.GetContact(uuid))
+	if err != nil {
+		return nil, err
+	}
+	resp, err := transport.Transport.PutJSONWithUnidentifiedSender(fmt.Sprintf(MESSAGE_PATH, uuid), body, unidentifiedAccessKeyPair.GetTargetKey())
 	if err != nil {
 		return nil, err
 	}
@@ -1001,79 +885,4 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 
 	log.Debugf("[textsecure] SendMessageResponse: %+v\n", smRes)
 	return &smRes, nil
-}
-
-func sendMessage(msg *outgoingMessage) (uint64, error) {
-	if _, ok := deviceLists[msg.destination]; !ok {
-		deviceLists[msg.destination] = []uint32{1}
-	}
-
-	dm := createMessage(msg)
-
-	content := &signalservice.Content{
-		DataMessage: dm,
-	}
-	b, err := proto.Marshal(content)
-	if err != nil {
-		return 0, err
-	}
-
-	resp, err := buildAndSendMessage(msg.destination, padMessage(b), false, dm.Timestamp)
-	if err != nil {
-		return 0, err
-	}
-	var e164 *string
-	var uuid *string
-
-	if msg.destination[0] == '+' {
-		e164 = &msg.destination
-	} else {
-		uuid = &msg.destination
-	}
-
-	if resp.NeedsSync {
-		log.Debugf("[textsecure] Needs sync. destination: %s", msg.destination)
-		sm := &signalservice.SyncMessage{
-			Sent: &signalservice.SyncMessage_Sent{
-				DestinationE164: e164,
-				DestinationUuid: uuid,
-				Timestamp:       dm.Timestamp,
-				Message:         dm,
-			},
-		}
-
-		_, serr := sendSyncMessage(sm, dm.Timestamp)
-		if serr != nil {
-			log.WithFields(log.Fields{
-				"error":       serr,
-				"destination": msg.destination,
-				"timestamp":   resp.Timestamp,
-			}).Error("Failed to send sync message")
-		}
-	}
-	return resp.Timestamp, err
-}
-
-// TODO switch to uuids
-func sendSyncMessage(sm *signalservice.SyncMessage, timestamp *uint64) (uint64, error) {
-	log.Debugln("[textsecure] sendSyncMessage", timestamp)
-	user := config.ConfigFile.Tel //TODO: switch tu uuid
-	if config.ConfigFile.UUID != "" {
-		user = config.ConfigFile.UUID
-	}
-	if _, ok := deviceLists[user]; !ok {
-		deviceLists[user] = []uint32{1}
-	}
-
-	content := &signalservice.Content{
-		SyncMessage: sm,
-	}
-
-	b, err := proto.Marshal(content)
-	if err != nil {
-		return 0, err
-	}
-
-	resp, err := buildAndSendMessage(user, padMessage(b), true, timestamp)
-	return resp.Timestamp, err
 }
