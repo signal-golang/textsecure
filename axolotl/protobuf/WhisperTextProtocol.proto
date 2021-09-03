@@ -1,43 +1,47 @@
-package textsecure;
+
+syntax = "proto2";
+
+//
+// Copyright 2020 Signal Messenger, LLC.
+// SPDX-License-Identifier: AGPL-3.0-only
+//
+
+package signal.proto.wire;
+
 
 option java_package = "org.whispersystems.libsignal.protocol";
 option java_outer_classname = "SignalProtos";
+option go_package = ".;textsecure";
 
 message SignalMessage {
-  optional bytes  ratchetKey      = 1;
-  optional uint32 counter         = 2;
-  optional uint32 previousCounter = 3;
-  optional bytes  ciphertext      = 4;
+  optional bytes  ratchet_key      = 1;
+  optional uint32 counter          = 2;
+  optional uint32 previous_counter = 3;
+  optional bytes  ciphertext       = 4;
 }
 
 message PreKeySignalMessage {
-  optional uint32 registrationId = 5;
-  optional uint32 preKeyId       = 1;
-  optional uint32 signedPreKeyId = 6;
-  optional bytes  baseKey        = 2;
-  optional bytes  identityKey    = 3;
-  optional bytes  message        = 4; // SignalMessage
-}
-
-message KeyExchangeMessage {
-  optional uint32 id               = 1;
-  optional bytes  baseKey          = 2;
-  optional bytes  ratchetKey       = 3;
-  optional bytes  identityKey      = 4;
-  optional bytes  baseKeySignature = 5;
+  optional uint32 registration_id   = 5;
+  optional uint32 pre_key_id        = 1;
+  optional uint32 signed_pre_key_id = 6;
+  optional bytes  base_key          = 2;
+  optional bytes  identity_key      = 3;
+  optional bytes  message           = 4; // SignalMessage
 }
 
 message SenderKeyMessage {
-  optional uint32 id         = 1;
-  optional uint32 iteration  = 2;
-  optional bytes  ciphertext = 3;
+  optional bytes  distribution_uuid = 1;
+  optional uint32 chain_id          = 2;
+  optional uint32 iteration         = 3;
+  optional bytes  ciphertext        = 4;
 }
 
 message SenderKeyDistributionMessage {
-  optional uint32 id         = 1;
-  optional uint32 iteration  = 2;
-  optional bytes  chainKey   = 3;
-  optional bytes  signingKey = 4;
+  optional bytes  distribution_uuid = 1;
+  optional uint32 chain_id          = 2;
+  optional uint32 iteration         = 3;
+  optional bytes  chain_key         = 4;
+  optional bytes  signing_key       = 5;
 }
 
 message DeviceConsistencyCodeMessage {

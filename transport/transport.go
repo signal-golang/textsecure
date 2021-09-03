@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/signal-golang/textsecure/helpers"
 	"github.com/signal-golang/textsecure/rootCa"
 	log "github.com/sirupsen/logrus"
 )
@@ -70,6 +71,7 @@ type Transporter interface {
 	PutJSON(url string, body []byte) (*response, error)
 	PutBinary(url string, body []byte) (*response, error)
 	PutJSONWithAuth(url string, body []byte, auth string) (*response, error)
+	PutJSONWithUnidentifiedSender(url string, body []byte, unidentifiedAccessKey []byte) (*response, error)
 }
 
 type httpTransporter struct {
@@ -240,6 +242,35 @@ func (ht *httpTransporter) PutWithAuth(url string, body []byte, ct string, auth 
 
 	return r, err
 }
+func (ht *httpTransporter) PutWithUnidentifiedSender(url string, body []byte, ct string, unidentifiedAccessKey []byte) (*response, error) {
+	br := bytes.NewReader(body)
+	req, err := http.NewRequest("PUT", ht.baseURL+url, br)
+	if err != nil {
+		return nil, err
+	}
+	if ht.userAgent != "" {
+		req.Header.Set("X-Signal-Agent", ht.userAgent)
+	}
+	req.Header.Get("Authorization")
+	req.Header.Add("Content-Type", ct)
+	unidentifiedAccessKeyBase64 := helpers.Base64EncWithoutPadding(unidentifiedAccessKey)
+	req.Header.Set("Unidentified-Access-Key", unidentifiedAccessKeyBase64)
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	cookies := resp.Header.Get("Set-Cookie")
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+		r.Cookies = cookies
+	}
+
+	log.Debugf("[textsecure] PUT with auth %s %d\n", url, r.Status)
+
+	return r, err
+}
 func (ht *httpTransporter) PutWithAuthCookies(url string, body []byte, ct string, auth string, cookies string) (*response, error) {
 	br := bytes.NewReader(body)
 	req, err := http.NewRequest("PUT", ht.baseURL+url, br)
@@ -277,6 +308,9 @@ func (ht *httpTransporter) PutJSONWithAuth(url string, body []byte, auth string)
 }
 func (ht *httpTransporter) PutJSONWithAuthCookies(url string, body []byte, auth string, cookies string) (*response, error) {
 	return ht.PutWithAuthCookies(url, body, "application/json; charset=utf-8", auth, cookies)
+}
+func (ht *httpTransporter) PutJSONWithUnidentifiedSender(url string, body []byte, unidentifiedAccessKey []byte) (*response, error) {
+	return ht.PutWithUnidentifiedSender(url, body, "application/json; charset=utf-8", unidentifiedAccessKey)
 }
 func (ht *httpTransporter) PutBinary(url string, body []byte) (*response, error) {
 	return ht.Put(url, body, "application/octet-stream")

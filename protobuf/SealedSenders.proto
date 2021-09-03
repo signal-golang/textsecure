@@ -1,0 +1,65 @@
+
+syntax = "proto2";
+
+//
+// Copyright 2020 Signal Messenger, LLC.
+// SPDX-License-Identifier: AGPL-3.0-only
+//
+
+package signal.proto.sealed_sender;
+option go_package = ".;signalservice";
+
+
+message ServerCertificate {
+    message Certificate {
+        optional uint32 id  = 1;
+        optional bytes  key = 2;
+    }
+
+    optional bytes certificate = 1;
+    optional bytes signature   = 2;
+}
+
+message SenderCertificate {
+    message Certificate {
+        optional string            senderE164    = 1;
+        optional string            senderUuid    = 6;
+        optional uint32            senderDevice  = 2;
+        optional fixed64           expires       = 3;
+        optional bytes             identityKey   = 4;
+        optional ServerCertificate signer        = 5;
+    }
+
+    optional bytes certificate = 1;
+    optional bytes signature   = 2;
+}
+
+message UnidentifiedSenderMessage {
+
+    message Message {
+        enum Type {
+            PREKEY_MESSAGE         = 1;
+            MESSAGE                = 2;
+            // Further cases should line up with Envelope.Type, even though old cases don't.
+            reserved 3 to 6;
+            SENDERKEY_MESSAGE      = 7;
+            PLAINTEXT_CONTENT      = 8;
+        }
+
+        enum ContentHint {
+            reserved     0; // Default: sender will not resend; an error should be shown immediately
+            RESENDABLE = 1; // Sender will try to resend; delay any error UI if possible
+            IMPLICIT   = 2; // Don't show any error UI at all; this is something sent implicitly like a typing message or a receipt
+        }
+
+        optional Type              type              = 1;
+        optional SenderCertificate senderCertificate = 2;
+        optional bytes             content           = 3;
+        optional ContentHint       contentHint       = 4;
+        optional bytes             groupId           = 5;
+    }
+
+    optional bytes ephemeralPublic  = 1;
+    optional bytes encryptedStatic  = 2;
+    optional bytes encryptedMessage = 3;
+}

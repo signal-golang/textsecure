@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -206,4 +207,27 @@ func handleAttachments(dm *textsecure.DataMessage) ([]*Attachment, error) {
 		}
 	}
 	return all, nil
+}
+
+// GET /v1/attachments/
+func allocateAttachment() (uint64, string, error) {
+	resp, err := transport.Transport.Get(allocateAttachmentPath)
+	if err != nil {
+		return 0, "", err
+	}
+	dec := json.NewDecoder(resp.Body)
+	var a jsonAllocation
+	dec.Decode(&a)
+	return a.ID, a.Location, nil
+}
+
+func getAttachmentLocation(id uint64, key string, cdnNumber uint32) (string, error) {
+	cdn := SIGNAL_CDN_URL
+	if cdnNumber == 2 {
+		cdn = SIGNAL_CDN2_URL
+	}
+	if id != 0 {
+		return cdn + fmt.Sprintf(ATTACHMENT_ID_DOWNLOAD_PATH, id), nil
+	}
+	return cdn + fmt.Sprintf(ATTACHMENT_KEY_DOWNLOAD_PATH, key), nil
 }

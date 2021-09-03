@@ -28,6 +28,11 @@ type Contact struct {
 	ExpireTimer   uint32
 	InboxPosition uint32
 	Archived      bool
+	Certificate   []byte
+}
+
+func (c *Contact) GetProfileKey() []byte {
+	return c.ProfileKey
 }
 
 type yamlContacts struct {
@@ -126,7 +131,7 @@ func updateContact(c *signalservice.ContactDetails) error {
 		InboxPosition: c.GetInboxPosition(),
 		Archived:      c.GetArchived(),
 	}
-	log.Debugln("[textsecure] avatar", c.GetAvatar())
+	// log.Debugln("[textsecure] avatar", c.GetAvatar())
 	return WriteContactsToPath()
 }
 
@@ -151,4 +156,8 @@ func UpdateProfileKey(src string, profileKey []byte) error {
 		return WriteContactsToPath()
 	}
 	return fmt.Errorf("Contact to update not found")
+}
+
+func GetContact(uuid string) Contact {
+	return Contacts[uuid]
 }

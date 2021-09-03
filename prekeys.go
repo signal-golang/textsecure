@@ -1,15 +1,20 @@
 // Copyright (c) 2014 Canonical Ltd.
+// Copyright (c) 2021 Aaron Kimmig
 // Licensed under the GPLv3, see the COPYING file for details.
 
 package textsecure
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/curve25519sign"
+	"github.com/signal-golang/textsecure/helpers"
+	log "github.com/sirupsen/logrus"
 )
 
 type preKeyEntity struct {
@@ -50,16 +55,16 @@ func randID() uint32 {
 
 func generatepreKeyEntity(record *axolotl.PreKeyRecord) *preKeyEntity {
 	entity := &preKeyEntity{}
-	entity.ID = *record.Pkrs.Id
+	entity.ID = record.Pkrs.Id
 	entity.PublicKey = encodeKey(record.Pkrs.PublicKey)
 	return entity
 }
 
 func generateSignedPreKeyEntity(record *axolotl.SignedPreKeyRecord) *signedPreKeyEntity {
 	entity := &signedPreKeyEntity{}
-	entity.ID = *record.Spkrs.Id
+	entity.ID = record.Spkrs.Id
 	entity.PublicKey = encodeKey(record.Spkrs.PublicKey)
-	entity.Signature = base64EncWithoutPadding(record.Spkrs.Signature)
+	entity.Signature = helpers.Base64EncWithoutPadding(record.Spkrs.Signature)
 	return entity
 }
 
@@ -73,8 +78,6 @@ func generatePreKey(id uint32) error {
 }
 
 var signedKey *axolotl.SignedPreKeyRecord
-
-var lastResortPreKeyID uint32 = 0xFFFFFF
 
 var preKeyBatchSize = 100
 
@@ -130,7 +133,7 @@ func generatePreKeyState() error {
 		preKeys.PreKeys[i] = generatepreKeyEntity(preKeyRecords[i])
 	}
 	preKeys.LastResortKey = generatepreKeyEntity(preKeyRecords[npkr-1])
-	preKeys.IdentityKey = base64EncWithoutPadding(identityKey.PublicKey.Serialize())
+	preKeys.IdentityKey = helpers.Base64EncWithoutPadding(identityKey.PublicKey.Serialize())
 	preKeys.SignedPreKey = generateSignedPreKeyEntity(signedKey)
 	return nil
 }
@@ -153,4 +156,58 @@ func loadPreKeys() error {
 
 	})
 	return err
+}
+
+func makePreKeyBundle(UUID string, deviceID uint32) (*axolotl.PreKeyBundle, error) {
+	pkr, err := getPreKeys(UUID, strconv.Itoa(int(deviceID)))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pkr.Devices) != 1 {
+		return nil, fmt.Errorf("no prekeys for contact %s, device %d", UUID, deviceID)
+	}
+
+	d := pkr.Devices[0]
+	preKeyId := uint32(0)
+	var preKey *axolotl.ECPublicKey
+	if d.PreKey == nil {
+		log.Debugln("[textsecure] makePreKeyBundle", fmt.Errorf("no prekey for contact %s, device %d", UUID, deviceID))
+	} else {
+		preKeyId = d.PreKey.ID
+		decPK, err := decodeKey(d.PreKey.PublicKey)
+		preKey = axolotl.NewECPublicKey(decPK)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if d.SignedPreKey == nil {
+		return nil, fmt.Errorf("no signed prekey for contact %s, device %d", UUID, deviceID)
+	}
+
+	decSPK, err := decodeKey(d.SignedPreKey.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	decSig, err := decodeSignature(d.SignedPreKey.Signature)
+	if err != nil {
+		return nil, err
+	}
+
+	decIK, err := decodeKey(pkr.IdentityKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pkb, err := axolotl.NewPreKeyBundle(
+		d.RegistrationID, d.DeviceID, preKeyId,
+		preKey, int32(d.SignedPreKey.ID), axolotl.NewECPublicKey(decSPK),
+		decSig, axolotl.NewIdentityKey(decIK))
+	if err != nil {
+		return nil, err
+	}
+
+	return pkb, nil
 }

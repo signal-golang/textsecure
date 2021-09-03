@@ -2,12 +2,10 @@ package groupsv2
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	zkgroup "github.com/nanu-c/zkgroup"
-	transport "github.com/signal-golang/textsecure/transport"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,8 +28,12 @@ func NewGroupsV2AuthorizationForGroup(uuid []byte, hexid string) (*GroupsV2Autho
 func NewGroupsV2Authorization(uuid []byte, groupSecretParams zkgroup.GroupSecretParams) (*GroupsV2Authorization, error) {
 	publicGroupParams, err := groupSecretParams.PublicParams()
 	today := time.Now().Unix() / 86400
+	credential, err := GetCredentialForRedemption(today)
+	if err != nil {
+		return nil, err
 
-	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(GetCredentialForRedemption(today).Credential)
+	}
+	authCredentialResponse, err := zkgroup.NewAuthCredentialResponse(credential.Credential)
 	if err != nil {
 		log.Warnln("[textsecure] NewGroupsV2AuthorizationForGroup2", err.Error())
 
@@ -64,29 +66,6 @@ func NewGroupsV2Authorization(uuid []byte, groupSecretParams zkgroup.GroupSecret
 	}, nil
 }
 
-type AuthCredentials struct {
-	username string `json:"username"`
-	password string `json:"password"`
-}
-
-func (a *AuthCredentials) AsBasic() string {
-	usernameAndPassword := a.username + ":" + a.password
-	encoded := base64.StdEncoding.EncodeToString([]byte(usernameAndPassword))
-	return "Basic " + encoded
-}
-
-func getCredendtails(path string) (*AuthCredentials, error) {
-	resp, err := transport.Transport.Get(path)
-	if err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(resp.Body)
-	var a AuthCredentials
-	dec.Decode(&a)
-
-	return &a, nil
-
-}
 func getGroupJoinInfo(groupSecretParams, groupLinkPassword []byte, groupsV2AuthorizationString string) {
 
 }
