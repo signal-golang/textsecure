@@ -20,11 +20,11 @@ import (
 var Transport Transporter
 
 func SetupTransporter(server string,
-	tel string,
+	uuid string,
 	password string,
 	userAgent string,
 	proxyServer string) {
-	Transport = newHTTPTransporter(server, tel, password, userAgent, proxyServer, rootCa.RootCA)
+	Transport = newHTTPTransporter(server, uuid, password, userAgent, proxyServer, rootCa.RootCA)
 }
 
 var CdnTransport *httpTransporter
@@ -267,7 +267,7 @@ func (ht *httpTransporter) PutWithUnidentifiedSender(url string, body []byte, ct
 		r.Cookies = cookies
 	}
 
-	log.Debugf("[textsecure] PUT with auth %s %d\n", url, r.Status)
+	log.Debugf("[textsecure] PUT with unidentified sender %s %d\n", url, r.Status)
 
 	return r, err
 }

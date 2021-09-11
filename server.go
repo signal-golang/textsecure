@@ -834,11 +834,11 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 	if err != nil {
 		return nil, err
 	}
-	unidentifiedAccessKeyPair, err := unidentifiedAccess.GetAccessForUUID(contacts.GetContact(uuid))
+	// unidentifiedAccessKeyPair, err := unidentifiedAccess.GetAccessForUUID(contacts.GetContact(uuid))
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.Transport.PutJSONWithUnidentifiedSender(fmt.Sprintf(MESSAGE_PATH, uuid), body, unidentifiedAccessKeyPair.GetTargetKey())
+	resp, err := transport.Transport.PutJSON(fmt.Sprintf(MESSAGE_PATH, uuid), body)
 	if err != nil {
 		return nil, err
 	}

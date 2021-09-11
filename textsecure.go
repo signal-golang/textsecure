@@ -301,10 +301,10 @@ func Setup(c *Client) error {
 
 	client.RegistrationDone()
 	rootCa.SetupCA(config.ConfigFile.RootCA)
-	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	config.ConfigFile = checkUUID(config.ConfigFile)
