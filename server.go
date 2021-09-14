@@ -134,6 +134,19 @@ type RegistrationInfo struct {
 	captchaToken   string
 }
 
+func (r *RegistrationInfo) Password() string {
+	return r.password
+}
+func (r *RegistrationInfo) RegistrationID() uint32 {
+	return r.registrationID
+}
+func (r *RegistrationInfo) SignalingKey() []byte {
+	return r.signalingKey
+}
+func (r *RegistrationInfo) CaptchaToken() string {
+	return r.captchaToken
+}
+
 var registrationInfo RegistrationInfo
 
 // Registration

@@ -20,7 +20,7 @@ type Config struct {
 	Name                      string              `yaml:"name"`                      // The username
 	UnidentifiedAccessKey     []byte              `yaml:"unidentifiedAccessKey"`     // The access key for unidentified users
 	Certificate               []byte              `yaml:"certificate"`               // The access key for unidentified users
-	CrayfishSupport           bool                `yaml:"cryfishSupport"`            // weather the client uses cryfish or not
+	CrayfishSupport           bool                `yaml:"crayfishSupport"`           // weather the client uses crayfish or not
 }
 
 // AccountCapabilities describes what functions axolotl supports
