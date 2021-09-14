@@ -17,9 +17,10 @@ type Config struct {
 	AccountCapabilities       AccountCapabilities `yaml:"accountCapabilities"`       // Account Attrributes are used in order to track the support of different function for signal
 	DiscoverableByPhoneNumber bool                `yaml:"discoverableByPhoneNumber"` // If the user should be found by his phone number
 	ProfileKey                []byte              `yaml:"profileKey"`                // The profile key is used in many places to encrypt the avatar, name etc and also in groupsv2 context
-	Name                      string              `yaml:"name"`
-	UnidentifiedAccessKey     []byte              `yaml:"unidentifiedAccessKey"` // The access key for unidentified users
-	Certificate               []byte              `yaml:"certificate"`           // The access key for unidentified users
+	Name                      string              `yaml:"name"`                      // The username
+	UnidentifiedAccessKey     []byte              `yaml:"unidentifiedAccessKey"`     // The access key for unidentified users
+	Certificate               []byte              `yaml:"certificate"`               // The access key for unidentified users
+	CrayfishSupport           bool                `yaml:"cryfishSupport"`            // weather the client uses cryfish or not
 }
 
 // AccountCapabilities describes what functions axolotl supports

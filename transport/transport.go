@@ -36,16 +36,16 @@ func SetupCDNTransporter(cdnUrl string, tel string, password string, userAgent s
 
 var DirectoryTransport *httpTransporter
 
-func SetupDirectoryTransporter(Url string, tel string, password string, userAgent string, proxyServer string) {
+func SetupDirectoryTransporter(Url string, uuid string, password string, userAgent string, proxyServer string) {
 	// setupCA()
-	DirectoryTransport = newHTTPTransporter(Url, tel, password, userAgent, proxyServer, rootCa.DirectoryCA)
+	DirectoryTransport = newHTTPTransporter(Url, uuid, password, userAgent, proxyServer, rootCa.DirectoryCA)
 }
 
 var StorageTransport *httpTransporter
 
-func SetupStorageTransporter(Url string, tel string, password string, userAgent string, proxyServer string) {
+func SetupStorageTransporter(Url string, uuid string, password string, userAgent string, proxyServer string) {
 	// setupCA()
-	StorageTransport = newHTTPTransporter(Url, tel, password, userAgent, proxyServer, rootCa.DirectoryCA)
+	StorageTransport = newHTTPTransporter(Url, uuid, password, userAgent, proxyServer, rootCa.DirectoryCA)
 }
 
 type response struct {

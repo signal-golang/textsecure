@@ -229,7 +229,7 @@ type RegistrationLockFailure struct {
 }
 
 // verifyCode verificates the account with signal server
-func verifyCode(code string, pin *string, credentials *transport.AuthCredentials) (error, *transport.AuthCredentials) {
+func verifyCode(code string, pin *string, credentials *transport.AuthCredentials) (*transport.AuthCredentials, error) {
 	code = strings.Replace(code, "-", "", -1)
 	key := identityKey.PrivateKey.Key()[:]
 	unidentifiedAccessKey, err := unidentifiedAccess.DeriveAccessKeyFrom(key)
@@ -261,12 +261,12 @@ func verifyCode(code string, pin *string, credentials *transport.AuthCredentials
 	log.Debugln("[textsecure] verifyCode", vd)
 	body, err := json.Marshal(vd)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	resp, err := transport.Transport.PutJSON(fmt.Sprintf(VERIFY_ACCOUNT_CODE_PATH, code), body)
 	if err != nil {
 		log.Errorln("[textsecure] verifyCode", err)
-		return err, nil
+		return nil, err
 	}
 	if resp.IsError() {
 
@@ -278,13 +278,20 @@ func verifyCode(code string, pin *string, credentials *transport.AuthCredentials
 			v := RegistrationLockFailure{}
 			err := json.Unmarshal([]byte(newStr), &v)
 			if err != nil {
-				return err, nil
+				return nil, err
 			}
-			return fmt.Errorf(fmt.Sprintf("RegistrationLockFailure \n Time to wait \n %s", newStr)), &v.Credentials
+			return &v.Credentials, fmt.Errorf(fmt.Sprintf("RegistrationLockFailure \n Time to wait \n %s", newStr))
 		} else {
-			return resp, nil
+			return nil, resp
 		}
 	}
+	// extract uuid
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	newStr := buf.String()
+	log.Errorln("[textsecure] successful registration", newStr)
+	defer resp.Body.Close()
+
 	config.ConfigFile.AccountCapabilities = vd.Capabilities
 	return nil, nil
 }
@@ -543,16 +550,6 @@ func getPreKeys(UUID string, deviceID string) (*preKeyResponse, error) {
 	return k, nil
 }
 
-// jsonContact is the data returned by the server for each registered contact
-type jsonContact struct {
-	Token string `json:"token"`
-	Voice string `json:"voice"`
-	Video string `json:"video"`
-}
-type jsonContacts struct {
-	Contacts []jsonContact `json:"contacts"`
-}
-
 func getContactDiscoveryRegisteredUsers(authorization string, request *contactDiscoveryCrypto.DiscoveryRequest, cookies string, mrenclave string) (*contactDiscoveryCrypto.DiscoveryResponse, error) {
 	log.Debugln("[textsecure] getContactDiscoveryRegisteredUser")
 	body, err := json.Marshal(*request)
@@ -612,27 +609,30 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 
 	authCredentials, err := transport.GetCredendtails(DIRECTORY_AUTH_PATH)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get auth credentials %v", err)
+		return nil, fmt.Errorf("could not get auth credentials %v", err)
 	}
 	remoteAttestation := contactsDiscovery.RemoteAttestation{}
 	attestations, err := remoteAttestation.GetAndVerifyMultiRemoteAttestation(CDS_MRENCLAVE,
 		authCredentials.AsBasic(),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not get remote attestation %v", err)
+	}
 	log.Debugln("[textsecure] GetRegisteredContacts assestations")
 	request, err := contactDiscoveryCrypto.CreateDiscoveryRequest(tokens, attestations)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get create createDiscoveryRequest %v", err)
+		return nil, fmt.Errorf("could not get create createDiscoveryRequest %v", err)
 	}
 	log.Debugln("[textsecure] GetRegisteredContacts contactDiscoveryRequest")
 
 	response, err := getContactDiscoveryRegisteredUsers(authCredentials.AsBasic(), request, remoteAttestation.Cookies, CDS_MRENCLAVE)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get get ContactDiscovery %v", err)
+		return nil, fmt.Errorf("could not get get ContactDiscovery %v", err)
 	}
 
 	responseData, err := contactDiscoveryCrypto.GetDiscoveryResponseData(*response, attestations)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get get ContactDiscovery data %v", err)
+		return nil, fmt.Errorf("could not get get ContactDiscovery data %v", err)
 	}
 	uuidlength := 16
 	ind := 0

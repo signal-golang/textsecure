@@ -216,6 +216,7 @@ type Client struct {
 	SyncSentHandler       func(*Message, uint64)
 	RegistrationDone      func()
 	GetUsername           func() string
+	RegisterWithCrayfish  func(*RegistrationInfo) (*CrayfishRegistration, error)
 }
 
 var (
@@ -354,53 +355,75 @@ func renewSenderCertificate() error {
 
 }
 
+type CrayfishRegistration struct {
+	UUID string `json:"uuid"`
+}
+
 func registerDevice() error {
+	var err error
 	if config.ConfigFile.Tel == "" {
 		config.ConfigFile.Tel = client.GetPhoneNumber()
 		if config.ConfigFile.Tel == "" {
 			return errors.New("empty phone number")
 		}
 	}
-	rootCa.SetupCA(config.ConfigFile.RootCA)
-	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	// try to register without token
-	code, responseCode, err := requestCode(config.ConfigFile.Tel, config.ConfigFile.VerificationType, "")
-	if responseCode != nil {
-		if *responseCode == responseNeedCaptcha {
-			// Need to generate a token on https://signalcaptchas.org/registration/generate.html
-			log.Infoln("[textsecure] registration needs captcha")
+	if config.ConfigFile.CrayfishSupport {
+		crayfishRegistration, err := client.RegisterWithCrayfish(&registrationInfo)
 
-			captcha := client.GetCaptchaToken()
-			code, _, err = requestCode(config.ConfigFile.Tel, config.ConfigFile.VerificationType, captcha)
-			if err != nil {
-				return err
-			}
-		} else {
+		if err != nil {
 			return err
 		}
-	} else if err != nil {
-		return err
-	}
-	if config.ConfigFile.VerificationType != "dev" {
-		code = client.GetVerificationCode()
-	}
-	err, credentials := verifyCode(code, nil, nil)
-	if err != nil {
-		if credentials != nil {
-			log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
-			pin := client.GetPin()
-			err, credentials = verifyCode(code, &pin, credentials)
-			if err != nil {
+		if err != nil {
+			log.Debugln("[textsecure] verifyCode", err)
+		}
+		config.ConfigFile.UUID = crayfishRegistration.UUID
+		config.ConfigFile.AccountCapabilities = config.AccountCapabilities{
+			UUID:    false,
+			Gv2:     true,
+			Storage: false,
+		}
+	} else {
+		rootCa.SetupCA(config.ConfigFile.RootCA)
+		transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+		// try to register without token
+		code, responseCode, err := requestCode(config.ConfigFile.Tel, config.ConfigFile.VerificationType, "")
+		if responseCode != nil {
+			if *responseCode == responseNeedCaptcha {
+				// Need to generate a token on https://signalcaptchas.org/registration/generate.html
+				log.Infoln("[textsecure] registration needs captcha")
+
+				captcha := client.GetCaptchaToken()
+				code, _, err = requestCode(config.ConfigFile.Tel, config.ConfigFile.VerificationType, captcha)
+				if err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+		if config.ConfigFile.VerificationType != "dev" {
+			code = client.GetVerificationCode()
+		}
+		credentials, err := verifyCode(code, nil, nil)
+		if err != nil {
+			if credentials != nil {
+				log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
+				pin := client.GetPin()
+				credentials, err = verifyCode(code, &pin, credentials)
+				if err != nil {
+					log.Warnln("[textsecure] verfication failed", err.Error())
+					return err
+				}
+			} else {
 				log.Warnln("[textsecure] verfication failed", err.Error())
 				return err
 			}
-		} else {
-			log.Warnln("[textsecure] verfication failed", err.Error())
-			return err
+
 		}
 
 	}
-
 	err = generatePreKeys()
 	if err != nil {
 		return err
