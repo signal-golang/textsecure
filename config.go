@@ -59,8 +59,13 @@ func WriteConfig(filename string, cfg *config.Config) error {
 	return ioutil.WriteFile(filename, b, 0600)
 }
 
-func saveConfig(cfg *config.Config) {
-	WriteConfig(configFile, cfg)
+func saveConfig(cfg *config.Config) error {
+	log.Debugln("[textsecure] saving config")
+	err := WriteConfig(configFile, cfg)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // loadConfig gets the config via the client and makes sure

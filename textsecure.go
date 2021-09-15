@@ -308,7 +308,7 @@ func Setup(c *Client) error {
 	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
-	config.ConfigFile = checkUUID(config.ConfigFile)
+	// config.ConfigFile = checkUUID(config.ConfigFile)
 	profileChanged := false
 	// check for a profileKey
 	if len(config.ConfigFile.ProfileKey) == 0 {
@@ -357,34 +357,43 @@ func renewSenderCertificate() error {
 
 type CrayfishRegistration struct {
 	UUID string `json:"uuid"`
+	Tel  string `json:"tel"`
 }
 
 func registerDevice() error {
 	var err error
-	if config.ConfigFile.Tel == "" {
-		config.ConfigFile.Tel = client.GetPhoneNumber()
-		if config.ConfigFile.Tel == "" {
-			return errors.New("empty phone number")
-		}
+	config.ConfigFile, err = loadConfig()
+	if err != nil {
+		return err
 	}
-	if config.ConfigFile.CrayfishSupport {
-		crayfishRegistration, err := client.RegisterWithCrayfish(&registrationInfo)
+	rootCa.SetupCA(config.ConfigFile.RootCA)
+	var tel string
+	var uuid string
 
+	if config.ConfigFile.CrayfishSupport {
+		client.GetConfig()
+		crayfishRegistration, err := client.RegisterWithCrayfish(&registrationInfo)
 		if err != nil {
 			return err
 		}
-		if err != nil {
-			log.Debugln("[textsecure] verifyCode", err)
-		}
+		log.Debugln()
+		config.ConfigFile.Tel = crayfishRegistration.Tel
 		config.ConfigFile.UUID = crayfishRegistration.UUID
 		config.ConfigFile.AccountCapabilities = config.AccountCapabilities{
 			UUID:    false,
 			Gv2:     true,
 			Storage: false,
 		}
+
+		err = saveConfig(config.ConfigFile)
+		log.Debugln("[textsecure] Crayfish registration done")
 	} else {
-		rootCa.SetupCA(config.ConfigFile.RootCA)
-		transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+		if config.ConfigFile.Tel == "" {
+			config.ConfigFile.Tel = client.GetPhoneNumber()
+			if config.ConfigFile.Tel == "" {
+				return errors.New("empty phone number")
+			}
+		}
 		// try to register without token
 		code, responseCode, err := requestCode(config.ConfigFile.Tel, config.ConfigFile.VerificationType, "")
 		if responseCode != nil {
@@ -407,6 +416,8 @@ func registerDevice() error {
 			code = client.GetVerificationCode()
 		}
 		credentials, err := verifyCode(code, nil, nil)
+		transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+
 		if err != nil {
 			if credentials != nil {
 				log.Warnln("[textsecure] verfication failed, try again with pin", err.Error())
@@ -424,6 +435,9 @@ func registerDevice() error {
 		}
 
 	}
+	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+
+	log.Debugln("[textsecure] generate keys")
 	err = generatePreKeys()
 	if err != nil {
 		return err
@@ -436,8 +450,14 @@ func registerDevice() error {
 	if err != nil {
 		return err
 	}
+	if config.ConfigFile.CrayfishSupport && config.ConfigFile.Tel == "" {
+		config.ConfigFile.Tel = tel
+		config.ConfigFile.UUID = uuid
+	}
 	config.ConfigFile.ProfileKey = profiles.GenerateProfileKey()
-	config.ConfigFile = checkUUID(config.ConfigFile)
+	// config.ConfigFile = checkUUID(config.ConfigFile)
+	saveConfig(config.ConfigFile)
+
 	client.RegistrationDone()
 	if client.RegistrationDone != nil {
 		log.Infoln("[textsecure] RegistrationDone")

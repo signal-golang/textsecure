@@ -11,6 +11,8 @@ import (
 )
 
 func sendMessage(msg *outgoingMessage) (uint64, error) {
+	// todo use UnidentifiedSenderMessage
+
 	if _, ok := deviceLists[msg.destination]; !ok {
 		deviceLists[msg.destination] = []uint32{1}
 	}

@@ -295,6 +295,7 @@ func verifyCode(code string, pin *string, credentials *transport.AuthCredentials
 			}
 			return &v.Credentials, fmt.Errorf(fmt.Sprintf("RegistrationLockFailure \n Time to wait \n %s", newStr))
 		} else {
+			// todo extract uuid from resp.Body
 			return nil, resp
 		}
 	}
