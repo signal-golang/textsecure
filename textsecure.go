@@ -367,8 +367,6 @@ func registerDevice() error {
 		return err
 	}
 	rootCa.SetupCA(config.ConfigFile.RootCA)
-	var tel string
-	var uuid string
 
 	if config.ConfigFile.CrayfishSupport {
 		client.GetConfig()
@@ -449,10 +447,6 @@ func registerDevice() error {
 	err = registerPreKeys()
 	if err != nil {
 		return err
-	}
-	if config.ConfigFile.CrayfishSupport && config.ConfigFile.Tel == "" {
-		config.ConfigFile.Tel = tel
-		config.ConfigFile.UUID = uuid
 	}
 	config.ConfigFile.ProfileKey = profiles.GenerateProfileKey()
 	// config.ConfigFile = checkUUID(config.ConfigFile)

@@ -60,9 +60,11 @@ func WriteConfig(filename string, cfg *config.Config) error {
 }
 
 func saveConfig(cfg *config.Config) error {
-	log.Debugln("[textsecure] saving config")
+
+	log.Debugln("[textsecure] saving config", cfg.Tel)
 	err := WriteConfig(configFile, cfg)
 	if err != nil {
+		log.Errorln("[textsecure] failed to save config", err)
 		return err
 	}
 	return nil
@@ -71,6 +73,7 @@ func saveConfig(cfg *config.Config) error {
 // loadConfig gets the config via the client and makes sure
 // that for unset values sane defaults are used
 func loadConfig() (*config.Config, error) {
+	log.Debugln("[textsecure] loading config")
 	cfg, err := client.GetConfig()
 
 	if err != nil {
