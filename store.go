@@ -249,7 +249,11 @@ func (err UnknownContactError) Error() string {
 // ContactIdentityKey returns the serialized public key of the given contact
 func ContactIdentityKey(id string) ([]byte, error) {
 	s := textSecureStore
-	idkeyfile := filepath.Join(s.identityDir, "remote_"+recID(id))
+	idClean, err := recID(id)
+	if err != nil {
+		return nil, err
+	}
+	idkeyfile := filepath.Join(s.identityDir, "remote_"+idClean)
 	if !exists(idkeyfile) {
 		return nil, UnknownContactError{id}
 	}

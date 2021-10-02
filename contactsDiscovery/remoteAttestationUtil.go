@@ -120,7 +120,7 @@ func validateAndBuildRemoteAttestation(
 	enclaveName string,
 ) (*RemoteAttestation, error) {
 	keys, err := remoteAttestationKeys(keyPair, remoteAttestation.ServerEphemeralPublic, remoteAttestation.ServerStaticPublic)
-	log.Debugln("[textsecure] validateAndBuildRemoteAttestation ", err)
+	log.Debugln("[textsecure] validateAndBuildRemoteAttestation ")
 	if err != nil {
 		return nil, err
 	}

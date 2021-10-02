@@ -767,7 +767,10 @@ func buildMessage(reciever string, paddedMessage []byte, devices []uint32, isSyn
 	if len(reciever) == 0 {
 		return nil, fmt.Errorf("empty reciever")
 	}
-	recid := recID(reciever)
+	recid, err := recID(reciever)
+	if err != nil {
+		return nil, err
+	}
 	messages := []jsonMessage{}
 	for _, devid := range devices {
 		if !textSecureStore.ContainsSession(recid, devid) {
@@ -884,7 +887,11 @@ func buildAndSendMessage(uuid string, paddedMessage []byte, isSync bool, timesta
 		dec.Decode(&j)
 		log.Debugf("[textsecure] Stale devices: %+v\n", j)
 		for _, id := range j.StaleDevices {
-			textSecureStore.DeleteSession(recID(uuid), id)
+			uuidCleanup, err := recID(uuid)
+			if err != nil {
+				return nil, err
+			}
+			textSecureStore.DeleteSession(uuidCleanup, id)
 		}
 		return buildAndSendMessage(uuid, paddedMessage, isSync, timestamp)
 	}

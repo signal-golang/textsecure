@@ -187,7 +187,11 @@ func EndSession(uuid string, msg string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	textSecureStore.DeleteAllSessions(recID(uuid))
+	uuidClean, err := recID(uuid)
+	if err != nil {
+		return 0, err
+	}
+	textSecureStore.DeleteAllSessions(uuidClean)
 	return ts, nil
 }
 
@@ -468,11 +472,15 @@ func handleReceipt(env *signalservice.Envelope) {
 }
 
 // recID removes the + from phone numbers
-func recID(source string) string {
-	if source[0] == '+' {
-		return source[1:]
+func recID(source string) (string, error) {
+	if len(source) == 0 {
+		return source[1:], nil
+	} else if len(source) > 0 && source[0] == '+' {
+		log.Errorln("[textsecure] invalid recipient id", source)
+		return "", errors.New("invalid recipient id")
+
 	}
-	return source
+	return source, nil
 }
 
 // EndSessionFlag signals that this message resets the session
@@ -485,8 +493,11 @@ func handleFlags(src string, dm *signalservice.DataMessage) (uint32, error) {
 	flags := uint32(0)
 	if dm.GetFlags() == uint32(signalservice.DataMessage_END_SESSION) {
 		flags = EndSessionFlag
-
-		textSecureStore.DeleteAllSessions(recID(src))
+		srcClean, err := recID(src)
+		if err != nil {
+			return 0, err
+		}
+		textSecureStore.DeleteAllSessions(srcClean)
 		textSecureStore.DeleteAllSessions(src)
 	}
 	if dm.GetFlags() == uint32(signalservice.DataMessage_PROFILE_KEY_UPDATE) {
@@ -567,7 +578,10 @@ func handleReceivedMessage(msg []byte) error {
 			// try the legacy way
 			log.Infof("[textsecure] Incoming WhisperMessage try legacy decrypting")
 
-			recid := recID(env.GetSourceE164())
+			recid, err := recID(env.GetSourceE164())
+			if err != nil {
+				recid = env.GetSourceUuid()
+			}
 			sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
 			b, err = sc.SessionDecryptWhisperMessage(wm)
 			if _, ok := err.(axolotl.DuplicateMessageError); ok {
