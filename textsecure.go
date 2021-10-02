@@ -474,10 +474,10 @@ func handleReceipt(env *signalservice.Envelope) {
 // recID removes the + from phone numbers
 func recID(source string) (string, error) {
 	if len(source) == 0 {
-		return source[1:], nil
+		return "", errors.New("invalid recipient id")
 	} else if len(source) > 0 && source[0] == '+' {
 		log.Errorln("[textsecure] invalid recipient id", source)
-		return "", errors.New("invalid recipient id")
+		return source[1:], nil
 
 	}
 	return source, nil
