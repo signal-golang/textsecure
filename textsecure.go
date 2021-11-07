@@ -5,10 +5,12 @@
 package textsecure
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"bytes"
@@ -20,9 +22,11 @@ import (
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
+	crayfish "github.com/signal-golang/textsecure/crayfish"
 	"github.com/signal-golang/textsecure/helpers"
 	"github.com/signal-golang/textsecure/profiles"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/registration"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
 	"github.com/signal-golang/textsecure/transport"
 	"github.com/signal-golang/textsecure/unidentifiedAccess"
@@ -46,6 +50,8 @@ func generateRegistrationID() uint32 {
 func generateSignalingKey() []byte {
 	b := make([]byte, 52)
 	randBytes(b[:])
+	//set signaling key version
+	b[0] = 1
 	return b
 }
 
@@ -220,7 +226,6 @@ type Client struct {
 	SyncSentHandler       func(*Message, uint64)
 	RegistrationDone      func()
 	GetUsername           func() string
-	RegisterWithCrayfish  func(*RegistrationInfo) (*CrayfishRegistration, error)
 }
 
 var (
@@ -269,16 +274,19 @@ func Setup(c *Client) error {
 	if err != nil {
 		return err
 	}
+	go crayfish.Run()
 
 	if needsRegistration() {
-		registrationInfo.registrationID = generateRegistrationID()
-		textSecureStore.SetLocalRegistrationID(registrationInfo.registrationID)
+		registration.Registration = registration.RegistrationInfo{
+			RegistrationID: generateRegistrationID(),
+		}
+		textSecureStore.SetLocalRegistrationID(registration.Registration.RegistrationID)
 
-		registrationInfo.password = generatePassword()
-		textSecureStore.storeHTTPPassword(registrationInfo.password)
+		registration.Registration.Password = generatePassword()
+		textSecureStore.storeHTTPPassword(registration.Registration.Password)
 
-		registrationInfo.signalingKey = generateSignalingKey()
-		textSecureStore.storeHTTPSignalingKey(registrationInfo.signalingKey)
+		registration.Registration.SignalingKey = generateSignalingKey()
+		textSecureStore.storeHTTPSignalingKey(registration.Registration.SignalingKey)
 
 		identityKey = axolotl.GenerateIdentityKeyPair()
 		err := textSecureStore.SetIdentityKeyPair(identityKey)
@@ -291,25 +299,25 @@ func Setup(c *Client) error {
 			return err
 		}
 	}
-	registrationInfo.registrationID, err = textSecureStore.GetLocalRegistrationID()
+	registration.Registration.RegistrationID, err = textSecureStore.GetLocalRegistrationID()
 	if err != nil {
 		return err
 	}
-	registrationInfo.password, err = textSecureStore.loadHTTPPassword()
+	registration.Registration.Password, err = textSecureStore.loadHTTPPassword()
 	if err != nil {
 		return err
 	}
-	registrationInfo.signalingKey, err = textSecureStore.loadHTTPSignalingKey()
+	registration.Registration.SignalingKey, err = textSecureStore.loadHTTPSignalingKey()
 	if err != nil {
 		return err
 	}
 
 	client.RegistrationDone()
 	rootCa.SetupCA(config.ConfigFile.RootCA)
-	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	// config.ConfigFile = checkUUID(config.ConfigFile)
@@ -358,13 +366,17 @@ func renewSenderCertificate() error {
 	return nil
 
 }
+func RegisterWithCrayfish(regisrationInfo *registration.RegistrationInfo, phoneNumber, captcha string) error {
+	err := crayfish.Instance.CrayfishRegister(regisrationInfo, phoneNumber, captcha)
+	if err != nil {
+		return err
+	}
+	return nil
 
-type CrayfishRegistration struct {
-	UUID string `json:"uuid"`
-	Tel  string `json:"tel"`
 }
 
 func registerDevice() error {
+	log.Debugln("[texsecure] register Device")
 	var err error
 	config.ConfigFile, err = loadConfig()
 	if err != nil {
@@ -373,12 +385,21 @@ func registerDevice() error {
 	rootCa.SetupCA(config.ConfigFile.RootCA)
 
 	if config.ConfigFile.CrayfishSupport {
+		log.Debugln("[textsecure] Crayfish registration starting")
 		client.GetConfig()
-		crayfishRegistration, err := client.RegisterWithCrayfish(&registrationInfo)
+		phoneNumber := client.GetPhoneNumber()
+		captcha := client.GetCaptchaToken()
+		err := RegisterWithCrayfish(&registration.Registration, phoneNumber, captcha)
 		if err != nil {
+			log.Errorln("[textsecure] Crayfish registration failed", err)
 			return err
 		}
-		log.Debugln()
+		code := client.GetVerificationCode()
+		crayfishRegistration, err := crayfish.Instance.CrayfishRegisterWithCode(&registration.Registration, phoneNumber, captcha, code)
+		if err != nil {
+			log.Errorln("[textsecure] Crayfish registration failed", err)
+			return err
+		}
 		config.ConfigFile.Tel = crayfishRegistration.Tel
 		config.ConfigFile.UUID = crayfishRegistration.UUID
 		config.ConfigFile.AccountCapabilities = config.AccountCapabilities{
@@ -418,7 +439,7 @@ func registerDevice() error {
 			code = client.GetVerificationCode()
 		}
 		credentials, err := verifyCode(code, nil, nil)
-		transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+		transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.Tel, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 
 		if err != nil {
 			if credentials != nil {
@@ -437,7 +458,7 @@ func registerDevice() error {
 		}
 
 	}
-	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.UUID, registrationInfo.password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 
 	log.Debugln("[textsecure] generate keys")
 	err = generatePreKeys()
@@ -474,10 +495,10 @@ func handleReceipt(env *signalservice.Envelope) {
 // recID removes the + from phone numbers
 func recID(source string) (string, error) {
 	if len(source) == 0 {
-		return source[1:], nil
+		return "", errors.New("invalid recipient id")
 	} else if len(source) > 0 && source[0] == '+' {
 		log.Errorln("[textsecure] invalid recipient id", source)
-		return "", errors.New("invalid recipient id")
+		return source[1:], nil
 
 	}
 	return source, nil
@@ -522,13 +543,13 @@ func (err MessageTypeNotImplementedError) Error() string {
 // ErrInvalidMACForMessage signals an incoming message with invalid MAC.
 var ErrInvalidMACForMessage = errors.New("invalid MAC for incoming message")
 
-// Authenticate and decrypt a received message
-func handleReceivedMessage(msg []byte) error {
+// decryptReceivedMessage decrypts a received message.
+func decryptReceivedMessage(msg []byte) ([]byte, error) {
 	// decrypt signalservice envelope
 	macpos := len(msg) - 10
 	tmac := msg[macpos:]
-	aesKey := registrationInfo.signalingKey[:32]
-	macKey := registrationInfo.signalingKey[32:]
+	aesKey := registration.Registration.SignalingKey[:32]
+	macKey := registration.Registration.SignalingKey[32:]
 	hasError := false
 	if !axolotl.ValidTruncMAC(msg[:macpos], tmac, macKey) {
 		hasError = true
@@ -543,15 +564,25 @@ func handleReceivedMessage(msg []byte) error {
 		ciphertext := msg[1:macpos]
 		plaintext, err = axolotl.Decrypt(aesKey, ciphertext)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
+	return plaintext, nil
+}
+
+func createEnvelope(plaintext []byte) (*signalservice.Envelope, error) {
 	env := &signalservice.Envelope{}
-	err = proto.Unmarshal(plaintext, env)
+	err := proto.Unmarshal(plaintext, env)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	return env, nil
+}
+
+// Authenticate and decrypt a received message
+func handleReceivedMessage(env *signalservice.Envelope) error {
+
 	recid := env.GetSourceUuid()
 
 	sc := axolotl.NewSessionCipher(textSecureStore, textSecureStore, textSecureStore, textSecureStore, recid, env.GetSourceDevice())
@@ -625,12 +656,22 @@ func handleReceivedMessage(msg []byte) error {
 		}
 	case signalservice.Envelope_UNIDENTIFIED_SENDER:
 
-		msg := env.GetContent()
-		str := string(msg)
-
-		fmt.Println(str) // uint64 in string format
-
-		return fmt.Errorf("not implemented message type unindentified sender %v", msg)
+		p, _ := proto.Marshal(env)
+		data, err := crayfish.Instance.HandleEnvelope(p)
+		if err != nil {
+			return err
+		}
+		content, err := base64.StdEncoding.DecodeString(data.Message)
+		if err != nil {
+			return err
+		}
+		env.Content = content
+		phoneNumber := "+" + strconv.Itoa(data.Sender.PhoneNumber.Code.Value) + strconv.Itoa(data.Sender.PhoneNumber.National.Value)
+		log.Println("[textsecure] handleReceivedMessage:", phoneNumber, data.Sender.UUID)
+		err = handleMessage(phoneNumber, data.Sender.UUID, uint64(data.Timestamp), content)
+		if err != nil {
+			return err
+		}
 
 	default:
 		return MessageTypeNotImplementedError{uint32(*env.Type)}

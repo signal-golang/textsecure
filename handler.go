@@ -155,3 +155,7 @@ func handleCallMessage(src string, srcUUID string, timestamp uint64, cm *signals
 	}
 	return nil
 }
+
+func handleUnidentifiedSenderMessage(srcUUID string, timestamp uint64, sm *signalservice.SyncMessage) error {
+	return nil
+}

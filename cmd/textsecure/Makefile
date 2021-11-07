@@ -26,18 +26,21 @@ endif
 ifeq ($(uname_s), Linux)
 ifeq ($(shell uname --machine), x86_64)
 	@echo "get zkgroup $(PLATFORM)"
-	go get -d github.com/nanu-c/zkgroup
+	go get -d github.com/nanu-c/zkgroup \
+	&& cd $(GOPATH)/src/github.com/nanu-c/zkgroup \
 	&& git submodule update \
 	&& cd lib/zkgroup \
-	&& cargo build --release --verbose
-	mv libzkgroup.so libzkgroup_linux_x86_64.so
+	&& cargo build --release --verbose 
+	mv $(GOPATH)/src/github.com/nanu-c/zkgroup/lib/zkgroup/target/debug/libzkgroup.so libzkgroup_linux_x86_64.so
+	cd crayfish&&cargo build
 else ifeq ($(shell uname --machine), aarch64)
 	@echo "get zkgroup $(PLATFORM)"
 	go get -d github.com/nanu-c/zkgroup
 	&& git submodule update \
 	&& cd lib/zkgroup \
 	&& cargo build --release --verbose
-	mv libzkgroup.so libzkgroup_linux_aarch64.so
+	mv $(GOPATH)/src/github.com/nanu-c/zkgroup/lib/zkgroup/target/debug/libzkgroup.so libzkgroup_linux_aarch64.so
+	cd crayfish&&cargo build
 else 
 	@echo architecture not supported
 	exit 1

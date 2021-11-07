@@ -69,7 +69,7 @@ func init() {
 	flag.StringVar(&leavegroup, "leavegroup", "", "Leave a group named by the argument")
 	flag.BoolVar(&endsession, "endsession", false, "Terminate session with peer")
 	flag.BoolVar(&showdevices, "showdevices", false, "Show linked devices")
-	flag.StringVar(&linkdevice, "linkdevice", "", "Link a new device, the argument is a url in the format 'tsdevice:/?uuid=xxx&pub_key=yyy'")
+	flag.StringVar(&linkdevice, "linkdevice", "", "Link a new device, the argument is a url in the format 'sgn:/?uuid=xxx&pub_key=yyy'")
 	flag.IntVar(&unlinkdevice, "unlinkdevice", 0, "Unlink a device, the argument is the id of the device to delete")
 	flag.IntVar(&stress, "stress", 0, "Automatically send many messages to the peer")
 	flag.StringVar(&configDir, "config", ".config", "Location of config dir")

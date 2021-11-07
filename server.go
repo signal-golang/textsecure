@@ -21,6 +21,7 @@ import (
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/registration"
 	"github.com/signal-golang/textsecure/unidentifiedAccess"
 
 	"github.com/signal-golang/textsecure/transport"
@@ -108,46 +109,6 @@ var (
 
 	CONTACT_DISCOVERY = "/v1/discovery/%s"
 )
-
-// RegistrationInfo holds the data required to be identified by and
-// to communicate with the push server.
-// The data is generated once at install time and stored locally.
-/**
- * Verify a Signal Service account with a received SMS or voice verification code.
- *
- * @param verificationCode The verification code received via SMS or Voice
- *                         (see {@link #requestSmsVerificationCode} and
- *                         {@link #requestVoiceVerificationCode}).
- * @param signalingKey 52 random bytes.  A 32 byte AES key and a 20 byte Hmac256 key,
- *                     concatenated.
- * @param signalProtocolRegistrationId A random 14-bit number that identifies this Signal install.
- *                                     This value should remain consistent across registrations for the
- *                                     same install, but probabilistically differ across registrations
- *                                     for separate installs.
- *
- * @throws IOException
- */
-type RegistrationInfo struct {
-	password       string
-	registrationID uint32
-	signalingKey   []byte
-	captchaToken   string
-}
-
-func (r *RegistrationInfo) Password() string {
-	return r.password
-}
-func (r *RegistrationInfo) RegistrationID() uint32 {
-	return r.registrationID
-}
-func (r *RegistrationInfo) SignalingKey() []byte {
-	return r.signalingKey
-}
-func (r *RegistrationInfo) CaptchaToken() string {
-	return r.captchaToken
-}
-
-var registrationInfo RegistrationInfo
 
 // Registration
 const (
@@ -250,8 +211,8 @@ func verifyCode(code string, pin *string, credentials *transport.AuthCredentials
 		log.Debugln("[textsecure] verifyCode", err)
 	}
 	vd := AccountAttributes{
-		SignalingKey:    base64.StdEncoding.EncodeToString(registrationInfo.signalingKey),
-		RegistrationID:  registrationInfo.registrationID,
+		SignalingKey:    base64.StdEncoding.EncodeToString(registration.Registration.SignalingKey),
+		RegistrationID:  registration.Registration.RegistrationID,
 		FetchesMessages: true,
 		Voice:           false,
 		Video:           false,
@@ -343,7 +304,7 @@ func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 	}
 	attributes := UpdateAccountAttributes{
 		SignalingKey:                   nil,
-		RegistrationID:                 registrationInfo.registrationID,
+		RegistrationID:                 registration.Registration.RegistrationID,
 		FetchesMessages:                true,
 		Pin:                            nil,
 		Name:                           config.ConfigFile.Name,

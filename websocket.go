@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/signal-golang/textsecure/config"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
+	"github.com/signal-golang/textsecure/registration"
 	rootCa "github.com/signal-golang/textsecure/rootCa"
 	log "github.com/sirupsen/logrus"
 )
@@ -144,7 +145,7 @@ func StartListening() error {
 	var err error
 
 	wsconn = &Conn{send: make(chan []byte, 256)}
-	err = wsconn.connect(config.ConfigFile.Server+websocketPath, config.ConfigFile.UUID, registrationInfo.password)
+	err = wsconn.connect(config.ConfigFile.Server+websocketPath, config.ConfigFile.UUID, registration.Registration.Password)
 	if err != nil {
 		log.Errorf(err.Error())
 		return err
@@ -183,11 +184,19 @@ func StartListening() error {
 		m := wsm.GetRequest().GetBody()
 
 		if len(m) > 0 {
-			err = handleReceivedMessage(m)
+			plaintext, err := decryptReceivedMessage(m)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
 				}).Error("[textsecure] Failed to handle received message")
+			} else {
+				env, _ := createEnvelope(plaintext)
+				err = handleReceivedMessage(env)
+				if err != nil {
+					log.WithFields(log.Fields{
+						"error": err,
+					}).Error("[textsecure] Failed to handle received message")
+				}
 			}
 		} else {
 			log.Debugln("[textsecure] Ask for new messages")
