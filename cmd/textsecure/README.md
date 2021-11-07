@@ -1,8 +1,14 @@
 # Info
-The textsecure-cmd depends on libzkgroup a rust lib.
+The textsecure-cmd depends on libzkgroup and crayfsh both rust libs.
+
+# Tooling
+`go`, `cargo`, `rust`
 
 # Installing
-In order to run textsecure-cmd you can either copy the precompiled library with `make copy-lib` or compile it with `make`.
+textsecure-cmd uses [crayfish](https://github.com/nanu-c/crayfish) as backend to decipher the signal messages. In order to checkout the code run `git submodule update`.
+Then build `crayfish` with `cd crayfish && cago build`
+In order to run textsecure-cmd you can either copy the precompiled zkgroup library with `make copy-lib` or compile it with `make`.
+
 
 # Troubleshooting
 
