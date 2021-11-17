@@ -338,7 +338,7 @@ func (c *CrayfishInstance) StartListening() error {
 					log.WithFields(log.Fields{
 						"error": err,
 					}).Error("[textsecure-crayfish-ws] Failed to start listening")
-					time.Sleep(time.Second * 5)
+					time.Sleep(time.Second * 2)
 				}
 			} else {
 				break

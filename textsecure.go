@@ -261,6 +261,7 @@ func setupLogging() {
 
 // Setup initializes the package.
 func Setup(c *Client) error {
+	go crayfish.Run()
 	var err error
 	client = c
 
@@ -274,7 +275,6 @@ func Setup(c *Client) error {
 	if err != nil {
 		return err
 	}
-	go crayfish.Run()
 
 	if needsRegistration() {
 		registration.Registration = registration.RegistrationInfo{
@@ -655,6 +655,10 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			return err
 		}
 	case signalservice.Envelope_UNIDENTIFIED_SENDER:
+
+		if registration.Registration.SignalingKey[0] != 1 {
+			log.Errorln("failed to handle message, signalingkey has wrong version, please re-register to update your signaling-key")
+		}
 
 		p, _ := proto.Marshal(env)
 		data, err := crayfish.Instance.HandleEnvelope(p)
