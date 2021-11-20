@@ -9,13 +9,14 @@ import (
 )
 
 func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) error {
-	b = stripPadding(b)
 
 	content := &signalservice.Content{}
 	err := proto.Unmarshal(b, content)
 	if err != nil {
+		log.Errorln("[textsecure] handleMessage umarshalling", err)
 		return err
 	}
+	log.Debugln("[textsecure] handleMessage")
 
 	if dm := content.GetDataMessage(); dm != nil {
 		return handleDataMessage(srcE164, srcUUID, timestamp, dm)

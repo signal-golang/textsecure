@@ -623,6 +623,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 		if err != nil {
 			return err
 		}
+		b = stripPadding(b)
 		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
 		if err != nil {
 			return err
@@ -650,6 +651,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 		if err != nil {
 			return err
 		}
+		b = stripPadding(b)
 		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
 		if err != nil {
 			return err

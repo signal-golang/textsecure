@@ -380,7 +380,7 @@ func (c *CrayfishInstance) StartWebsocket() error {
 			}
 			return err
 		}
-		log.Debugln("[textsecure-crayfish-ws] incoming msg", string(bmsg))
+		log.Debugln("[textsecure-crayfish-ws] incoming msg")
 		csm := &CrayfishWebSocketMessage{}
 		err = json.Unmarshal(bmsg, csm)
 		if err != nil {
@@ -549,7 +549,7 @@ func (c *CrayfishInstance) HandleEnvelope(msg []byte) (*CrayfishWebSocketRespons
 	envelopeMessage := &CrayfishWebSocketRequest_HANDLE_ENVELOPE_MESSAGE{
 		Message: sEnc,
 	}
-	log.Debugln("[textsecure-crayfish-ws] Sending envelope", msg)
+	log.Debugln("[textsecure-crayfish-ws] Sending envelope")
 
 	request := &CrayfishWebSocketRequestMessage{
 		Type:    &requestType,
@@ -567,6 +567,7 @@ func (c *CrayfishInstance) HandleEnvelope(msg []byte) (*CrayfishWebSocketRespons
 	c.wsconn.send <- m
 	c.receiveChannel = make(chan *CrayfishWebSocketResponseMessage, 1)
 	response := <-c.receiveChannel
+	log.Debugf("[textsecure-crayfish-ws] HandleEnvelope recieved an response")
 	rm, err := json.Marshal(response.Message)
 	if err != nil {
 		return nil, err
@@ -576,5 +577,6 @@ func (c *CrayfishInstance) HandleEnvelope(msg []byte) (*CrayfishWebSocketRespons
 	if err != nil {
 		return nil, err
 	}
+
 	return &data, nil
 }
