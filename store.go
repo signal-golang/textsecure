@@ -264,12 +264,12 @@ func ContactIdentityKey(id string) ([]byte, error) {
 	return append([]byte{5}, b...), nil
 }
 
-func GetFingerprint(remoteIdentifier string) ([]string, []byte, error) {
+func GetFingerprint(remoteUUID string, remoteIdentifier string) ([]string, []byte, error) {
 
 	localIdentifier := config.ConfigFile.Tel
 	localIdentityKey := MyIdentityKey()
 
-	remoteIdentityKey, err := ContactIdentityKey(remoteIdentifier)
+	remoteIdentityKey, err := ContactIdentityKey(remoteUUID)
 	if err != nil {
 		return nil, nil, err
 	}
