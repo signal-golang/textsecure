@@ -675,6 +675,11 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 		id := signalservice.AttachmentPointer_CdnId{
 			CdnId: msg.attachment.id,
 		}
+		// todo send file names
+		filename := ""
+		if msg.attachment.voiceNote {
+			filename = "voice.mp3"
+		}
 		dm.Attachments = []*signalservice.AttachmentPointer{
 			{
 				AttachmentIdentifier: &id,
@@ -682,6 +687,7 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 				Key:                  msg.attachment.keys[:],
 				Digest:               msg.attachment.digest[:],
 				Size:                 &msg.attachment.size,
+				FileName:             &filename,
 			},
 		}
 		if msg.attachment.voiceNote {
