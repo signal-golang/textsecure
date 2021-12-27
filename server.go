@@ -122,38 +122,42 @@ func requestCode(tel, method, captcha string) (string, *int, error) {
 	if captcha != "" {
 		path += "&captcha=" + captcha
 	}
-	resp, err := transport.Transport.Get(path)
-	if err != nil {
-		log.Errorln("[textsecure] requestCode", err)
-		return "", nil, err
-	}
-	if resp.IsError() {
-		if resp.Status == 402 {
-			buf := new(bytes.Buffer)
-			buf.ReadFrom(resp.Body)
-			newStr := buf.String()
-			log.Errorln("[textsecure] requestCode", newStr)
-			defer resp.Body.Close()
+	if transport.Transport != nil {
 
-			return "", &resp.Status, errors.New("Need to solve captcha")
-		} else if resp.Status == 413 {
-			buf := new(bytes.Buffer)
-			buf.ReadFrom(resp.Body)
-			newStr := buf.String()
-			log.Errorln("[textsecure] requestCode", newStr)
-			defer resp.Body.Close()
-
-			return "", &resp.Status, errors.New("Rate limit exeded")
-		} else {
-			log.Debugln("[textsecure] request code status", resp.Status)
-			defer resp.Body.Close()
-
-			return "", nil, errors.New("Error, see logs")
+		resp, err := transport.Transport.Get(path)
+		if err != nil {
+			log.Errorln("[textsecure] requestCode", err)
+			return "", nil, err
 		}
-	} else {
-		defer resp.Body.Close()
-		return "", nil, nil
+		if resp.IsError() {
+			if resp.Status == 402 {
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(resp.Body)
+				newStr := buf.String()
+				log.Errorln("[textsecure] requestCode", newStr)
+				defer resp.Body.Close()
+
+				return "", &resp.Status, errors.New("Need to solve captcha")
+			} else if resp.Status == 413 {
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(resp.Body)
+				newStr := buf.String()
+				log.Errorln("[textsecure] requestCode", newStr)
+				defer resp.Body.Close()
+
+				return "", &resp.Status, errors.New("Rate limit exeded")
+			} else {
+				log.Debugln("[textsecure] request code status", resp.Status)
+				defer resp.Body.Close()
+
+				return "", nil, errors.New("Error, see logs")
+			}
+		} else {
+			defer resp.Body.Close()
+			return "", nil, nil
+		}
 	}
+	return "", nil, errors.New("[textsecure] No transport available")
 	// unofficial dev method, useful for development, with no telephony account needed on the server
 	// if method == "dev" {
 	// 	code := make([]byte, 7)
