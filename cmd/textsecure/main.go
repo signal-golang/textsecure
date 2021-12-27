@@ -113,7 +113,12 @@ func getCaptchaToken() string {
 
 	return readLine("4. Enter captcha token>")
 }
-
+func getPhoneNumber() string {
+	return readLine("Enter Phone number beginning with + and country code like +44...>")
+}
+func getPin() string {
+	return readLine("Enter Pin>")
+}
 func getVerificationCode() string {
 	return readLine("Enter verification code>")
 }
@@ -200,6 +205,14 @@ func conversationLoop(isGroup bool) {
 }
 
 func receiptMessageHandler(msg *textsecure.Message) {
+}
+func typingMessageHandler(msg *textsecure.Message) {
+}
+func callMessageHandler(msg *textsecure.Message) {
+}
+func syncSentHandler(msg *textsecure.Message, id uint64) {
+}
+func syncReadHandler(text string, id uint64) {
 }
 
 func messageHandler(msg *textsecure.Message) {
@@ -503,7 +516,14 @@ func main() {
 		ReceiptMessageHandler: receiptMessageHandler,
 		RegistrationDone:      registrationDone,
 		GetUsername:           getUsername,
+		GetPhoneNumber:        getPhoneNumber,
+		GetPin:                getPin,
+		TypingMessageHandler:  typingMessageHandler,
+		CallMessageHandler:    callMessageHandler,
+		SyncReadHandler:       syncReadHandler,
+		SyncSentHandler:       syncSentHandler,
 	}
+
 	err := textsecure.Setup(client)
 	if err != nil {
 		log.Fatal(err)

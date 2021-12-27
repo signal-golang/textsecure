@@ -168,8 +168,10 @@ func Run() {
 		} else if _, err := os.Stat("./crayfish/target/debug/crayfish"); err == nil {
 			Instance.cmd = exec.Command("./crayfish/target/debug/crayfish")
 		} else {
-			log.Errorln("[textsecure-crayfish] crayfish not found")
+			log.Errorln("[textsecure-crayfish] crayfish not found textsecure doesn't work without crayfish")
+			log.Errorln("[textsecure-crayfish] Please install crayfish, hints are in the README at https://github.com/signal-golang/textsecure")
 			Instance.cmd = exec.Command("pwd")
+			os.Exit(1)
 		}
 	} else {
 		Instance.cmd = exec.Command(path)
