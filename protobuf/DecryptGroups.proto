@@ -62,6 +62,7 @@
    repeated DecryptedRequestingMember requestingMembers         = 9;
             bytes                     inviteLinkPassword        = 10;
             string                    description               = 11;
+            EnabledState              isAnnouncementGroup       = 12;
  }
  
  // Decrypted version of message GroupChange.Actions
@@ -87,6 +88,7 @@
    repeated DecryptedApproveMember        promoteRequestingMembers = 18;
             bytes                         newInviteLinkPassword    = 19;
             DecryptedString               newDescription           = 20;
+            EnabledState                  newIsAnnouncementGroup   = 21;
  }
  
  message DecryptedString {
@@ -105,5 +107,11 @@
    uint32                       revision             = 6;
    bool                         pendingAdminApproval = 7;
    string                       description          = 8;
+   bool                         isAnnouncementGroup  = 9;
  }
  
+ enum EnabledState {
+   UNKNOWN  = 0;
+   ENABLED  = 1;
+   DISABLED = 2;
+ }

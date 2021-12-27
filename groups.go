@@ -530,3 +530,17 @@ func LeaveGroup(hexid string) error {
 	removeGroup(g.ID)
 	return nil
 }
+
+func JoinGroup(hexID string) (*groupsv2.GroupV2, error) {
+	log.Debugln("[textsecure] join group", hexID)
+	log.Debugln("[textsecure] joining groups is not yet implemented")
+	g := groupsv2.FindGroup(hexID)
+	if g == nil {
+		return nil, UnknownGroupIDError{hexID}
+	}
+	err := g.JoinGroup()
+	if err != nil {
+		return nil, err
+	}
+	return g, nil
+}

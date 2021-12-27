@@ -6,8 +6,8 @@
  syntax = "proto2";
 
  package signalservice;
- option go_package = ".;signalservice";
  
+ option go_package = ".;signalservice";
  option java_package         = "org.whispersystems.signalservice.internal.push";
  option java_outer_classname = "SignalServiceProtos";
  
@@ -624,4 +624,3 @@
    optional uint64 timestamp  = 2;
    optional uint32 deviceId   = 3;
  }
- 

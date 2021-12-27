@@ -283,7 +283,9 @@ func handleGroupChangesForGroup(groupChange *signalservice.DecryptedGroupChange,
 	// }
 
 }
-
+func (g *GroupV2) JoinGroup() error {
+	return nil
+}
 func decryptUuidOrUnknown(uuidCipherTex []byte) *[]byte {
 	// https://github.com/signalapp/zkgroup/blob/ea80ccc47bc8363d15906fb0f57588e940b589a0/rust/src/api/groups/group_params.rs#L118-L124
 	return nil
