@@ -331,12 +331,12 @@ func Setup(c *Client) error {
 	// check if a username is set
 	if config.ConfigFile.Name == "" {
 		config.ConfigFile.Name = client.GetUsername()
+		profileChanged = true
 		saveConfig(config.ConfigFile)
 	}
 	if profileChanged {
 		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
 	}
-
 	// check for unidentified access
 	if len(config.ConfigFile.Certificate) == 0 {
 		err = renewSenderCertificate()
@@ -352,6 +352,17 @@ func Setup(c *Client) error {
 			}
 		}
 	}
+	if len(config.ConfigFile.ProfileKeyCredential) == 0 || true {
+		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
+		profile, err := profiles.GetProfileAndCredential(config.ConfigFile.UUID, config.ConfigFile.ProfileKey)
+		if err != nil {
+			return err
+		}
+		config.ConfigFile.ProfileKeyCredential = []byte(profile.Credential)
+		saveConfig(config.ConfigFile)
+
+	}
+
 	return err
 }
 func renewSenderCertificate() error {
@@ -402,9 +413,11 @@ func registerDevice() error {
 	config.ConfigFile.Tel = crayfishRegistration.Tel
 	config.ConfigFile.UUID = crayfishRegistration.UUID
 	config.ConfigFile.AccountCapabilities = config.AccountCapabilities{
-		UUID:    false,
-		Gv2:     true,
-		Storage: false,
+		Gv2:               true,
+		SenderKey:         false,
+		AnnouncementGroup: false,
+		ChangeNumber:      false,
+		Gv1Migration:      false,
 	}
 
 	err = saveConfig(config.ConfigFile)

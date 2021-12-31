@@ -2,6 +2,8 @@ package profiles
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +11,7 @@ import (
 
 	zkgroup "github.com/nanu-c/zkgroup"
 	uuidUtil "github.com/satori/go.uuid"
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/transport"
@@ -16,8 +19,9 @@ import (
 )
 
 const (
-	PROFILE_PATH       = "/v1/profile/%s"
-	NAME_PADDED_LENGTH = 53
+	PROFILE_PATH            = "/v1/profile/%s"
+	PROFILE_CREDENTIAL_PATH = "/v1/profile/%s/%s/%s"
+	NAME_PADDED_LENGTH      = 53
 )
 
 // Profile ...
@@ -70,7 +74,6 @@ func UpdateProfile(profileKey []byte, uuid, name string) error {
 
 // WriteProfile ...
 func writeOwnProfile(profile ProfileSettings) error {
-	// String response = makeServiceRequest(String.format(PROFILE_PATH, ""), "PUT", requestBody);
 	body, err := json.Marshal(profile)
 	if err != nil {
 		return err
@@ -121,32 +124,159 @@ func getCommitment(profileKey, uuid []byte) ([]byte, error) {
 
 // Profile describes the profile type
 type Profile struct {
-	IdentityKey                    string          `json:"identityKey"`
-	Name                           string          `json:"name"`
-	Avatar                         string          `json:"avatar"`
-	UnidentifiedAccess             string          `json:"uak"`
-	UnrestrictedUnidentifiedAccess bool            `json:"uua"`
-	Capabilities                   ProfileSettings `json:"capabilities"`
-	Username                       string          `json:"username"`
-	UUID                           string          `json:"uuid"`
-	// Payments                       string          `json:"payments"`
-	// Credential                     string          `json:"credential"`
+	IdentityKey                    string                     `json:"identityKey"`
+	UnidentifiedAccess             string                     `json:"unidentifiedAccess"`
+	UnrestrictedUnidentifiedAccess bool                       `json:"unrestrictedUnidentifiedAccess"`
+	Capabilities                   config.AccountCapabilities `json:"capabilities"`
+	Badges                         []string                   `json:"badges"`
+	UUID                           string                     `json:"uuid"`
+	Name                           string                     `json:"name"`
+	About                          string                     `json:"about"`
+	AboutEmoji                     string                     `json:"aboutEmoji"`
+	Avatar                         string                     `json:"avatar"`
+	PaymentAddress                 string                     `json:"paymentAddress"`
+	Credential                     []byte                     `json:"credential"`
 }
 
-func GetProfile(UUID string, profileKey []byte) {
+func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
 	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, UUID))
 	profile := &Profile{}
 
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(&profile)
 	if err != nil {
-		log.Debugln(err)
+		log.Debugln("[textsecure] GetProfile", err)
+		return nil, err
 	} else {
-		fmt.Printf("%+v\n", profile)
-		name, err := decryptName(profileKey, []byte(profile.Name))
-		log.Debugln(name, err)
+		err = decryptProfile(profileKey, profile)
+		if err != nil {
+			log.Debugln("[textsecure] ", err)
+			return nil, err
+		}
 	}
+	return profile, nil
 
+}
+func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
+	log.Infoln("[textsecure] GetProfileAndCredential")
+	uuid, err := uuidUtil.FromString(UUID)
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(config.ZKGROUP_SERVER_PUBLIC_PARAMS)
+
+	requestContext, err := zkgroup.CreateProfileKeyCredentialRequestContext(zkGroupServerPublicParams, uuid.Bytes(), profileKey)
+	if err != nil {
+		log.Debugln("[textsecure] createProfileCredentialRequest", err)
+		return nil, err
+	}
+	credentialsRequest, err := requestContext.ProfileKeyCredentialRequestContextGetRequest()
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	credentialsRequestHex := hex.EncodeToString(credentialsRequest)
+
+	version, err := zkgroup.ProfileKeyGetProfileKeyVersion(profileKey, uuid.Bytes())
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_CREDENTIAL_PATH, UUID, version, credentialsRequestHex))
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	profile := &Profile{}
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&profile)
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	} else {
+		err = decryptProfile(profileKey, profile)
+		if err != nil {
+			log.Debugln("[textsecure] GetProfileAndCredential", err)
+			return nil, err
+		}
+	}
+	response := zkgroup.ProfileKeyCredentialResponse(profile.Credential)
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	serverPublicParams, err := zkgroup.NewServerPublicParams(zkGroupServerPublicParams)
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	credential, err := serverPublicParams.ReceiveProfileKeyCredential(requestContext, response)
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	log.Debugln("[textsecure] GetProfileAndCredential", len(credential))
+	profile.Credential = credential
+
+	return profile, err
+
+}
+func decryptProfile(profileKey []byte, profile *Profile) error {
+	name, err := decryptString(profileKey, profile.Name)
+	if err != nil {
+		log.Debugln("[textsecure] decryptProfile name", err)
+		return err
+	}
+	profile.Name = name
+	if profile.About != "" {
+		about, err := decryptString(profileKey, profile.About)
+		if err != nil {
+			log.Debugln("[textsecure] decryptProfile about", err)
+			return err
+		}
+		profile.About = about
+	}
+	if profile.AboutEmoji != "" {
+
+		emoji, err := decryptString(profileKey, profile.AboutEmoji)
+		if err != nil {
+			log.Debugln("[textsecure] decryptProfile aboutEmoji", err)
+			return err
+		}
+		profile.AboutEmoji = emoji
+	}
+	identityKey, err := base64.StdEncoding.DecodeString(profile.IdentityKey)
+	if err != nil {
+		log.Debugln("[textsecure] decryptProfile identitykey", err)
+		return err
+	}
+	profile.IdentityKey = string(identityKey)
+
+	return nil
+}
+
+func decryptString(profileKey []byte, data string) (string, error) {
+	bData, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return "", err
+	}
+	dData, err := decryptName(profileKey, bData)
+	if err != nil {
+		return "", err
+	}
+	return string(dData), nil
+
+}
+func createProfileCredentialRequest(uuid, profileKey []byte) (zkgroup.ProfileKeyCredentialRequest, error) {
+	zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(config.ZKGROUP_SERVER_PUBLIC_PARAMS)
+
+	requestContext, err := zkgroup.CreateProfileKeyCredentialRequestContext(zkGroupServerPublicParams, uuid, profileKey)
+	if err != nil {
+		log.Debugln("[textsecure] createProfileCredentialRequest", err)
+		return nil, err
+	}
+	return requestContext.ProfileKeyCredentialRequestContextGetRequest()
 }
 
 // GetProfileE164 get a profile by a phone number
@@ -172,7 +302,7 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 	if err != nil {
 		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
-	c.Username = profile.Username
+	c.Name = profile.Name
 	c.UUID = profile.UUID
 	c.Avatar = avatarDecrypted
 	contacts.Contacts[c.UUID] = c

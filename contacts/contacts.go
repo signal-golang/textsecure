@@ -15,20 +15,21 @@ import (
 
 // Contact contains information about a contact.
 type Contact struct {
-	UUID          string
-	Tel           string
-	ProfileKey    []byte
-	IdentityKey   []byte
-	Name          string
-	Username      string
-	Avatar        []byte
-	Color         string
-	Blocked       bool
-	Verified      *signalservice.Verified
-	ExpireTimer   uint32
-	InboxPosition uint32
-	Archived      bool
-	Certificate   []byte
+	UUID                 string
+	Tel                  string
+	ProfileKey           []byte
+	ProfileKeyCredential []byte
+	IdentityKey          []byte
+	Name                 string
+	Username             string
+	Avatar               []byte
+	Color                string
+	Blocked              bool
+	Verified             *signalservice.Verified
+	ExpireTimer          uint32
+	InboxPosition        uint32
+	Archived             bool
+	Certificate          []byte
 }
 
 func (c *Contact) GetProfileKey() []byte {

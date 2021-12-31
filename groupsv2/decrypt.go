@@ -67,10 +67,17 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 func (g *GroupV2) decryptMember(member *signalservice.Member) (*signalservice.DecryptedMember, error) {
 	var err error
 	decryptedMember := &signalservice.DecryptedMember{}
+	if g.cipher == nil {
+		groupSecretParams, err := zkgroup.NewGroupSecretParams(g.MasterKey)
+		if err != nil {
+			return nil, err
+		}
+		g.cipher = zkgroup.NewClientZkGroupCipher(groupSecretParams)
+	}
 
 	decryptedMember.JoinedAtRevision = member.GetJoinedAtRevision()
 	decryptedMember.Role = member.GetRole()
-	if member.GetPresentation() == nil {
+	if member.GetPresentation() == nil || len(member.GetPresentation()) == 0 {
 		// TODO: check valid Uuid
 		decryptedMember.Uuid, err = g.decryptUUID(member.GetUserId())
 		if err != nil {
@@ -108,6 +115,13 @@ func (g *GroupV2) decryptMember(member *signalservice.Member) (*signalservice.De
 }
 
 func (g *GroupV2) decryptUUID(uuid []byte) ([]byte, error) {
+	if g.cipher == nil {
+		groupSecretParams, err := zkgroup.NewGroupSecretParams(g.MasterKey)
+		if err != nil {
+			return nil, err
+		}
+		g.cipher = zkgroup.NewClientZkGroupCipher(groupSecretParams)
+	}
 	return g.cipher.DecryptUUID(uuid)
 }
 

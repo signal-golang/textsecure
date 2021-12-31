@@ -7,3 +7,7 @@ func SetUsername(name string) {
 	config.ConfigFile.Name = name
 	saveConfig(config.ConfigFile)
 }
+
+func RefreshOwnProfile() {
+
+}

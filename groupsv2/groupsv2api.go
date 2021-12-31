@@ -6,6 +6,7 @@ import (
 	"time"
 
 	zkgroup "github.com/nanu-c/zkgroup"
+	"github.com/signal-golang/textsecure/config"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,7 @@ func NewGroupsV2Authorization(uuid []byte, groupSecretParams zkgroup.GroupSecret
 		log.Warnln("[textsecure] NewGroupsV2AuthorizationForGroup2", err.Error())
 
 	}
-	zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(ZKGROUP_SERVER_PUBLIC_PARAMS)
+	zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(config.ZKGROUP_SERVER_PUBLIC_PARAMS)
 	serverPublicParams, err := zkgroup.NewServerPublicParams(zkGroupServerPublicParams)
 	if err != nil {
 		log.Warnln("[textsecure] NewGroupsV2AuthorizationForGroup1", err.Error())

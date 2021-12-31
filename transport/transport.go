@@ -67,6 +67,7 @@ type Transporter interface {
 	Del(url string) (*response, error)
 	Put(url string, body []byte, ct string) (*response, error)
 	PutWithAuth(url string, body []byte, ct string, auth string) (*response, error)
+	PatchWithAuth(url string, body []byte, ct string, auth string) (*response, error)
 
 	PutJSON(url string, body []byte) (*response, error)
 	PutBinary(url string, body []byte) (*response, error)
@@ -314,6 +315,35 @@ func (ht *httpTransporter) PutJSONWithUnidentifiedSender(url string, body []byte
 }
 func (ht *httpTransporter) PutBinary(url string, body []byte) (*response, error) {
 	return ht.Put(url, body, "application/octet-stream")
+}
+func (ht *httpTransporter) PatchWithAuth(url string, body []byte, ct string, auth string) (*response, error) {
+	br := bytes.NewReader(body)
+	req, err := http.NewRequest("PATCH", ht.baseURL+url, br)
+	if err != nil {
+		return nil, err
+	}
+	if ht.userAgent != "" {
+		req.Header.Set("X-Signal-Agent", ht.userAgent)
+	}
+	req.Header.Get("Authorization")
+	req.Header.Add("Content-Type", ct)
+	req.Header.Set("Authorization", auth)
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	cookies := resp.Header.Get("Set-Cookie")
+
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+		r.Cookies = cookies
+	}
+
+	log.Debugf("[textsecure] PATCH with auth %s %d\n", url, r.Status)
+
+	return r, err
 }
 
 func (ht *httpTransporter) Duplicate() *httpTransporter {

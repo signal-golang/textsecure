@@ -17,18 +17,30 @@ type Config struct {
 	AccountCapabilities       AccountCapabilities `yaml:"accountCapabilities"`       // Account Attrributes are used in order to track the support of different function for signal
 	DiscoverableByPhoneNumber bool                `yaml:"discoverableByPhoneNumber"` // If the user should be found by his phone number
 	ProfileKey                []byte              `yaml:"profileKey"`                // The profile key is used in many places to encrypt the avatar, name etc and also in groupsv2 context
+	ProfileKeyCredential      []byte              `yaml:"profileKeyCredential"`      // The profile key is used in many places to encrypt the avatar, name etc and also in groupsv2 context
 	Name                      string              `yaml:"name"`                      // The username
 	UnidentifiedAccessKey     []byte              `yaml:"unidentifiedAccessKey"`     // The access key for unidentified users
 	Certificate               []byte              `yaml:"certificate"`               // The access key for unidentified users
-	CrayfishSupport           bool                `yaml:"crayfishSupport"`           // weather the client uses crayfish or not
+	CrayfishSupport           bool                `yaml:"crayfishSupport"`
+	Group                     struct {
+		MaxGroupSize                   int
+		MaxGroupTitleLengthBytes       int
+		MaxGroupDescriptionLengthBytes int
+		ExternalServiceSecret          string
+	} // weather the client uses crayfish or not
 }
+
+const (
+	ZKGROUP_SERVER_PUBLIC_PARAMS = "AMhf5ywVwITZMsff/eCyudZx9JDmkkkbV6PInzG4p8x3VqVJSFiMvnvlEKWuRob/1eaIetR31IYeAbm0NdOuHH8Qi+Rexi1wLlpzIo1gstHWBfZzy1+qHRV5A4TqPp15YzBPm0WSggW6PbSn+F4lf57VCnHF7p8SvzAA2ZZJPYJURt8X7bbg+H3i+PEjH9DXItNEqs2sNcug37xZQDLm7X36nOoGPs54XsEGzPdEV+itQNGUFEjY6X9Uv+Acuks7NpyGvCoKxGwgKgE5XyJ+nNKlyHHOLb6N1NuHyBrZrgtY/JYJHRooo5CEqYKBqdFnmbTVGEkCvJKxLnjwKWf+fEPoWeQFj5ObDjcKMZf2Jm2Ae69x+ikU5gBXsRmoF94GXQ=="
+)
 
 // AccountCapabilities describes what functions axolotl supports
 type AccountCapabilities struct {
-	UUID         bool `json:"uuid" yaml:"uuid"`
-	Gv2          bool `json:"gv2-3" yaml:"gv2"`
-	Storage      bool `json:"storage" yaml:"storage"`
-	Gv1Migration bool `json:"gv1-migration" yaml:"gv1-migration"`
+	Gv2               bool `json:"gv2" yaml:"gv2"`
+	SenderKey         bool `json:"senderKey" yaml:"senderKey"`
+	AnnouncementGroup bool `json:"announcementGroup" yaml:"announcementGroup"`
+	ChangeNumber      bool `json:"changeNumber" yaml:"changeNumber"`
+	Gv1Migration      bool `json:"gv1-migration" yaml:"gv1-migration"`
 }
 
 var (

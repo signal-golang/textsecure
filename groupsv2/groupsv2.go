@@ -19,10 +19,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const ZKGROUP_SERVER_PUBLIC_PARAMS = "AMhf5ywVwITZMsff/eCyudZx9JDmkkkbV6PInzG4p8x3VqVJSFiMvnvlEKWuRob/1eaIetR31IYeAbm0NdOuHH8Qi+Rexi1wLlpzIo1gstHWBfZzy1+qHRV5A4TqPp15YzBPm0WSggW6PbSn+F4lf57VCnHF7p8SvzAA2ZZJPYJURt8X7bbg+H3i+PEjH9DXItNEqs2sNcug37xZQDLm7X0="
-const HIGHEST_KNOWN_EPOCH = 1
-const GROUPSV2_GROUP = "/v1/groups/"
-const GROUPSV2_GROUP_JOIN = "/v1/groups/join/%s"
+const (
+	HIGHEST_KNOWN_EPOCH = 1
+	GROUPSV2_GROUP      = "/v1/groups/"
+	GROUPSV2_GROUP_JOIN = "/v1/groups/join/%s"
+)
 
 const (
 	GroupV2JoinsStatusMember  = 0
@@ -40,13 +41,15 @@ var (
 
 // GroupV2 holds group metadata.
 type GroupV2 struct {
-	MasterKey      []byte
-	Hexid          string
-	GroupContext   signalservice.Group
-	cipher         *zkgroup.ClientZkGroupCipher
-	DecryptedGroup *signalservice.DecryptedGroup
-	GroupAction    *signalservice.DecryptedGroupChange
-	JoinStatus     int
+	MasterKey         []byte
+	Hexid             string
+	GroupContext      signalservice.Group
+	cipher            *zkgroup.ClientZkGroupCipher
+	DecryptedGroup    *signalservice.DecryptedGroup
+	GroupAction       *signalservice.DecryptedGroupChange
+	JoinStatus        int
+	Revision          uint32
+	AnnouncementsOnly bool
 }
 
 // idToHex returns the hex representation of the group id byte-slice
@@ -208,7 +211,7 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 		group = &GroupV2{
 			MasterKey: groupContext.GetMasterKey(),
 			Hexid:     hexid,
-			// Revision:  groupContext.GetRevision(),
+			Revision:  groupContext.GetRevision(),
 		}
 		// TODO: get members from server
 		groupsV2[hexid] = group
@@ -232,7 +235,7 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 			log.Errorln(err)
 		}
 		// verify server signature
-		zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(ZKGROUP_SERVER_PUBLIC_PARAMS)
+		zkGroupServerPublicParams, _ := base64.StdEncoding.DecodeString(config.ZKGROUP_SERVER_PUBLIC_PARAMS)
 		serverPublicParams, err := zkgroup.NewServerPublicParams(zkGroupServerPublicParams)
 		if err != nil {
 			log.Errorln("[textsecure][groupsv2] server public params", err)
@@ -284,7 +287,10 @@ func handleGroupChangesForGroup(groupChange *signalservice.DecryptedGroupChange,
 
 }
 func (g *GroupV2) JoinGroup() error {
-	return nil
+	uuid, _ := uuidUtil.FromString(config.ConfigFile.UUID)
+	_, err := g.AddPendingMembers(uuid.Bytes()) // richtige id?
+	log.Errorln("[textsecure] joingroup ", err)
+	return err
 }
 func decryptUuidOrUnknown(uuidCipherTex []byte) *[]byte {
 	// https://github.com/signalapp/zkgroup/blob/ea80ccc47bc8363d15906fb0f57588e940b589a0/rust/src/api/groups/group_params.rs#L118-L124
@@ -329,13 +335,20 @@ func basicAuth(username, password string) string {
 
 func PatchGroupV2(groupActions *signalservice.GroupChange_Actions,
 	groupsV2Authorization *GroupsV2Authorization) error {
+	c := &signalservice.GroupChange_Actions{}
+	m := []byte{10, 16, 172, 94, 146, 71, 221, 126, 68, 130, 142, 143, 150, 184, 19, 17, 100, 26, 16, 2, 82, 42, 10, 40, 148, 97, 208, 9, 152, 186, 62, 179, 136, 124, 206, 228, 145, 189, 13, 222, 0, 68, 202, 214, 0, 125, 28, 38, 52, 47, 3, 92, 62, 179, 93, 17, 68, 251, 49, 239, 82, 224, 165, 0}
+	err := proto.Unmarshal(m, c)
+	if err != nil {
+		log.Errorln(err)
+	}
+	fmt.Printf("[textsecure] PatchGroup %+v\n", c)
 
 	out, err := proto.Marshal(groupActions)
 	if err != nil {
 		log.Errorln("[textsecure][groupsv2] Failed to encode address groupActions:", err)
 		return err
 	}
-	resp, err := transport.StorageTransport.PutWithAuth(GROUPSV2_GROUP, out, "", "Basic "+basicAuth(groupsV2Authorization.Username, groupsV2Authorization.Password))
+	resp, err := transport.StorageTransport.PatchWithAuth(GROUPSV2_GROUP, out, "application/x-protobuf", "Basic "+basicAuth(groupsV2Authorization.Username, groupsV2Authorization.Password))
 	if err != nil {
 		log.Errorln("[textsecure][groupsv2] Failed to encode address groupActions2:", err)
 

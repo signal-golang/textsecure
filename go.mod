@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/kr/text v0.2.0 // indirect
-	github.com/nanu-c/zkgroup v0.8.8
+	github.com/nanu-c/zkgroup v0.9.0
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/onsi/ginkgo v1.12.0 // indirect
 	github.com/onsi/gomega v1.9.0 // indirect
@@ -17,7 +17,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/signal-golang/ed25519 v0.0.0-20200301051623-f19b832d0d2e
 	github.com/signal-golang/mimemagic v0.0.0-20200821045537-3f613cf2cd3f
-	github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/text v0.3.3
