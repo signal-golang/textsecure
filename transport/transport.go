@@ -332,13 +332,11 @@ func (ht *httpTransporter) PatchWithAuth(url string, body []byte, ct string, aut
 	if err != nil {
 		return nil, err
 	}
-	cookies := resp.Header.Get("Set-Cookie")
 
 	r := &response{}
 	if resp != nil {
 		r.Status = resp.StatusCode
 		r.Body = resp.Body
-		r.Cookies = cookies
 	}
 
 	log.Debugf("[textsecure] PATCH with auth %s %d\n", url, r.Status)

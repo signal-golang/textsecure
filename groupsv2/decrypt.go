@@ -31,13 +31,7 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 	}
 	membersList := g.GroupContext.GetMembers()
 
-	// pendingMembersList := group.GetPendingMembers()
-	// requestingMembersList := group.GetRequestingMembers()
-	// len(membersList)
 	decryptedMembers := []*signalservice.DecryptedMember{}
-	// decryptedPendingMembers = []*signalservice.DecryptedPendingMember{}
-	// decryptedRequestingMembers = []*signalservice.DecryptedRequestingMember{}
-
 	for _, member := range membersList {
 		decryptedMember, err := g.decryptMember(member)
 		if err == nil {
@@ -47,6 +41,7 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 	// TODO: decrypt pending and requesting members
 	decryptedGroup := &signalservice.DecryptedGroup{}
 	title, err := g.cipher.DecryptBlob(g.GroupContext.GetTitle())
+	log.Debugln("[textsecure][groupsv2] decrypt group title", string(title))
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +51,8 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 		}
 		return -1
 	}, string(title))
+	log.Debugln("[textsecure][groupsv2] decrypt group title", cleanTitle)
+
 	decryptedGroup.Title = cleanTitle
 	decryptedGroup.Revision = g.GroupContext.Revision
 	decryptedGroup.Avatar = g.GroupContext.GetAvatar()

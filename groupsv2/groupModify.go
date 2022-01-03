@@ -18,13 +18,17 @@ const (
 	aNNOUNCEMENTS_ONLY_CHANGE_EPOCH uint32 = 3
 )
 
-func (g *GroupV2) ModifyGroup(user *entities.GroupUser, inviteLinkPasswordString string, submittedActions signalservice.GroupChange_Actions) (*entities.Resp, error) {
+type ModifyGroupParams struct {
+	InviteLinkPassword string `form:"inviteLinkPassword,optional"`
+}
+
+func (g *GroupV2) ModifyGroup(user *entities.GroupUser, params ModifyGroupParams, submittedActions *signalservice.GroupChange_Actions) (*entities.Resp, error) {
 	groupChangeApplicator := GroupChangeApplicator{}
 	groupValidator := GroupValidator{}
 	// check path param
 	var inviteLinkPassword []byte
-	if len(inviteLinkPasswordString) != 0 {
-		if passwd, err := base64.StdEncoding.DecodeString(inviteLinkPasswordString); err != nil {
+	if len(params.InviteLinkPassword) != 0 {
+		if passwd, err := base64.StdEncoding.DecodeString(params.InviteLinkPassword); err != nil {
 			return nil, entities.Status(http.StatusInternalServerError, err.Error())
 		} else {
 			inviteLinkPassword = passwd
@@ -208,7 +212,7 @@ func (g *GroupV2) ModifyGroup(user *entities.GroupUser, inviteLinkPasswordString
 
 	submittedActions.SourceUuid = sourceUuid
 
-	bb, err := proto.Marshal(&submittedActions)
+	bb, err := proto.Marshal(submittedActions)
 	if err != nil {
 		return nil, entities.Status(http.StatusInternalServerError, err.Error())
 	}

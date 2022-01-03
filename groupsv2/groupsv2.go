@@ -287,9 +287,16 @@ func handleGroupChangesForGroup(groupChange *signalservice.DecryptedGroupChange,
 
 }
 func (g *GroupV2) JoinGroup() error {
+	err := g.UpdateGroupFromServer()
+	if err != nil {
+		return err
+	}
 	uuid, _ := uuidUtil.FromString(config.ConfigFile.UUID)
-	_, err := g.AddPendingMembers(uuid.Bytes()) // richtige id?
-	log.Errorln("[textsecure] joingroup ", err)
+	err = g.AddPendingMembers(uuid.Bytes())
+	if err != nil {
+		return err
+	}
+	log.Infoln("[textsecure][groupv2] joined group ", err)
 	return err
 }
 func decryptUuidOrUnknown(uuidCipherTex []byte) *[]byte {
@@ -303,7 +310,7 @@ func saveGroupV2(hexid string) error {
 	if err != nil {
 		return err
 	}
-	log.Debugln("[textsecure] save groupv2", idToPath(hexid))
+	log.Debugln("[textsecure][groupv2] save group", idToPath(hexid))
 	return ioutil.WriteFile(idToPath(hexid), b, 0600)
 }
 
@@ -333,32 +340,20 @@ func basicAuth(username, password string) string {
 	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
-func PatchGroupV2(groupActions *signalservice.GroupChange_Actions,
+func PatchGroupV2(out []byte,
 	groupsV2Authorization *GroupsV2Authorization) error {
-	c := &signalservice.GroupChange_Actions{}
-	m := []byte{10, 16, 172, 94, 146, 71, 221, 126, 68, 130, 142, 143, 150, 184, 19, 17, 100, 26, 16, 2, 82, 42, 10, 40, 148, 97, 208, 9, 152, 186, 62, 179, 136, 124, 206, 228, 145, 189, 13, 222, 0, 68, 202, 214, 0, 125, 28, 38, 52, 47, 3, 92, 62, 179, 93, 17, 68, 251, 49, 239, 82, 224, 165, 0}
-	err := proto.Unmarshal(m, c)
-	if err != nil {
-		log.Errorln(err)
-	}
-	fmt.Printf("[textsecure] PatchGroup %+v\n", c)
-
-	out, err := proto.Marshal(groupActions)
-	if err != nil {
-		log.Errorln("[textsecure][groupsv2] Failed to encode address groupActions:", err)
-		return err
-	}
 	resp, err := transport.StorageTransport.PatchWithAuth(GROUPSV2_GROUP, out, "application/x-protobuf", "Basic "+basicAuth(groupsV2Authorization.Username, groupsV2Authorization.Password))
 	if err != nil {
 		log.Errorln("[textsecure][groupsv2] Failed to encode address groupActions2:", err)
-
 		return err
 	}
-	// if resp.isError() {
-	// 	log.Errorln("Failed to encode address groupActions3:", err)
-	// 	return resp
-	// }
-	log.Infoln("[textsecure][groupsv2] patch project:", resp)
+	if resp.IsError() {
+		return resp
+	}
+	log.Infoln("[textsecure][groupsv2] patch group:", resp.Status)
+	if resp.IsError() {
+		return resp
+	}
 
 	return nil
 

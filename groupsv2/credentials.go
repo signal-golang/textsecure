@@ -3,14 +3,19 @@ package groupsv2
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"time"
 
+	signalservice "github.com/signal-golang/textsecure/protobuf"
 	transport "github.com/signal-golang/textsecure/transport"
+	"google.golang.org/protobuf/proto"
+
 	log "github.com/sirupsen/logrus"
 )
 
 const (
 	GROUPSV2_CREDENTIAL = "/v1/certificate/group/%d/%d"
+	GROUPSV2_TOKEN      = "/v1/groups/token"
 )
 
 type GroupCredentials struct {
@@ -20,6 +25,9 @@ type GroupCredentials struct {
 type GroupCredential struct {
 	Credential     []byte
 	RedemptionTime int64
+}
+type GroupExternalCredential struct {
+	Token []byte `json:"token"`
 }
 
 var Credentials *GroupCredentials
@@ -56,7 +64,7 @@ func GetCredentialForToday() (*GroupCredential, error) {
 }
 
 func GetGroupAuthCredentials(startDay int64, endDay int64) error {
-	log.Debugln("[textsecure][groupsv2] get groupCredentials", fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
+	log.Debugln("[textsecure][groupsv2] get groupCredentials")
 	resp, err := transport.Transport.Get(fmt.Sprintf(GROUPSV2_CREDENTIAL, startDay, endDay))
 	if err != nil {
 		return err
@@ -69,4 +77,25 @@ func GetGroupAuthCredentials(startDay int64, endDay int64) error {
 	dec.Decode(&response)
 	Credentials = &response
 	return nil
+}
+
+func GetGroupExternalCredential(credential *GroupCredential) (*signalservice.GroupExternalCredential, error) {
+	log.Debugln("[textsecure][groupsv2] get groupExternalCredentials")
+	resp, err := transport.Transport.Get(GROUPSV2_TOKEN)
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		return nil, resp
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var response signalservice.GroupExternalCredential
+	err = proto.Unmarshal(data, &response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
 }

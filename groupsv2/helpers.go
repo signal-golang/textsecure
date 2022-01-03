@@ -4,10 +4,12 @@ import (
 	zkgroup "github.com/nanu-c/zkgroup"
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/helpers"
+	log "github.com/sirupsen/logrus"
 )
 
 // todo handle group join requests via link
 func (g *GroupV2) CheckJoinStatus() error {
+	log.Debugln("[textsecure][groupsv2] check join status")
 	found := false
 	if g.DecryptedGroup != nil {
 		for _, m := range g.DecryptedGroup.Members {
@@ -31,6 +33,8 @@ func (g *GroupV2) CheckJoinStatus() error {
 	} else {
 		g.JoinStatus = GroupV2JoinsStatusInvite
 	}
+	log.Debugln("[textsecure][groupsv2] check join status is", g.JoinStatus)
+
 	return nil
 }
 
