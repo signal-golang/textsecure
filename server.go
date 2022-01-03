@@ -30,11 +30,10 @@ import (
 )
 
 var (
-	SERVICE_REFLECTOR_HOST = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
-	SIGNAL_CDN_URL         = "https://cdn.signal.org"
-	SIGNAL_CDN2_URL        = "https://cdn2.signal.org"
-	DIRECTORY_URL          = "https://api.directory.signal.org"
-	STORAGE_URL            = "https://storage.signal.org"
+	SIGNAL_CDN_URL  = "https://cdn.signal.org"
+	SIGNAL_CDN2_URL = "https://cdn2.signal.org"
+	DIRECTORY_URL   = "https://api.directory.signal.org"
+	STORAGE_URL     = "https://storage.signal.org"
 
 	createAccountPath = "/v1/accounts/%s/code/%s?client=%s"
 	// CREATE_ACCOUNT_SMS_PATH   = "/v1/accounts/sms/code/%s?client=%s";
@@ -643,18 +642,6 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 	return lc, nil
 }
 
-// Attachment handling
-
-type jsonAllocation struct {
-	ID       uint64 `json:"id"`
-	Location string `json:"location"`
-}
-
-func getProfileLocation(profilePath string) (string, error) {
-	cdn := SIGNAL_CDN_URL
-	return cdn + fmt.Sprintf(profilePath), nil
-}
-
 // Messages
 
 type jsonMessage struct {
@@ -679,24 +666,24 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	dm.ExpireTimer = &msg.expireTimer
 	if msg.attachment != nil {
 		id := signalservice.AttachmentPointer_CdnId{
-			CdnId: msg.attachment.id,
+			CdnId: msg.attachment.Id,
 		}
 		// todo send file names
 		filename := ""
-		if msg.attachment.voiceNote {
+		if msg.attachment.VoiceNote {
 			filename = "voice.mp3"
 		}
 		dm.Attachments = []*signalservice.AttachmentPointer{
 			{
 				AttachmentIdentifier: &id,
-				ContentType:          &msg.attachment.ct,
-				Key:                  msg.attachment.keys[:],
-				Digest:               msg.attachment.digest[:],
-				Size:                 &msg.attachment.size,
+				ContentType:          &msg.attachment.Ct,
+				Key:                  msg.attachment.Keys[:],
+				Digest:               msg.attachment.Digest[:],
+				Size:                 &msg.attachment.Size,
 				FileName:             &filename,
 			},
 		}
-		if msg.attachment.voiceNote {
+		if msg.attachment.VoiceNote {
 			var flag uint32 = 1
 			dm.Attachments[0].Flags = &flag
 		}

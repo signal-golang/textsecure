@@ -14,22 +14,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/helpers"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/curve25519"
 )
-
-// randBytes returns a sequence of random bytes from the CSPRNG
-func randBytes(data []byte) {
-	if _, err := io.ReadFull(rand.Reader, data); err != nil {
-		panic(err)
-	}
-}
 
 // randUint32 returns a random 32bit uint from the CSPRNG
 func randUint32() uint32 {
@@ -73,7 +66,7 @@ func aesEncrypt(key, plaintext []byte) ([]byte, error) {
 
 	ciphertext := make([]byte, len(plaintext))
 	iv := make([]byte, 16)
-	randBytes(iv)
+	crypto.RandBytes(iv)
 
 	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(ciphertext, plaintext)

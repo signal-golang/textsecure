@@ -3,6 +3,7 @@ module github.com/signal-golang/textsecure
 go 1.15
 
 require (
+	github.com/blackoverflow/gcmsiv v0.0.0-20201031155123-20af2af977ff
 	github.com/go-redis/redis v6.15.7+incompatible
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/golang/protobuf v1.4.3

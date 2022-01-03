@@ -2,7 +2,9 @@ package textsecure
 
 import (
 	"github.com/golang/protobuf/proto"
+	"github.com/signal-golang/textsecure/attachments"
 	"github.com/signal-golang/textsecure/config"
+	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
@@ -79,7 +81,7 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 		return err
 	}
 
-	atts, err := handleAttachments(dm)
+	atts, err := attachments.HandleAttachments(dm)
 	if err != nil {
 		return err
 	}
@@ -110,7 +112,9 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 		reaction:    dm.GetReaction(),
 		// requiredProtocolVersion: dm.GetRequiredProtocolVersion(),
 		// isViewOnce: *dm.IsViewOnce,
+
 	}
+	go contacts.UpdateProfileKey(srcUUID, dm.GetProfileKey())
 
 	if client.MessageHandler != nil {
 		client.MessageHandler(msg)

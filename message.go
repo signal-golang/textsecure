@@ -1,6 +1,7 @@
 package textsecure
 
 import (
+	"github.com/signal-golang/textsecure/attachments"
 	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 )
@@ -11,7 +12,7 @@ type Message struct {
 	sourceUUID              string
 	source                  string
 	message                 string
-	attachments             []*Attachment
+	attachments             []*attachments.Attachment
 	group                   *Group
 	groupV2                 *groupsv2.GroupV2
 	flags                   uint32
@@ -48,7 +49,7 @@ func (m *Message) Message() string {
 }
 
 // Attachments returns the list of attachments on the message.
-func (m *Message) Attachments() []*Attachment {
+func (m *Message) Attachments() []*attachments.Attachment {
 	return m.attachments
 }
 

@@ -19,10 +19,12 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/signal-golang/textsecure/attachments"
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	crayfish "github.com/signal-golang/textsecure/crayfish"
+	"github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/helpers"
 	"github.com/signal-golang/textsecure/profiles"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -36,7 +38,7 @@ import (
 // Generate a random 16 byte string used for HTTP Basic Authentication to the server
 func generatePassword() string {
 	b := make([]byte, 16)
-	randBytes(b[:])
+	crypto.RandBytes(b[:])
 	return helpers.Base64EncWithoutPadding(b)
 }
 
@@ -49,7 +51,7 @@ func generateRegistrationID() uint32 {
 // to be used to secure the communication with the server
 func generateSignalingKey() []byte {
 	b := make([]byte, 52)
-	randBytes(b[:])
+	crypto.RandBytes(b[:])
 	//set signaling key version
 	b[0] = 1
 	return b
@@ -91,21 +93,12 @@ func needsRegistration() bool {
 
 var identityKey *axolotl.IdentityKeyPair
 
-type att struct {
-	id        uint64
-	ct        string
-	keys      []byte
-	digest    []byte
-	size      uint32
-	voiceNote bool
-}
-
 type outgoingMessage struct {
 	destination string
 	msg         string
 	group       *groupMessage
 	groupV2     *signalservice.GroupContextV2
-	attachment  *att
+	attachment  *attachments.Att
 	flags       uint32
 	expireTimer uint32
 	timestamp   *uint64
@@ -153,7 +146,7 @@ func MIMETypeFromReader(r io.Reader) (mime string, reader io.Reader) {
 // with an optional message to a given contact.
 func SendAttachment(uuid string, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
-	a, err := uploadAttachment(r, ct)
+	a, err := attachments.UploadAttachment(r, ct)
 	if err != nil {
 		return 0, err
 	}
@@ -169,7 +162,7 @@ func SendAttachment(uuid string, msg string, r io.Reader, timer uint32) (uint64,
 // SendVoiceNote sends a voice note
 func SendVoiceNote(uuid, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
-	a, err := uploadVoiceNote(r, ct)
+	a, err := attachments.UploadVoiceNote(r, ct)
 	if err != nil {
 		return 0, err
 	}
@@ -199,13 +192,6 @@ func EndSession(uuid string, msg string) (uint64, error) {
 	}
 	textSecureStore.DeleteAllSessions(uuidClean)
 	return ts, nil
-}
-
-// Attachment represents an attachment received from a peer
-type Attachment struct {
-	R        io.Reader
-	MimeType string
-	FileName string
 }
 
 // Client contains application specific data and callbacks.
@@ -335,7 +321,7 @@ func Setup(c *Client) error {
 		saveConfig(config.ConfigFile)
 	}
 	if profileChanged {
-		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
+		profiles.UpdateOwnProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
 	}
 	// check for unidentified access
 	if len(config.ConfigFile.Certificate) == 0 {
@@ -353,7 +339,7 @@ func Setup(c *Client) error {
 		}
 	}
 	if len(config.ConfigFile.ProfileKeyCredential) == 0 || true {
-		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
+		profiles.UpdateOwnProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
 		profile, err := profiles.GetProfileAndCredential(config.ConfigFile.UUID, config.ConfigFile.ProfileKey)
 		if err != nil {
 			return err

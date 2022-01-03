@@ -4,9 +4,13 @@
 package contacts
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 
+	"github.com/signal-golang/textsecure/attachments"
+	"github.com/signal-golang/textsecure/config"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
 
@@ -15,21 +19,28 @@ import (
 
 // Contact contains information about a contact.
 type Contact struct {
-	UUID                 string
-	Tel                  string
-	ProfileKey           []byte
-	ProfileKeyCredential []byte
-	IdentityKey          []byte
-	Name                 string
-	Username             string
-	Avatar               []byte
-	Color                string
-	Blocked              bool
-	Verified             *signalservice.Verified
-	ExpireTimer          uint32
-	InboxPosition        uint32
-	Archived             bool
-	Certificate          []byte
+	UUID                           string
+	Tel                            string
+	ProfileKey                     []byte
+	ProfileKeyCredential           []byte
+	IdentityKey                    []byte
+	Name                           string
+	Username                       string
+	Avatar                         bool
+	Color                          string
+	Blocked                        bool
+	Verified                       *signalservice.Verified
+	ExpireTimer                    uint32
+	InboxPosition                  uint32
+	Archived                       bool
+	Certificate                    []byte
+	UnrestrictedUnidentifiedAccess bool
+	UnidentifiedAccess             string
+	Capabilities                   config.AccountCapabilities
+	About                          string
+	AboutEmoji                     string
+	Credential                     []byte
+	PaymentAddress                 string
 }
 
 func (c *Contact) GetProfileKey() []byte {
@@ -105,25 +116,26 @@ func contactsToYaml() *yamlContacts {
 func updateContact(c *signalservice.ContactDetails) error {
 	log.Debugln("[textsecure] updateContact ", c.GetUuid())
 
-	// var r io.Reader
-	// av := c.GetAvatar()
-	// buf := new(bytes.Buffer)
-	// if av != nil {
-	// 	att, err := handleProfileAvatar(av, c.GetProfileKey())
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r = att.R
-	// 	buf.ReadFrom(r)
-	// }
-	// avatar, _ := ioutil.ReadAll(buf)
+	av := c.GetAvatar()
+	hasAvatar := false
+	if av != nil {
+		var r io.Reader
+		buf := new(bytes.Buffer)
+		att, err := attachments.HandleProfileAvatar(av, c.GetProfileKey())
+		if err != nil {
+			return err
+		}
+		r = att.R
+		buf.ReadFrom(r)
+		ioutil.WriteFile(config.ConfigFile.StorageDir+"/../attachments"+c.GetUuid()+".png", buf.Bytes(), 0644)
+		hasAvatar = true
+	}
 
 	Contacts[c.GetUuid()] = Contact{
-		Tel:  c.GetNumber(),
-		UUID: c.GetUuid(),
-		Name: c.GetName(),
-		// Avatar:        avatar,
-		Avatar:        nil,
+		Tel:           c.GetNumber(),
+		UUID:          c.GetUuid(),
+		Name:          c.GetName(),
+		Avatar:        hasAvatar,
 		Color:         c.GetColor(),
 		Verified:      c.GetVerified(),
 		ProfileKey:    c.GetProfileKey(),
@@ -132,7 +144,7 @@ func updateContact(c *signalservice.ContactDetails) error {
 		InboxPosition: c.GetInboxPosition(),
 		Archived:      c.GetArchived(),
 	}
-	// log.Debugln("[textsecure] avatar", c.GetAvatar())
+
 	return WriteContactsToPath()
 }
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/signal-golang/textsecure/axolotl"
 	"github.com/signal-golang/textsecure/config"
+	"github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/fingerprint"
 	"golang.org/x/crypto/pbkdf2"
 
@@ -72,7 +73,7 @@ func newStore(password, path string) (*store, error) {
 
 		// Create salt if this is first run
 		if !exists(saltFile) {
-			randBytes(salt)
+			crypto.RandBytes(salt)
 			err = ioutil.WriteFile(saltFile, salt, 0600)
 			if err != nil {
 				return nil, err

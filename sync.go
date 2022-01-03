@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/signal-golang/textsecure/attachments"
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -88,7 +89,7 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 		return err
 	}
 
-	atts, err := handleAttachments(dm)
+	atts, err := attachments.HandleAttachments(dm)
 	if err != nil {
 		return err
 	}
@@ -185,7 +186,7 @@ func sendContactUpdate() error {
 
 	}
 
-	a, err := uploadAttachment(&buf, "application/octet-stream")
+	a, err := attachments.UploadAttachment(&buf, "application/octet-stream")
 	if err != nil {
 		return err
 	}
@@ -194,12 +195,12 @@ func sendContactUpdate() error {
 		Contacts: &signalservice.SyncMessage_Contacts{
 			Blob: &signalservice.AttachmentPointer{
 				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnId{
-					CdnId: a.id,
+					CdnId: a.Id,
 				},
-				ContentType: &a.ct,
-				Key:         a.keys[:],
-				Digest:      a.digest[:],
-				Size:        &a.size,
+				ContentType: &a.Ct,
+				Key:         a.Keys[:],
+				Digest:      a.Digest[:],
+				Size:        &a.Size,
 			},
 		},
 	}
@@ -232,7 +233,7 @@ func sendGroupUpdate() error {
 		buf.Write(b)
 	}
 
-	a, err := uploadAttachment(&buf, "application/octet-stream")
+	a, err := attachments.UploadAttachment(&buf, "application/octet-stream")
 	if err != nil {
 		return err
 	}
@@ -241,12 +242,12 @@ func sendGroupUpdate() error {
 		Groups: &signalservice.SyncMessage_Groups{
 			Blob: &signalservice.AttachmentPointer{
 				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnId{
-					CdnId: a.id,
+					CdnId: a.Id,
 				},
-				ContentType: &a.ct,
-				Key:         a.keys[:],
-				Digest:      a.digest[:],
-				Size:        &a.size,
+				ContentType: &a.Ct,
+				Key:         a.Keys[:],
+				Digest:      a.Digest[:],
+				Size:        &a.Size,
 			},
 		},
 	}

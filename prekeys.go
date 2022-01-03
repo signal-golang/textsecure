@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/signal-golang/textsecure/axolotl"
+	"github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/curve25519sign"
 	"github.com/signal-golang/textsecure/helpers"
 	log "github.com/sirupsen/logrus"
@@ -113,7 +114,7 @@ func generateSignedPreKey() *axolotl.SignedPreKeyRecord {
 	kp := axolotl.NewECKeyPair()
 	id := getNextSignedPreKeyID()
 	var random [64]byte
-	randBytes(random[:])
+	crypto.RandBytes(random[:])
 	priv := identityKey.PrivateKey.Key()
 	signature := curve25519sign.Sign(priv, kp.PublicKey.Serialize(), random)
 	record := axolotl.NewSignedPreKeyRecord(id, uint64(time.Now().UnixNano()*1000), kp, signature[:])

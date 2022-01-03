@@ -52,15 +52,30 @@ func (g *GroupV2) decryptGroup() (*signalservice.DecryptedGroup, error) {
 		return -1
 	}, string(title))
 	log.Debugln("[textsecure][groupsv2] decrypt group title", cleanTitle)
-
+	// avatar, err := g.downloadGroupAvatar()
 	decryptedGroup.Title = cleanTitle
 	decryptedGroup.Revision = g.GroupContext.Revision
 	decryptedGroup.Avatar = g.GroupContext.GetAvatar()
 	decryptedGroup.AccessControl = g.GroupContext.GetAccessControl()
 	decryptedGroup.Members = decryptedMembers
+	// decryptedGroup.Avatar = string(avatar)
 	return decryptedGroup, nil
 }
+func (g *GroupV2) decryptAvatar() ([]byte, error) {
+	if g.cipher == nil {
+		groupSecretParams, err := zkgroup.NewGroupSecretParams(g.MasterKey)
+		if err != nil {
+			return nil, err
+		}
+		g.cipher = zkgroup.NewClientZkGroupCipher(groupSecretParams)
+	}
+	// avatar := g.DecryptedGroup.GetAvatar()
+	// attachments.HandleProfileAvatar(
+	return g.cipher.DecryptBlob([]byte(g.GroupContext.GetAvatar()))
+}
+func (g *GroupV2) downloadGroupAvatar() {
 
+}
 func (g *GroupV2) decryptMember(member *signalservice.Member) (*signalservice.DecryptedMember, error) {
 	var err error
 	decryptedMember := &signalservice.DecryptedMember{}

@@ -32,6 +32,12 @@ type Config struct {
 
 const (
 	ZKGROUP_SERVER_PUBLIC_PARAMS = "AMhf5ywVwITZMsff/eCyudZx9JDmkkkbV6PInzG4p8x3VqVJSFiMvnvlEKWuRob/1eaIetR31IYeAbm0NdOuHH8Qi+Rexi1wLlpzIo1gstHWBfZzy1+qHRV5A4TqPp15YzBPm0WSggW6PbSn+F4lf57VCnHF7p8SvzAA2ZZJPYJURt8X7bbg+H3i+PEjH9DXItNEqs2sNcug37xZQDLm7X36nOoGPs54XsEGzPdEV+itQNGUFEjY6X9Uv+Acuks7NpyGvCoKxGwgKgE5XyJ+nNKlyHHOLb6N1NuHyBrZrgtY/JYJHRooo5CEqYKBqdFnmbTVGEkCvJKxLnjwKWf+fEPoWeQFj5ObDjcKMZf2Jm2Ae69x+ikU5gBXsRmoF94GXQ=="
+	SERVICE_REFLECTOR_HOST       = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
+	SIGNAL_CDN_URL               = "https://cdn.signal.org"
+	SIGNAL_CDN2_URL              = "https://cdn2.signal.org"
+	ATTACHMENT_ID_DOWNLOAD_PATH  = "/attachments/%d"
+	ATTACHMENT_KEY_DOWNLOAD_PATH = "/attachments/%s"
+	AllocateAttachmentPath       = "/v1/attachments/"
 )
 
 // AccountCapabilities describes what functions axolotl supports

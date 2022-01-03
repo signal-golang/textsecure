@@ -7,10 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math/rand"
 
 	zkgroup "github.com/nanu-c/zkgroup"
 	uuidUtil "github.com/satori/go.uuid"
+	"github.com/signal-golang/textsecure/attachments"
 	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/crypto"
@@ -44,7 +47,8 @@ func uuidToByte(id string) []byte {
 }
 
 // UpdateProfile ...
-func UpdateProfile(profileKey []byte, uuid, name string) error {
+
+func UpdateOwnProfile(profileKey []byte, uuid, name string) error {
 	uuidByte := uuidToByte(uuid)
 
 	profile := ProfileSettings{}
@@ -68,7 +72,6 @@ func UpdateProfile(profileKey []byte, uuid, name string) error {
 	if err != nil {
 		return err
 	}
-	GetProfile(uuid, profileKey)
 	return nil
 }
 
@@ -280,11 +283,12 @@ func createProfileCredentialRequest(uuid, profileKey []byte) (zkgroup.ProfileKey
 }
 
 // GetProfileE164 get a profile by a phone number
-func GetProfileE164(tel string) (contacts.Contact, error) {
+func GetProfileE164(tel string) (*contacts.Contact, error) {
 
 	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, tel))
 	if err != nil {
 		log.Errorln("[textsecure] GetProfileE164 ", err)
+		return nil, err
 	}
 
 	profile := &Profile{}
@@ -292,20 +296,86 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 	err = dec.Decode(&profile)
 	if err != nil {
 		log.Errorln("[textsecure] GetProfileE164 ", err)
+		return nil, err
 	}
-	avatar, _ := GetAvatar(profile.Avatar)
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(avatar)
-
 	c := contacts.Contacts[profile.UUID]
-	avatarDecrypted, err := decryptAvatar(buf.Bytes(), []byte(profile.IdentityKey))
-	if err != nil {
-		log.Errorln("[textsecure] GetProfileE164 ", err)
+	c.Name = profile.Name
+	c.UUID = profile.UUID
+	hasAvatar := false
+	if profile.Avatar != "" {
+		var r io.Reader
+		buf := new(bytes.Buffer)
+		att, err := attachments.GetProfileAvatar(profile.Avatar, c.GetProfileKey())
+		if err != nil {
+			return nil, err
+		}
+		r = att.R
+		buf.ReadFrom(r)
+		ioutil.WriteFile(config.ConfigFile.StorageDir+"/../attachments/"+profile.UUID+".png", buf.Bytes(), 0644)
+		hasAvatar = true
+	}
+	c.Avatar = hasAvatar
+	contacts.Contacts[c.UUID] = c
+	contacts.WriteContactsToPath()
+	return &c, nil
+}
+
+// GetProfileUUID get a profile by a uuid
+func GetProfileUUID(uuid string) (*contacts.Contact, error) {
+	log.Errorln("[textsecure] GetProfileUUId ", uuid)
+	var err error
+	c := contacts.Contacts[uuid]
+	profile := &Profile{}
+	if c.ProfileKey != nil && len(c.ProfileKey) > 0 {
+		profile, err = GetProfileAndCredential(uuid, c.ProfileKey)
+		c.Credential = profile.Credential
+		c.PaymentAddress = profile.PaymentAddress
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, uuid))
+		if err != nil {
+			log.Errorln("[textsecure] GetProfileUUId ", err)
+			return nil, err
+		}
+		dec := json.NewDecoder(resp.Body)
+		err = dec.Decode(&profile)
+		if err != nil {
+			log.Errorln("[textsecure] GetProfileUUID ", err)
+			return nil, err
+
+		}
 	}
 	c.Name = profile.Name
 	c.UUID = profile.UUID
-	c.Avatar = avatarDecrypted
+	c.UnidentifiedAccess = profile.UnidentifiedAccess
+	c.UnrestrictedUnidentifiedAccess = profile.UnrestrictedUnidentifiedAccess
+
+	fmt.Printf("[textsecure] GetProfileUUId %+v\n", profile)
+
+	hasAvatar := false
+	if profile.Avatar != "" {
+		var r io.Reader
+		buf := new(bytes.Buffer)
+		log.Debugln(profile.Avatar)
+		defer fmt.Errorf("[textsecure] GetProfileUUId error decrypting avatar")
+		att, err := attachments.GetProfileAvatar(profile.Avatar, c.ProfileKey)
+		if err != nil {
+			return nil, err
+		}
+		r = att.R
+		buf.ReadFrom(r)
+		log.Debugln("[textsecure] GetProfileUUId writing avatar")
+		err = ioutil.WriteFile(config.ConfigFile.StorageDir+"/../attachments/"+profile.UUID+".png", buf.Bytes(), 0644)
+		if err != nil {
+			return nil, err
+		}
+		hasAvatar = true
+	}
+	c.Avatar = hasAvatar
 	contacts.Contacts[c.UUID] = c
 	contacts.WriteContactsToPath()
-	return c, nil
+	return &c, nil
 }
