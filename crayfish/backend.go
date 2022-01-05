@@ -290,6 +290,7 @@ func (c *Conn) sendAck() error {
 
 // write writes a message with the given message type and payload.
 func (c *Conn) write(mt int, payload []byte) error {
+	Instance.cmd.Process.Signal(syscall.SIGCONT)
 	c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 	return c.ws.WriteMessage(mt, payload)
 }
