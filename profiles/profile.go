@@ -144,7 +144,11 @@ func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
 		log.Debugln("[textsecure] GetProfile", err)
 		return nil, err
 	}
-
+	if resp.IsError() {
+		log.Debugln("[textsecure] GetProfile", resp)
+		return nil, resp
+	}
+	
 	dec := json.NewDecoder(resp.Body)
 	profile := &Profile{}
 	err = dec.Decode(&profile)
