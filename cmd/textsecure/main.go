@@ -381,7 +381,7 @@ func RekeyHandler(w http.ResponseWriter, r *http.Request) {
 func GatewaySend(to string, message string, filename string) (bool, string) {
 	var errormessage string
 	var err error
-	isGroup := regexp.MustCompile(`^([a-fA-F\d]{32})$`).MatchString(to)
+	isGroup := regexp.MustCompile(`^([a-f\d]{64})$`).MatchString(to)
 	if filename != "" {
 		f, fErr := os.Open(filename)
 		if fErr != nil {
