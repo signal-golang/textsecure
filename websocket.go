@@ -188,9 +188,14 @@ func StartListening() error {
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
-				}).Error("[textsecure] Failed to handle received message")
+				}).Error("[textsecure] Failed to decrypt received message")
 			} else {
-				env, _ := createEnvelope(plaintext)
+				env, err := createEnvelope(plaintext)
+				if err != nil {
+					log.WithFields(log.Fields{
+						"error": err,
+					}).Error("[textsecure] Failed to create envelope")
+				}
 				err = handleReceivedMessage(env)
 				if err != nil {
 					log.WithFields(log.Fields{

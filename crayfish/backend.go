@@ -573,6 +573,7 @@ func (c *CrayfishInstance) HandleEnvelope(msg []byte) (*CrayfishWebSocketRespons
 	log.Debugf("[textsecure-crayfish-ws] HandleEnvelope recieved an response")
 	rm, err := json.Marshal(response.Message)
 	if err != nil {
+		log.Errorln("[textsecure-crayfish-ws] failed to marshal response message", response.Message)
 		return nil, err
 	}
 	var data CrayfishWebSocketResponse_HANDLE_ENVELOPE_MESSAGE
