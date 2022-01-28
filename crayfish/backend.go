@@ -150,12 +150,12 @@ type PhoneNumber struct {
 	National PhoneNumberNational `json:"national,string,omitempty"`
 }
 type PhoneNumberCode struct {
-	Value  int    `json:"value"`
+	Value  uint64 `json:"value"`
 	Source string `json:"source"`
 }
 type PhoneNumberNational struct {
-	Value int `json:"value"`
-	Zeros int `json:"zeros"`
+	Value uint64 `json:"value"`
+	Zeros int    `json:"zeros"`
 }
 
 func Run() {

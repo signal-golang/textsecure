@@ -636,7 +636,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			return err
 		}
 		env.Content = content
-		phoneNumber := "+" + strconv.Itoa(data.Sender.PhoneNumber.Code.Value) + strconv.Itoa(data.Sender.PhoneNumber.National.Value)
+		phoneNumber := "+" + strconv.FormatUint(data.Sender.PhoneNumber.Code.Value, 10) + strconv.FormatUint(data.Sender.PhoneNumber.National.Value, 10)
 		log.Println("[textsecure] handleReceivedMessage:", phoneNumber, data.Sender.UUID)
 		err = handleMessage(phoneNumber, data.Sender.UUID, uint64(data.Timestamp), content)
 		if err != nil {
