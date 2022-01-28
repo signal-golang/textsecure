@@ -147,7 +147,7 @@ type Sender struct {
 }
 type PhoneNumber struct {
 	Code     PhoneNumberCode     `json:"code"`
-	National PhoneNumberNational `json:"national"`
+	National PhoneNumberNational `json:"national,string,omitempty"`
 }
 type PhoneNumberCode struct {
 	Value  int    `json:"value"`
