@@ -20,6 +20,7 @@ import (
 	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
+	"github.com/signal-golang/textsecure/profiles"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/registration"
 	"github.com/signal-golang/textsecure/unidentifiedAccess"
@@ -223,11 +224,13 @@ func verifyCode(code string, pin *string, credentials *transport.AuthCredentials
 		Pin:             nil,
 		Name:            config.ConfigFile.Name,
 		Capabilities: config.AccountCapabilities{
+			// Uuid:              true,
 			Gv2:               true,
-			SenderKey:         false,
-			AnnouncementGroup: false,
-			ChangeNumber:      false,
+			Storage:           false,
 			Gv1Migration:      false,
+			SenderKey:         false,
+			AnnouncementGroup: true,
+			ChangeNumber:      false,
 		},
 		DiscoverableByPhoneNumber:      true,
 		UnidentifiedAccessKey:          &unidentifiedAccessKey,
@@ -308,9 +311,12 @@ func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 		log.Errorln("[textsecure] SetAccountCapabilities ceating unidentifiedAccessKey: ", err)
 		return err
 	}
+	signalingKey := base64.StdEncoding.EncodeToString(registration.Registration.SignalingKey)
 	attributes := UpdateAccountAttributes{
-		SignalingKey:                   nil,
+		SignalingKey:                   &signalingKey,
 		RegistrationID:                 registration.Registration.RegistrationID,
+		Voice:                          false,
+		Video:                          false,
 		FetchesMessages:                true,
 		Pin:                            nil,
 		Name:                           config.ConfigFile.Name,
@@ -319,8 +325,6 @@ func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 		UnrestrictedUnidentifiedAccess: true,
 		Capabilities:                   capabilities,
 		DiscoverableByPhoneNumber:      true,
-		Video:                          false,
-		Voice:                          false,
 	}
 
 	err = setAccountAttributes(&attributes)
@@ -332,7 +336,8 @@ func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 
 // SetAccountAttributes updates the account attributes
 func setAccountAttributes(attributes *UpdateAccountAttributes) error {
-	log.Debugln("[textsecure] setAccountAttributes")
+	attributes.Capabilities.Gv2_2 = true
+	attributes.Capabilities.Gv2_3 = true
 	body, err := json.Marshal(attributes)
 	if err != nil {
 		return err
@@ -344,6 +349,12 @@ func setAccountAttributes(attributes *UpdateAccountAttributes) error {
 	if resp.IsError() {
 		return resp
 	}
+	p, err := profiles.GetProfile(config.ConfigFile.UUID, config.ConfigFile.ProfileKey)
+	if err != nil {
+		return err
+	}
+	config.ConfigFile.AccountCapabilities = attributes.Capabilities
+	saveConfig(config.ConfigFile)
 	return nil
 }
 

@@ -26,10 +26,14 @@ const (
 
 // Profile ...
 type ProfileSettings struct {
-	Version    string `json:"version"`
-	Name       []byte `json:"name"`
-	Avatar     bool   `json:"avatar"`
-	Commitment []byte `json:"commitment"`
+	Version        string   `json:"version"`
+	Name           []byte   `json:"name"`
+	About          []byte   `json:"about"`
+	AboutEmoji     []byte   `json:"aboutEmoji"`
+	paymentAddress []byte   `json:"paymentAddress"`
+	Avatar         bool     `json:"avatar"`
+	Commitment     []byte   `json:"commitment"`
+	BadgeIds       []string `json:"badgeIds"`
 }
 
 // GenerateProfileKey generates a new ProfileKey
@@ -45,6 +49,7 @@ func uuidToByte(id string) []byte {
 
 // UpdateProfile ...
 func UpdateProfile(profileKey []byte, uuid, name string) error {
+	log.Debugln("[textsecure] UpdateProfile", uuid, name)
 	uuidByte := uuidToByte(uuid)
 
 	profile := ProfileSettings{}
@@ -68,7 +73,11 @@ func UpdateProfile(profileKey []byte, uuid, name string) error {
 	if err != nil {
 		return err
 	}
-	GetProfile(uuid, profileKey)
+	myProfile, err := GetProfile(uuid, profileKey)
+	if err != nil {
+		return err
+	}
+	config.ConfigFile.AccountCapabilities = myProfile.Capabilities
 	return nil
 }
 
@@ -223,6 +232,7 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 
 }
 func decryptProfile(profileKey []byte, profile *Profile) error {
+	fmt.Println("[textsecure] decryptProfile")
 	name, err := decryptString(profileKey, profile.Name)
 	if err != nil {
 		log.Debugln("[textsecure] decryptProfile name", err)

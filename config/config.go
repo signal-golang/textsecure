@@ -36,11 +36,15 @@ const (
 
 // AccountCapabilities describes what functions axolotl supports
 type AccountCapabilities struct {
+	// Uuid              bool `json:"uuid" yaml:"uuid"`
 	Gv2               bool `json:"gv2" yaml:"gv2"`
+	Gv2_2             bool `json:"gv2-2" yaml:"gv2_2"`
+	Gv2_3             bool `json:"gv2-3" yaml:"gv2_3"`
+	Storage           bool `json:"storage" yaml:"storage"`
+	Gv1Migration      bool `json:"gv1-migration" yaml:"gv1-migration"`
 	SenderKey         bool `json:"senderKey" yaml:"senderKey"`
 	AnnouncementGroup bool `json:"announcementGroup" yaml:"announcementGroup"`
 	ChangeNumber      bool `json:"changeNumber" yaml:"changeNumber"`
-	Gv1Migration      bool `json:"gv1-migration" yaml:"gv1-migration"`
 }
 
 var (

@@ -336,7 +336,12 @@ func Setup(c *Client) error {
 	}
 	if profileChanged {
 		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
+	} else {
+		config.ConfigFile.ProfileKey = profiles.GenerateProfileKey()
+		saveConfig(config.ConfigFile)
+		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
 	}
+
 	// check for unidentified access
 	if len(config.ConfigFile.Certificate) == 0 {
 		err = renewSenderCertificate()
@@ -413,11 +418,13 @@ func registerDevice() error {
 	config.ConfigFile.Tel = crayfishRegistration.Tel
 	config.ConfigFile.UUID = crayfishRegistration.UUID
 	config.ConfigFile.AccountCapabilities = config.AccountCapabilities{
+		// Uuid:              false,
 		Gv2:               true,
-		SenderKey:         false,
-		AnnouncementGroup: false,
-		ChangeNumber:      false,
+		Storage:           false,
 		Gv1Migration:      false,
+		SenderKey:         false,
+		AnnouncementGroup: true,
+		ChangeNumber:      false,
 	}
 
 	err = saveConfig(config.ConfigFile)
