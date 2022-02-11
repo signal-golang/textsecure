@@ -349,7 +349,7 @@ func setAccountAttributes(attributes *UpdateAccountAttributes) error {
 	if resp.IsError() {
 		return resp
 	}
-	p, err := profiles.GetProfile(config.ConfigFile.UUID, config.ConfigFile.ProfileKey)
+	_, err = profiles.GetProfile(config.ConfigFile.UUID, config.ConfigFile.ProfileKey)
 	if err != nil {
 		return err
 	}
