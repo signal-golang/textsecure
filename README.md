@@ -4,7 +4,7 @@ This is a Go package implementing the TextSecure **push data** (i.e. not encrypt
 
 The included sample command line app can send and receive text messages and attachments and supports group chat.
 
-**The API presented by the package is in flux**,  mainly driven by the needs of https://github.com/nanu-c/textsecure-qml
+**The API presented by the package is in flux**,  mainly driven by the needs of https://github.com/nanu-c/axolotl
 
 Automatically generated documentation can be found on [GoDoc](https://pkg.go.dev/github.com/signal-golang/textsecure)
 
@@ -15,6 +15,7 @@ This command will install both the library and the test client.
 
     go get github.com/signal-golang/textsecure/cmd/textsecure
 
+textsecure also depends on [crayfish](https://github.com/nanu-c/crayfish) which is a Go library for interacting with the upstream [libsignal-client](https://github.com/signalapp/libsignal-client) library. It's currently used for registration and decryption of messages. libzkgroup is used for the groupv2 protocol and is add by [this go wrapper] (https://github.com/nanu-c/zkgroup). It has to be added to the `LD_LIBRARY_PATH` environment variable. Crayfish is built with `cago build` and has to be placed next to the `textsecure` binary.
 
 Configuration
 -------------
