@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime/quotedprintable"
 	"strconv"
 	"strings"
 	"time"
@@ -578,6 +580,14 @@ func idToHexUUID(id []byte) string {
 	lsbHex := hex.EncodeToString(lsb)
 	return msbHex[:8] + "-" + msbHex[8:12] + "-" + msbHex[12:] + "-" + lsbHex[:4] + "-" + lsbHex[4:]
 }
+func findIndexByE147(phone string, contacts []contacts.Contact) int {
+	for i, c := range contacts {
+		if c.Tel == phone {
+			return i
+		}
+	}
+	return -1
+}
 
 // GetRegisteredContacts returns the subset of the local contacts
 // that are also registered with the server
@@ -592,7 +602,6 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 	}
 	tokensMap := map[string]*string{}
 	tokens := []string{}
-	// todo deduplicate contacts
 	for _, c := range localContacts {
 		t := c.Tel
 		if tokensMap[t] == nil {
@@ -632,18 +641,29 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 	ind := 0
 
 	contacts.Contacts = map[string]contacts.Contact{}
-	for i := range localContacts {
+	for _, phone := range tokens {
+
 		UUID := idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
-		localContacts[i].UUID = UUID
+		index := findIndexByE147(phone, localContacts)
+		fmt.Println(localContacts[index].Name, phone, UUID, len(localContacts), len(responseData)/uuidlength) //todo remove
+		if strings.Count(localContacts[index].Name, "=") > 2 {
+			decodedName, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(localContacts[index].Name)))
+			if err != nil {
+				log.Debug("[textsecure] GetRegisteredContacts update name from quoted printable error:", err)
+			} else {
+				localContacts[index].Name = string(decodedName)
+			}
+		}
+		localContacts[index].UUID = UUID
 		if len(UUID) > 0 && UUID != "00000000-0000-0000-0000-000000000000" {
 			// add registered contact by UUID
-			localContacts[i].Registered = true
+			localContacts[index].Registered = true
 			// add registered contact by UUID
-			contacts.Contacts[localContacts[i].UUID] = localContacts[i]
+			contacts.Contacts[localContacts[index].UUID] = localContacts[index]
 		} else {
-			localContacts[i].Registered = false
+			localContacts[index].Registered = false
 			// add unregistered contacts by phone number
-			contacts.Contacts[localContacts[i].Tel] = localContacts[i]
+			contacts.Contacts[localContacts[index].Tel] = localContacts[index]
 		}
 		ind++
 	}

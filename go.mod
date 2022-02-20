@@ -1,6 +1,6 @@
 module github.com/signal-golang/textsecure
 
-go 1.15
+go 1.16
 
 require (
 	github.com/go-redis/redis v6.15.7+incompatible
