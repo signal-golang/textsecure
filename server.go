@@ -558,6 +558,9 @@ func getContactDiscoveryRegisteredUsers(authorization string, request *contactDi
 	if err != nil {
 		return nil, err
 	}
+	if resp.IsError() {
+		return nil, resp
+	}
 	discoveryResponse := &contactDiscoveryCrypto.DiscoveryResponse{}
 	dec := json.NewDecoder(resp.Body)
 	log.Debugln("[textsecure] GetAndVerifyMultiRemoteAttestation resp")
@@ -581,18 +584,18 @@ func idToHexUUID(id []byte) string {
 func GetRegisteredContacts() ([]contacts.Contact, error) {
 	log.Debugln("[textsecure] GetRegisteredContacts")
 
-	lc, err := client.GetLocalContacts()
+	localContacts, err := client.GetLocalContacts()
 	if err != nil {
 		return nil, fmt.Errorf("could not get local contacts :%s", err)
+	} else if len(localContacts) == 0 {
+		return nil, fmt.Errorf("no local contacts")
 	}
 	tokensMap := map[string]*string{}
 	tokens := []string{}
-	m := []contacts.Contact{}
 	// todo deduplicate contacts
-	for _, c := range lc {
+	for _, c := range localContacts {
 		t := c.Tel
 		if tokensMap[t] == nil {
-			m = append(m, c)
 			tokens = append(tokens, t)
 			tokensMap[t] = &t
 		}
@@ -621,7 +624,6 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get get ContactDiscovery %v", err)
 	}
-
 	responseData, err := contactDiscoveryCrypto.GetDiscoveryResponseData(*response, attestations)
 	if err != nil {
 		return nil, fmt.Errorf("could not get get ContactDiscovery data %v", err)
@@ -629,29 +631,28 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 	uuidlength := 16
 	ind := 0
 
-	for i := range m {
-		m[i].UUID = idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
-		ind++
-	}
-	lc = []contacts.Contact{}
 	contacts.Contacts = map[string]contacts.Contact{}
-	for _, c := range m {
-		lc = append(lc, c)
-
-		if c.UUID != "" && c.UUID != "0" && (c.UUID[0] != 0 || c.UUID[len(c.UUID)-1] != 0) {
-			contacts.Contacts[c.UUID] = c
-
+	for i := range localContacts {
+		UUID := idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
+		localContacts[i].UUID = UUID
+		if len(UUID) > 0 && UUID != "00000000-0000-0000-0000-000000000000" {
+			// add registered contact by UUID
+			localContacts[i].Registered = true
+			// add registered contact by UUID
+			contacts.Contacts[localContacts[i].UUID] = localContacts[i]
 		} else {
-			contacts.Contacts[c.Tel] = c
-			log.Debugln("[textsecure] empty uuid for tel ", c.Tel)
+			localContacts[i].Registered = false
+			// add unregistered contacts by phone number
+			contacts.Contacts[localContacts[i].Tel] = localContacts[i]
 		}
+		ind++
 	}
 	err = contacts.WriteContactsToPath()
 	if err != nil {
-		log.Debugln("[textsecure] 3", err)
-
+		log.Debugln("[textsecure] writing contacts failed", err)
 	}
-	return lc, nil
+	log.Debug("[textsecure] GetRegisteredContacts synchronizing contacts finished")
+	return localContacts, nil
 }
 
 // Attachment handling

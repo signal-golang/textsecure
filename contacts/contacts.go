@@ -22,7 +22,8 @@ type Contact struct {
 	IdentityKey          []byte
 	Name                 string
 	Username             string
-	Avatar               []byte
+	AvatarImg            []byte
+	Avatar               bool
 	Color                string
 	Blocked              bool
 	Verified             *signalservice.Verified
@@ -30,6 +31,7 @@ type Contact struct {
 	InboxPosition        uint32
 	Archived             bool
 	Certificate          []byte
+	Registered           bool
 }
 
 func (c *Contact) GetProfileKey() []byte {
@@ -61,6 +63,7 @@ var filePath string
 
 // ReadContacts loads the contacts yaml file and pareses it
 func ReadContacts(fileName string) ([]Contact, error) {
+	log.Debug("[textsecure] ReadContacts")
 	b, err := ioutil.ReadFile(fileName)
 	filePath = fileName
 	if err != nil {
@@ -123,7 +126,7 @@ func updateContact(c *signalservice.ContactDetails) error {
 		UUID: c.GetUuid(),
 		Name: c.GetName(),
 		// Avatar:        avatar,
-		Avatar:        nil,
+		Avatar:        false,
 		Color:         c.GetColor(),
 		Verified:      c.GetVerified(),
 		ProfileKey:    c.GetProfileKey(),
@@ -156,7 +159,7 @@ func UpdateProfileKey(src string, profileKey []byte) error {
 		Contacts[src] = contact
 		return WriteContactsToPath()
 	}
-	return fmt.Errorf("Contact to update not found")
+	return fmt.Errorf("Contact to update not found %s", src)
 }
 
 func GetContact(uuid string) Contact {

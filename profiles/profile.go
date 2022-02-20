@@ -232,7 +232,7 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 
 }
 func decryptProfile(profileKey []byte, profile *Profile) error {
-	fmt.Println("[textsecure] decryptProfile")
+	log.Println("[textsecure] decryptProfile")
 	name, err := decryptString(profileKey, profile.Name)
 	if err != nil {
 		log.Debugln("[textsecure] decryptProfile name", err)
@@ -314,7 +314,8 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 	}
 	c.Name = profile.Name
 	c.UUID = profile.UUID
-	c.Avatar = avatarDecrypted
+	c.Avatar = true
+	c.AvatarImg = avatarDecrypted
 	contacts.Contacts[c.UUID] = c
 	contacts.WriteContactsToPath()
 	return c, nil
