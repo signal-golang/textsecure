@@ -645,7 +645,6 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 
 		UUID := idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
 		index := findIndexByE147(phone, localContacts)
-		fmt.Println(localContacts[index].Name, phone, UUID, len(localContacts), len(responseData)/uuidlength) //todo remove
 		if strings.Count(localContacts[index].Name, "=") > 2 {
 			decodedName, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(localContacts[index].Name)))
 			if err != nil {
