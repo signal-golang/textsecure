@@ -332,6 +332,8 @@ func (c *Conn) writeWorker() {
 	}
 }
 func (c *CrayfishInstance) StartListening() error {
+	// ensure crayfish started, so we delay the start of the listener for a bit
+	time.Sleep(1 * time.Second)
 	defer func() {
 		log.Debugf("[textsecure-crayfish-ws] BackendStartListening")
 		for {
