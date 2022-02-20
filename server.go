@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"mime/quotedprintable"
 	"strconv"
 	"strings"
@@ -646,7 +646,7 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 		UUID := idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
 		index := findIndexByE147(phone, localContacts)
 		if strings.Count(localContacts[index].Name, "=") > 2 {
-			decodedName, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(localContacts[index].Name)))
+			decodedName, err := ioutil.ReadAll(quotedprintable.NewReader(strings.NewReader(localContacts[index].Name)))
 			if err != nil {
 				log.Debug("[textsecure] GetRegisteredContacts update name from quoted printable error:", err)
 			} else {
