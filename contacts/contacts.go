@@ -63,7 +63,7 @@ var filePath string
 
 // ReadContacts loads the contacts yaml file and pareses it
 func ReadContacts(fileName string) ([]Contact, error) {
-	log.Debug("[textsecure] ReadContacts")
+	log.Debug("[textsecure] read contacts from ", fileName)
 	b, err := ioutil.ReadFile(fileName)
 	filePath = fileName
 	if err != nil {
@@ -80,6 +80,8 @@ func ReadContacts(fileName string) ([]Contact, error) {
 
 // WriteContacts saves a list of contacts to a file
 func WriteContacts(filename string, contacts []Contact) error {
+	log.Debug("[textsecure] write contacts ", len(contacts))
+
 	c := &yamlContacts{contacts}
 	b, err := yaml.Marshal(c)
 	if err != nil {
