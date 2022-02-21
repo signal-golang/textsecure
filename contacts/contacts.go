@@ -23,7 +23,8 @@ type Contact struct {
 	Name                 string
 	Username             string
 	AvatarImg            []byte
-	Avatar               bool
+	Avatar               []byte
+	HasAvatar            bool
 	Color                string
 	Blocked              bool
 	Verified             *signalservice.Verified
@@ -128,7 +129,7 @@ func updateContact(c *signalservice.ContactDetails) error {
 		UUID: c.GetUuid(),
 		Name: c.GetName(),
 		// Avatar:        avatar,
-		Avatar:        false,
+		HasAvatar:     false,
 		Color:         c.GetColor(),
 		Verified:      c.GetVerified(),
 		ProfileKey:    c.GetProfileKey(),

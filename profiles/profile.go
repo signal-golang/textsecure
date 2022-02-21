@@ -314,7 +314,7 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 	}
 	c.Name = profile.Name
 	c.UUID = profile.UUID
-	c.Avatar = true
+	c.HasAvatar = true
 	c.AvatarImg = avatarDecrypted
 	contacts.Contacts[c.UUID] = c
 	contacts.WriteContactsToPath()
