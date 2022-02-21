@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"mime/quotedprintable"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -602,13 +603,17 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 	}
 	tokensMap := map[string]*string{}
 	tokens := []string{}
+	// regexp for valid phone numbers
+	re := regexp.MustCompile(`^(?:(?:\(?(?:00|\+)([1-4]\d\d|[1-9]\d?)\)?)?[\-\.\ \\\/]?)?((?:\(?\d{1,}\)?[\-\.\ \\\/]?){0,})(?:[\-\.\ \\\/]?(?:#|ext\.?|extension|x)[\-\.\ \\\/]?(\d+))?$`)
 	for _, c := range localContacts {
 		t := c.Tel
-		if tokensMap[t] == nil {
+		// check if the contact is a valid phone number and if it is not a duplicate
+		if re.MatchString(t) && tokensMap[t] == nil {
 			tokens = append(tokens, t)
 			tokensMap[t] = &t
+		} else {
+			log.Debugln("[textsecure] GetRegisteredContacts: skipping contact because of invalid phone number or it's already added: ", t)
 		}
-
 	}
 
 	authCredentials, err := transport.GetCredendtails(DIRECTORY_AUTH_PATH)
