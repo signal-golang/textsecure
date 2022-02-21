@@ -67,13 +67,15 @@ func ReadContacts(fileName string) ([]Contact, error) {
 	log.Debug("[textsecure] read contacts from ", fileName)
 	b, err := ioutil.ReadFile(fileName)
 	filePath = fileName
-	if err != nil {
-		return nil, err
-	}
 	contactsYaml := &yamlContacts{}
-	err = yaml.Unmarshal(b, contactsYaml)
 	if err != nil {
-		return nil, err
+		log.Debugln("[textsecure] ReadContacts: there is no contact file", err)
+	} else {
+		// only read the contacts file if it exists
+		err = yaml.Unmarshal(b, contactsYaml)
+		if err != nil {
+			return nil, err
+		}
 	}
 	LoadContacts(contactsYaml)
 	return contactsYaml.Contacts, nil
