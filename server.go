@@ -615,6 +615,9 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 			log.Debugln("[textsecure] GetRegisteredContacts: skipping contact because of invalid phone number or it's already added: ", t)
 		}
 	}
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("no valid phone numbers")
+	}
 
 	authCredentials, err := transport.GetCredendtails(DIRECTORY_AUTH_PATH)
 	if err != nil {
