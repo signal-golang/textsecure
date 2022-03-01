@@ -69,6 +69,14 @@ func saveConfig(cfg *config.Config) error {
 	}
 	return nil
 }
+func RefreshConfig() {
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Errorln("[textsecure] failed to load config", err)
+		return
+	}
+	saveConfig(cfg)
+}
 
 // loadConfig gets the config via the client and makes sure
 // that for unset values sane defaults are used
