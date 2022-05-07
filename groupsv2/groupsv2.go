@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -33,7 +34,7 @@ const (
 )
 
 var (
-	groupURLHost   = "group.signal.org"
+	groupURLHost   = "signal.group"
 	groupURLPrefix = "https://" + groupURLHost + "/#"
 	groupV2Dir     string
 	groupsV2       = map[string]*GroupV2{}
@@ -56,6 +57,33 @@ type GroupV2 struct {
 // to be used as both keys in the map and for naming the files.
 func idToHex(id []byte) string {
 	return hex.EncodeToString(id)
+}
+
+// Parse an arbitrary string to a Signal group URL.
+// If the URL is invalid, nil is returned.
+func getGroupUrl(uriString string) *url.URL {
+	url, err := url.Parse(uriString)
+	if err != nil {
+		log.Errorln("[textsecure][groupsv2] GroupInviteLinkUrl error parsing URL", err)
+		return nil
+	}
+	if url.Scheme != "https" {
+		log.Errorln("[textsecure][groupsv2] GroupInviteLinkUrl URL invalid scheme ", url.Scheme)
+		return nil
+	}
+	if url.Host != groupURLHost {
+		log.Errorln("[textsecure][groupsv2] GroupInviteLinkUrl URL invalid host ", url.Host)
+		return nil
+	}
+	if url.Path != "" {
+		log.Errorln("[textsecure][groupsv2] GroupInviteLinkUrl URL path should be empty ", url.Path)
+		return nil
+	}
+	if url.Fragment == "" {
+		log.Errorln("[textsecure][groupsv2] GroupInviteLinkUrl URL fragment is empty ")
+		return nil
+	}
+	return url
 }
 
 func GroupInviteLinkUrl() {
