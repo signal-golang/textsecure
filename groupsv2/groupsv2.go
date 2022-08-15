@@ -274,7 +274,7 @@ func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error)
 					log.Errorln("[textsecure][groupsv2] signature verification failed", err)
 					return nil, err
 				}
-				log.Debugln("[textsecure][groupsv2] signature verification succesful")
+				log.Debugln("[textsecure][groupsv2] signature verification successful")
 			}
 		}
 

@@ -149,22 +149,30 @@ type Profile struct {
 
 func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
 	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, UUID))
-	profile := &Profile{}
-
+	if err != nil {
+		log.Debugln("[textsecure] GetProfile", err)
+		return nil, err
+	}
+	if resp.IsError() {
+		log.Debugln("[textsecure] GetProfile", resp)
+		return nil, resp
+	}
+	
 	dec := json.NewDecoder(resp.Body)
+	profile := &Profile{}
 	err = dec.Decode(&profile)
 	if err != nil {
 		log.Debugln("[textsecure] GetProfile", err)
 		return nil, err
-	} else {
-		err = decryptProfile(profileKey, profile)
-		if err != nil {
-			log.Debugln("[textsecure] ", err)
-			return nil, err
-		}
 	}
-	return profile, nil
 
+	err = decryptProfile(profileKey, profile)
+	if err != nil {
+		log.Debugln("[textsecure] GetProfile", err)
+		return nil, err
+	}
+
+	return profile, nil
 }
 func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 	log.Infoln("[textsecure] GetProfileAndCredential")
