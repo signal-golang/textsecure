@@ -263,31 +263,6 @@ func (c *Conn) connect(originURL string) error {
 	return nil
 }
 
-// Send ack response message
-func (c *Conn) sendAck() error {
-	typ := CrayfishWebSocketMessage_RESPONSE
-	message := ACKMessage{
-		Status: "ok",
-	}
-	responseType := CrayfishWebSocketResponseMessageTyp_ACK
-	csm := &CrayfishWebSocketMessage{
-		Type: &typ,
-		Response: &CrayfishWebSocketResponseMessage{
-			Type:    &responseType,
-			Message: &message,
-		},
-	}
-
-	b, err := json.Marshal(csm)
-	if err != nil {
-		return err
-	}
-	log.Debugln("[textsecure-crayfish-ws] websocket sending ack response ")
-
-	c.send <- b
-	return nil
-}
-
 // write writes a message with the given message type and payload.
 func (c *Conn) write(mt int, payload []byte) error {
 	Instance.cmd.Process.Signal(syscall.SIGCONT)
@@ -413,15 +388,6 @@ func (c *CrayfishInstance) StartWebsocket() error {
 
 		} else {
 			log.Errorln("[textsecure-crayfish-ws] failed to handle incoming websocket message")
-		}
-		if csm.Type != nil {
-			err = c.wsconn.sendAck()
-			if err != nil {
-				log.WithFields(log.Fields{
-					"error": err,
-				}).Error("[textsecure-crayfish-ws] Failed to send ack")
-				return err
-			}
 		}
 	}
 }
