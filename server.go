@@ -442,11 +442,11 @@ func addNewDevice(ephemeralId, publicKey, verificationCode string) error {
 	theirPublicKey := axolotl.NewECPublicKey(decPk)
 
 	pm := &signalservice.ProvisionMessage{
-		IdentityKeyPublic:  identityKey.PublicKey.Serialize(),
-		IdentityKeyPrivate: identityKey.PrivateKey.Key()[:],
-		Uuid:               &config.ConfigFile.UUID,
-		ProvisioningCode:   &verificationCode,
-		Number:             &config.ConfigFile.Tel,
+		AciIdentityKeyPublic:  identityKey.PublicKey.Serialize(),
+		AciIdentityKeyPrivate: identityKey.PrivateKey.Key()[:],
+		Aci:                   &config.ConfigFile.UUID,
+		ProvisioningCode:      &verificationCode,
+		Number:                &config.ConfigFile.Tel,
 	}
 
 	ciphertext, err := provisioningCipher(pm, theirPublicKey)
@@ -608,7 +608,7 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 	for _, c := range localContacts {
 		t := c.Tel
 		// check if the contact is a valid phone number and if it is not a duplicate
-		if re.MatchString(t) && tokensMap[t] == nil {
+		if t != "" && re.MatchString(t) && tokensMap[t] == nil {
 			tokens = append(tokens, t)
 			tokensMap[t] = &t
 		} else {
@@ -738,14 +738,6 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 		if msg.attachment.voiceNote {
 			var flag uint32 = 1
 			dm.Attachments[0].Flags = &flag
-		}
-	}
-	if msg.group != nil {
-		dm.Group = &signalservice.GroupContext{
-			Id:          msg.group.id,
-			Type:        &msg.group.typ,
-			Name:        &msg.group.name,
-			MembersE164: msg.group.members,
 		}
 	}
 	if msg.groupV2 != nil {

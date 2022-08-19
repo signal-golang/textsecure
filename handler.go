@@ -84,10 +84,6 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 		return err
 	}
 	log.Debugln("[textsecure] handleDataMessage", timestamp, *dm.Timestamp, dm.GetExpireTimer())
-	gr, err := handleGroups(src, dm)
-	if err != nil {
-		return err
-	}
 	gr2, err := groupsv2.HandleGroupsV2(src, dm)
 	if err != nil {
 		return err
@@ -97,7 +93,6 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 		sourceUUID:  srcUUID,
 		message:     dm.GetBody(),
 		attachments: atts,
-		group:       gr,
 		groupV2:     gr2,
 		flags:       flags,
 		expireTimer: dm.GetExpireTimer(),
@@ -105,7 +100,6 @@ func handleDataMessage(src string, srcUUID string, timestamp uint64, dm *signals
 		timestamp:   *dm.Timestamp,
 		quote:       dm.GetQuote(),
 		contact:     dm.GetContact(),
-		preview:     dm.GetPreview(),
 		sticker:     dm.GetSticker(),
 		reaction:    dm.GetReaction(),
 		// requiredProtocolVersion: dm.GetRequiredProtocolVersion(),

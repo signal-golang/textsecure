@@ -92,11 +92,6 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 	if err != nil {
 		return err
 	}
-
-	gr, err := handleGroups(dest, dm)
-	if err != nil {
-		return err
-	}
 	grV2, err := handleGroupsV2(dest, dm)
 	if err != nil {
 		return err
@@ -110,7 +105,6 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 		source:      dest,
 		message:     dm.GetBody(),
 		attachments: atts,
-		group:       gr,
 		groupV2:     grV2,
 		contact:     cs,
 		flags:       flags,
@@ -118,7 +112,6 @@ func handleSyncSent(s *signalservice.SyncMessage_Sent, ts uint64) error {
 		profileKey:  dm.GetProfileKey(),
 		timestamp:   *dm.Timestamp,
 		quote:       dm.GetQuote(),
-		preview:     dm.GetPreview(),
 		sticker:     dm.GetSticker(),
 		reaction:    dm.GetReaction(),
 	}
@@ -257,7 +250,7 @@ func sendGroupUpdate() error {
 func handleSyncRead(readMessages []*signalservice.SyncMessage_Read) error {
 	if client.SyncReadHandler != nil {
 		for _, s := range readMessages {
-			client.SyncReadHandler(s.GetSenderE164(), s.GetTimestamp())
+			client.SyncReadHandler(s.GetSenderUuid(), s.GetTimestamp())
 		}
 	}
 

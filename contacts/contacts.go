@@ -33,6 +33,8 @@ type Contact struct {
 	Archived             bool
 	Certificate          []byte
 	Registered           bool
+	About                string
+	AboutEmoji           string
 }
 
 func (c *Contact) GetProfileKey() []byte {
@@ -95,6 +97,7 @@ func WriteContacts(filename string, contacts []Contact) error {
 
 // WriteContactsToPath saves a list of contacts to a file at the standard location
 func WriteContactsToPath() error {
+	log.Debugln("[textsecure] write contacts to path ", filePath)
 	c := contactsToYaml()
 	b, err := yaml.Marshal(c)
 	if err != nil {

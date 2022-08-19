@@ -20,7 +20,6 @@ type Message struct {
 	timestamp               uint64
 	quote                   *signalservice.DataMessage_Quote
 	contact                 []*signalservice.DataMessage_Contact
-	preview                 []*signalservice.DataMessage_Preview
 	sticker                 *signalservice.DataMessage_Sticker
 	requiredProtocolVersion uint32
 	isViewOnce              bool

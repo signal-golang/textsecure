@@ -175,42 +175,6 @@ var GroupUpdateFlag uint32 = 1
 var GroupLeaveFlag uint32 = 2
 
 // handleGroups is the main entry point for handling the group metadata on messages.
-func handleGroups(src string, dm *signalservice.DataMessage) (*Group, error) {
-	gr := dm.GetGroup()
-	if gr == nil {
-		return nil, nil
-	}
-	hexid := idToHex(gr.GetId())
-	log.Debugln("[textsecure] handle group", hexid, gr.GetType())
-	switch gr.GetType() {
-	case signalservice.GroupContext_UPDATE:
-		if err := updateGroup(gr); err != nil {
-			return nil, err
-		}
-		groups[hexid].Flags = GroupUpdateFlag
-	case signalservice.GroupContext_DELIVER:
-		eGr, ok := groups[hexid]
-		setupGroups()
-		if !ok || len(eGr.Members) == 0 || hexid == eGr.Name {
-			log.Debugln("[textsecure] request update group", hexid)
-			g, _ := newPartlyGroup(gr.GetId())
-			g.Members = []string{src}
-			RequestGroupInfo(g)
-			setupGroups()
-			return nil, UnknownGroupIDError{hexid}
-		}
-		groups[hexid].Flags = 0
-	case signalservice.GroupContext_QUIT:
-		if err := quitGroup(src, hexid); err != nil {
-			return nil, err
-		}
-		groups[hexid].Flags = GroupLeaveFlag
-	}
-
-	return groups[hexid], nil
-}
-
-// handleGroups is the main entry point for handling the group metadata on messages.
 func handleGroupsV2(src string, dm *signalservice.DataMessage) (*groupsv2.GroupV2, error) {
 	gr := dm.GetGroupV2()
 	if gr == nil {

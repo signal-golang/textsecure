@@ -239,7 +239,7 @@ func setupLogging() {
 	if loglevel == "" {
 		loglevel = os.Getenv("TEXTSECURE_LOGLEVEL")
 	}
-
+	fmt.Printf("INFO[0000] [textsecure] Setting log level to %s\n", loglevel)
 	switch strings.ToUpper(loglevel) {
 	case "DEBUG":
 		log.SetLevel(log.DebugLevel)
@@ -580,7 +580,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			// try the legacy way
 			log.Infof("[textsecure] Incoming WhisperMessage try legacy decrypting")
 
-			recid, err := recID(env.GetSourceE164())
+			recid, err := recID(env.GetSourceUuid())
 			if err != nil {
 				recid = env.GetSourceUuid()
 			}
@@ -595,7 +595,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			return err
 		}
 		b = stripPadding(b)
-		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
+		err = handleMessage(env.GetSourceUuid(), env.GetSourceUuid(), env.GetTimestamp(), b)
 		if err != nil {
 			return err
 		}
@@ -623,7 +623,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			return err
 		}
 		b = stripPadding(b)
-		err = handleMessage(env.GetSourceE164(), env.GetSourceUuid(), env.GetTimestamp(), b)
+		err = handleMessage(env.GetSourceUuid(), env.GetSourceUuid(), env.GetTimestamp(), b)
 		if err != nil {
 			return err
 		}
