@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	siv "github.com/agl/gcmsiv"
+	siv "github.com/Blackoverflow/gcmsiv"
 	"github.com/signal-golang/textsecure/config"
 	transport "github.com/signal-golang/textsecure/transport"
 

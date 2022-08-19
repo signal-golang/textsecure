@@ -1,7 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
+github.com/Blackoverflow/gcmsiv v0.0.0-20201031155123-20af2af977ff h1:l3WopnX/gWnDItXZdr2Ygq0+4ZwXCSyozyPNR8jdb8I=
+github.com/Blackoverflow/gcmsiv v0.0.0-20201031155123-20af2af977ff/go.mod h1:t1lmwOv+IYxaUkr2qIKXEfn90t4GgocS0qy8jkDonbg=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/agl/gcmsiv v0.0.0-20190418185415-e8dcd2f151dc h1:MB338WDPuyQ8qXRiSRK2NVTv0EmLYsHXZAevEiQO1+c=
-github.com/agl/gcmsiv v0.0.0-20190418185415-e8dcd2f151dc/go.mod h1:5joDAvk82M2Cx1X8mAL5Orvhy5lfW4BjrTCW65wbvRo=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
