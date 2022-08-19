@@ -159,7 +159,7 @@ func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
 	} else {
 		err = decryptProfile(profileKey, profile)
 		if err != nil {
-			log.Debugln("[textsecure] ", err)
+			log.Errorln("[textsecure] decrypt profile error", err)
 			return nil, err
 		}
 	}
@@ -225,9 +225,8 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 		log.Debugln("[textsecure] GetProfileAndCredential", err)
 		return nil, err
 	}
-	log.Debugln("[textsecure] GetProfileAndCredential", len(credential))
+	log.Debugln("[textsecure] GetProfileAndCredential credential length", len(credential))
 	profile.Credential = credential
-
 	return profile, err
 
 }
@@ -235,7 +234,7 @@ func decryptProfile(profileKey []byte, profile *Profile) error {
 	log.Println("[textsecure] decryptProfile")
 	name, err := decryptString(profileKey, profile.Name)
 	if err != nil {
-		log.Debugln("[textsecure] decryptProfile name", err)
+		log.Debugln("[textsecure] decryptProfile name", profile.Name, err)
 		return err
 	}
 	profile.Name = name
@@ -300,10 +299,12 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 	profile := &Profile{}
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(&profile)
+
 	if err != nil {
 		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
-	avatar, _ := GetAvatar(profile.Avatar)
+
+	avatar, _ := GetRemoteAvatar(profile.Avatar)
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(avatar)
 
@@ -312,6 +313,10 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 	if err != nil {
 		log.Errorln("[textsecure] GetProfileE164 ", err)
 	}
+	err = saveLocalAvatar(profile.UUID, avatarDecrypted)
+	if err != nil {
+		log.Errorln("[textsecure] GetProfileE164 saving avatar failed ", err)
+	}
 	c.Name = profile.Name
 	c.UUID = profile.UUID
 	c.HasAvatar = true
@@ -319,4 +324,88 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 	contacts.Contacts[c.UUID] = c
 	contacts.WriteContactsToPath()
 	return c, nil
+}
+
+// GetProfileUUID get a profile by a phone number
+func GetProfileUUID(uuid string) (*contacts.Contact, error) {
+	c := contacts.Contacts[uuid]
+	profile := &Profile{}
+	var err error
+	if len(c.ProfileKey) > 0 {
+		profile, err = GetProfileAndCredential(c.UUID, c.ProfileKey)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, uuid))
+		if err != nil {
+			log.Errorln("[textsecure] GetProfileUuid ", err)
+		}
+
+		dec := json.NewDecoder(resp.Body)
+		err = dec.Decode(&profile)
+		if err != nil {
+			log.Errorln("[textsecure] GetProfileUuid ", err)
+		}
+	}
+	var avatarDecrypted []byte
+
+	if profile.Avatar != "" {
+		avatar, err := GetRemoteAvatar("/" + profile.Avatar)
+		if err != nil {
+			log.Errorln("[textsecure] GetProfileUuid getting Avatar failed: ", err)
+			profile.Avatar = ""
+		} else {
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(avatar)
+			key := c.ProfileKey
+			if len(key) == 0 {
+				log.Errorln("[textsecure] GetProfileUuid decrypting avatar failed: profile key doesn't exists")
+				profile.Avatar = ""
+			} else {
+				avatar := buf.Bytes()
+				if len(avatar) > 0 {
+					avatarDecrypted, err = decryptAvatar(buf.Bytes(), key)
+					if err != nil {
+						log.Errorln("[textsecure] GetProfileUuid Avatar decryption failed", err)
+						profile.Avatar = ""
+
+					}
+					err = saveLocalAvatar(profile.UUID, avatarDecrypted)
+					if err != nil {
+						log.Errorln("[textsecure] GetProfileE164 saving avatar failed ", err)
+					}
+				} else {
+					log.Errorln("[textsecure] GetProfileUuid decrypting avatar failed: avatar is empty")
+
+				}
+			}
+		}
+
+	}
+
+	// err = decryptProfile(c.ProfileKey, profile)
+	// if err != nil {
+	// 	log.Debugln("[textsecure] GetProfileAndCredential", err)
+	// 	return nil, err
+	// }
+
+	c.Username = profile.Name
+	if c.Name == "" {
+		c.Name = profile.Name
+	}
+	c.UUID = profile.UUID
+	if profile.Avatar != "" {
+		c.HasAvatar = true
+		c.AvatarImg = avatarDecrypted
+	}
+	if profile.About != "" {
+		c.About = profile.About
+	}
+	if profile.AboutEmoji != "" {
+		c.AboutEmoji = profile.AboutEmoji
+	}
+	contacts.Contacts[c.UUID] = c
+	contacts.WriteContactsToPath()
+	return &c, nil
 }

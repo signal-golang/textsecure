@@ -2,7 +2,6 @@ package crayfish
 
 import (
 	"crypto/tls"
-	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -18,8 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	// "github.com/nanu-c/textsecure/app/ui"
-	uuid "github.com/satori/go.uuid"
-	"github.com/signal-golang/textsecure/registration"
+
 	"github.com/signal-golang/textsecure/rootCa"
 	log "github.com/sirupsen/logrus"
 )
@@ -36,11 +33,6 @@ type CrayfishInstance struct {
 	cmd            *exec.Cmd
 	stopping       bool
 	receiveChannel chan *CrayfishWebSocketResponseMessage
-}
-
-type CrayfishRegistration struct {
-	UUID string `json:"uuid"`
-	Tel  string `json:"tel"`
 }
 
 const (
@@ -60,6 +52,7 @@ const (
 
 type CrayfishWebSocketMessageType int32
 
+// the crayfish websocket message types
 const (
 	CrayfishWebSocketMessage_UNKNOWN  CrayfishWebSocketMessageType = 0
 	CrayfishWebSocketMessage_REQUEST  CrayfishWebSocketMessageType = 1
@@ -73,11 +66,13 @@ type CrayfishWebSocketMessage struct {
 }
 type CrayfishWebSocketRequestMessageType int32
 
+// the crayfish request types
 const (
 	CrayfishWebSocketRequestMessageTyp_UNKNOWN             CrayfishWebSocketRequestMessageType = 0
 	CrayfishWebSocketRequestMessageTyp_START_REGISTRATION  CrayfishWebSocketRequestMessageType = 1
 	CrayfishWebSocketRequestMessageTyp_VERIFY_REGISTRATION CrayfishWebSocketRequestMessageType = 2
 	CrayfishWebSocketRequestMessageTyp_HANDLE_ENVELOPE     CrayfishWebSocketRequestMessageType = 3
+	CrayfishWebSocketRequestMessageTyp_DECRYPT_AVATAR      CrayfishWebSocketRequestMessageType = 4
 )
 
 type CrayfishWebSocketRequestMessage struct {
@@ -92,6 +87,7 @@ const (
 	CrayfishWebSocketResponseMessageTyp_ACK                 CrayfishWebSocketResponseMessageType = 1
 	CrayfishWebSocketResponseMessageTyp_VERIFY_REGISTRATION CrayfishWebSocketResponseMessageType = 2
 	CrayfishWebSocketResponseMessageTyp_HANDLE_ENVELOPE     CrayfishWebSocketResponseMessageType = 3
+	CrayfishWebSocketResponseMessageTyp_DECRYPT_AVATAR      CrayfishWebSocketResponseMessageType = 3
 )
 
 type CrayfishWebSocketResponseMessage struct {
@@ -110,52 +106,6 @@ type Conn struct {
 
 	// Buffered channel of outbound messages
 	send chan []byte
-}
-
-type CrayfishWebSocketRequest_REGISTER_MESSAGE struct {
-	Number   string `json:"number"`
-	Password string `json:"password"`
-	Captcha  string `json:"captcha"`
-	UseVoice bool   `json:"use_voice"`
-}
-
-type CrayfishWebSocketRequest_VERIFY_REGISTER_MESSAGE struct {
-	Code         uint64   `json:"confirm_code"`
-	Number       string   `json:"number"`
-	Password     string   `json:"password"`
-	SignalingKey [52]byte `json:"signaling_key"`
-}
-
-type CrayfishWebSocketRequestMessageTyp_SEALED_SESSION_DECRYPT_Message struct {
-}
-type CrayfishWebSocketResponse_VERIFY_REGISTER_MESSAGE struct {
-	UUID           [16]byte `json:"uuid"`
-	StorageCapable bool     `json:"storage_capable"`
-}
-type CrayfishWebSocketRequest_HANDLE_ENVELOPE_MESSAGE struct {
-	Message string `json:"message"`
-}
-type CrayfishWebSocketResponse_HANDLE_ENVELOPE_MESSAGE struct {
-	Message      string `json:"message"`
-	Timestamp    int64  `json:"timestamp"`
-	SenderDevice int32  `json:"sender_device"`
-	Sender       Sender `json:"sender"`
-}
-type Sender struct {
-	UUID        string      `json:"uuid"`
-	PhoneNumber PhoneNumber `json:"phonenumber"`
-}
-type PhoneNumber struct {
-	Code     PhoneNumberCode     `json:"code"`
-	National PhoneNumberNational `json:"national,string,omitempty"`
-}
-type PhoneNumberCode struct {
-	Value  uint64 `json:"value"`
-	Source string `json:"source"`
-}
-type PhoneNumberNational struct {
-	Value uint64 `json:"value"`
-	Zeros int    `json:"zeros"`
 }
 
 func Run() {
@@ -416,88 +366,6 @@ func (c *CrayfishInstance) handleCrayfishResponseMessage(response *CrayfishWebSo
 	return nil
 }
 
-func (c *CrayfishInstance) CrayfishRegister(registrationInfo *registration.RegistrationInfo,
-	phoneNumber string,
-	captcha string) error {
-	log.Debugf("[textsecure-crayfish-ws] Registering via crayfish build message")
-	registerMessage := &CrayfishWebSocketRequest_REGISTER_MESSAGE{
-		Number:   phoneNumber,
-		Password: registrationInfo.Password,
-		Captcha:  captcha,
-		UseVoice: false,
-	}
-	messageType := CrayfishWebSocketMessage_REQUEST
-	requestType := CrayfishWebSocketRequestMessageTyp_START_REGISTRATION
-	request := &CrayfishWebSocketRequestMessage{
-		Type:    &requestType,
-		Message: registerMessage,
-	}
-	registerRequestMessage := &CrayfishWebSocketMessage{
-		Type:    &messageType,
-		Request: request,
-	}
-	m, err := json.Marshal(registerRequestMessage)
-	if err != nil {
-		return err
-	}
-	log.Debugf("[textsecure-crayfish-ws] Registering via crayfish send")
-	c.wsconn.send <- m
-	return nil
-}
-func (c *CrayfishInstance) CrayfishRegisterWithCode(registrationInfo *registration.RegistrationInfo,
-	phoneNumber string,
-	captcha string,
-	code string) (*CrayfishRegistration, error) {
-	codeInt, err := strconv.ParseUint(code, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	messageType := CrayfishWebSocketMessage_REQUEST
-	var signalingKey [52]byte
-	copy(signalingKey[:], registrationInfo.SignalingKey)
-	verificationMessage := &CrayfishWebSocketRequest_VERIFY_REGISTER_MESSAGE{
-		Number:       phoneNumber,
-		Code:         codeInt,
-		SignalingKey: signalingKey,
-		Password:     registrationInfo.Password,
-	}
-	requestVerifyType := CrayfishWebSocketRequestMessageTyp_VERIFY_REGISTRATION
-	verificationRequest := &CrayfishWebSocketRequestMessage{
-		Type:    &requestVerifyType,
-		Message: verificationMessage,
-	}
-	verificationRequestMessage := &CrayfishWebSocketMessage{
-		Type:    &messageType,
-		Request: verificationRequest,
-	}
-	mv, err := json.Marshal(verificationRequestMessage)
-	if err != nil {
-		return nil, err
-	}
-	log.Debugf("[textsecure-crayfish-ws] Registering via crayfish send verification")
-	c.wsconn.send <- mv
-	c.receiveChannel = make(chan *CrayfishWebSocketResponseMessage, 1)
-	response := <-c.receiveChannel
-	rm, err := json.Marshal(response.Message)
-	if err != nil {
-		return nil, err
-	}
-	var data CrayfishWebSocketResponse_VERIFY_REGISTER_MESSAGE
-	err = json.Unmarshal(rm, &data)
-	if err != nil {
-		return nil, err
-	}
-	uuidString, err := uuid.FromBytes(data.UUID[:])
-	if err != nil {
-		return nil, err
-	}
-	log.Debugf("[textsecure-crayfish-ws] Registering via crayfish uuid %s", uuidString.String())
-	return &CrayfishRegistration{
-		UUID: uuidString.String(),
-		Tel:  phoneNumber,
-	}, nil
-}
-
 func (c *CrayfishInstance) Stop() error {
 	c.stopping = true
 	err := c.StopListening()
@@ -511,44 +379,4 @@ func (c *CrayfishInstance) Stop() error {
 		}
 	}
 	return nil
-}
-
-func (c *CrayfishInstance) HandleEnvelope(msg []byte) (*CrayfishWebSocketResponse_HANDLE_ENVELOPE_MESSAGE, error) {
-	messageType := CrayfishWebSocketMessage_REQUEST
-	requestType := CrayfishWebSocketRequestMessageTyp_HANDLE_ENVELOPE
-	sEnc := b64.StdEncoding.EncodeToString(msg)
-	envelopeMessage := &CrayfishWebSocketRequest_HANDLE_ENVELOPE_MESSAGE{
-		Message: sEnc,
-	}
-	log.Debugln("[textsecure-crayfish-ws] Sending envelope")
-
-	request := &CrayfishWebSocketRequestMessage{
-		Type:    &requestType,
-		Message: envelopeMessage,
-	}
-	handleEnvelopeMessage := &CrayfishWebSocketMessage{
-		Type:    &messageType,
-		Request: request,
-	}
-	m, err := json.Marshal(handleEnvelopeMessage)
-	if err != nil {
-		return nil, err
-	}
-	log.Debugf("[textsecure-crayfish-ws] HandleEnvelope send")
-	c.wsconn.send <- m
-	c.receiveChannel = make(chan *CrayfishWebSocketResponseMessage, 1)
-	response := <-c.receiveChannel
-	log.Debugf("[textsecure-crayfish-ws] HandleEnvelope recieved an response")
-	rm, err := json.Marshal(response.Message)
-	if err != nil {
-		log.Errorln("[textsecure-crayfish-ws] failed to marshal response message", response.Message)
-		return nil, err
-	}
-	var data CrayfishWebSocketResponse_HANDLE_ENVELOPE_MESSAGE
-	err = json.Unmarshal(rm, &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return &data, nil
 }
