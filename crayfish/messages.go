@@ -21,7 +21,9 @@ type CrayfishWebSocketResponse_VERIFY_REGISTER_MESSAGE struct {
 	StorageCapable bool     `json:"storage_capable"`
 }
 type CrayfishWebSocketRequest_HANDLE_ENVELOPE_MESSAGE struct {
-	Message string `json:"message"`
+	Message       string `json:"message"`
+	LocalUUUID    string `json:"local_uuid"`
+	LocalDeviceID int32  `json:"local_device_id"`
 }
 type CrayfishWebSocketResponse_HANDLE_ENVELOPE_MESSAGE struct {
 	Message      string `json:"message"`

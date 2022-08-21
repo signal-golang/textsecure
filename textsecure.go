@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 
 	"bytes"
@@ -261,11 +260,11 @@ func setupLogging() {
 
 // Setup initializes the package.
 func Setup(c *Client) error {
-	go crayfish.Run()
 	var err error
 	client = c
 
 	config.ConfigFile, err = loadConfig()
+	go crayfish.Run()
 	if err != nil {
 		return err
 	}
@@ -634,6 +633,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 		}
 
 		p, _ := proto.Marshal(env)
+		log.Debugf("[textsecure] Incoming UnidentifiedSenderMessage %s.\n", env)
 		data, err := crayfish.Instance.HandleEnvelope(p)
 		if err != nil {
 			return err
@@ -643,9 +643,13 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			return err
 		}
 		env.Content = content
-		phoneNumber := "+" + strconv.FormatUint(data.Sender.PhoneNumber.Code.Value, 10) + strconv.FormatUint(data.Sender.PhoneNumber.National.Value, 10)
-		log.Println("[textsecure] handleReceivedMessage:", phoneNumber, data.Sender.UUID)
-		err = handleMessage(phoneNumber, data.Sender.UUID, uint64(data.Timestamp), content)
+		log.Println("[textsecure] handleReceivedMessage:", data.Sender.UUID)
+		log.Debugln("[textsecure] handleReceivedMessage content length: ", len(content))
+		if len(content) == 0 {
+			err = errors.New("[textsecure] handleReceivedMessage content length is 0")
+			return err
+		}
+		err = handleMessage("", data.Sender.UUID, uint64(data.Timestamp), content)
 		if err != nil {
 			return err
 		}

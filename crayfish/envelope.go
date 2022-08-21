@@ -12,7 +12,9 @@ func (c *CrayfishInstance) HandleEnvelope(msg []byte) (*CrayfishWebSocketRespons
 	requestType := CrayfishWebSocketRequestMessageTyp_HANDLE_ENVELOPE
 	sEnc := b64.StdEncoding.EncodeToString(msg)
 	envelopeMessage := &CrayfishWebSocketRequest_HANDLE_ENVELOPE_MESSAGE{
-		Message: sEnc,
+		Message:       sEnc,
+		LocalUUUID:    c.LocalUUID,
+		LocalDeviceID: c.LocalDeviceID,
 	}
 	log.Debugln("[textsecure-crayfish-ws] Sending envelope")
 

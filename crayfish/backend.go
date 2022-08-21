@@ -17,6 +17,7 @@ import (
 
 	// "github.com/nanu-c/textsecure/app/ui"
 
+	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/rootCa"
 	log "github.com/sirupsen/logrus"
 )
@@ -33,6 +34,8 @@ type CrayfishInstance struct {
 	cmd            *exec.Cmd
 	stopping       bool
 	receiveChannel chan *CrayfishWebSocketResponseMessage
+	LocalUUID      string
+	LocalDeviceID  int32
 }
 
 const (
@@ -109,7 +112,10 @@ type Conn struct {
 }
 
 func Run() {
-	Instance = &CrayfishInstance{}
+	Instance = &CrayfishInstance{
+		LocalUUID:     config.ConfigFile.UUID,
+		LocalDeviceID: 0,
+	}
 	log.Infoln("[textsecure-crayfish] Starting crayfish-backend")
 	path, err := exec.LookPath("crayfish")
 	if err != nil {
