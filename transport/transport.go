@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -73,6 +74,7 @@ type Transporter interface {
 	PutBinary(url string, body []byte) (*response, error)
 	PutJSONWithAuth(url string, body []byte, auth string) (*response, error)
 	PutJSONWithUnidentifiedSender(url string, body []byte, unidentifiedAccessKey []byte) (*response, error)
+	GetWithUnidentifiedAccessKey(url string, unidentifiedAccessKey []byte) (*response, error)
 }
 
 type httpTransporter struct {
@@ -240,6 +242,29 @@ func (ht *httpTransporter) PutWithAuth(url string, body []byte, ct string, auth 
 	}
 
 	log.Debugf("[textsecure] PUT with auth %s %d\n", url, r.Status)
+
+	return r, err
+}
+func (ht *httpTransporter) GetWithUnidentifiedAccessKey(url string, unidentifedAccessKey []byte) (*response, error) {
+	req, err := http.NewRequest("GET", ht.baseURL+url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if ht.userAgent != "" {
+		req.Header.Set("X-Signal-Agent", ht.userAgent)
+	}
+	req.Header.Set("Unidentified-Access-Key", base64.StdEncoding.EncodeToString(unidentifedAccessKey))
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+	}
+
+	log.Debugf("[textsecure] GET with unidentified access key %s %d\n", url, r.Status)
 
 	return r, err
 }

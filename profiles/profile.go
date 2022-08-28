@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 
 	zkgroup "github.com/nanu-c/zkgroup"
@@ -15,13 +16,16 @@ import (
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/crypto"
 	"github.com/signal-golang/textsecure/transport"
+	"github.com/signal-golang/textsecure/unidentifiedAccess"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
 	PROFILE_PATH            = "/v1/profile/%s"
 	PROFILE_CREDENTIAL_PATH = "/v1/profile/%s/%s/%s"
-	NAME_PADDED_LENGTH      = 53
+	PROFILE_USERNAME_PATH   = "/v1/profile/username/%s"
+
+	NAME_PADDED_LENGTH = 53
 )
 
 // Profile ...
@@ -108,7 +112,7 @@ func encryptName(key, input []byte, paddedLength int) ([]byte, error) {
 
 func decryptName(key, nonceAndCiphertext []byte) ([]byte, error) {
 	if len(nonceAndCiphertext) < 12+16+1 {
-		return nil, errors.New("nonceAndCipher too short")
+		return nil, errors.New("decrypt Name nonceAndCipher too short " + string(len(nonceAndCiphertext)))
 	}
 	nonce := nonceAndCiphertext[:12]
 	ciphertext := nonceAndCiphertext[12:]
@@ -148,18 +152,41 @@ type Profile struct {
 }
 
 func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
-	resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, UUID))
-	profile := &Profile{}
-
-	dec := json.NewDecoder(resp.Body)
-	err = dec.Decode(&profile)
+	unidentifiedAccess, err := unidentifiedAccess.GetAccessForSync(config.ConfigFile.ProfileKey, config.ConfigFile.Certificate)
 	if err != nil {
-		log.Debugln("[textsecure] GetProfile", err)
+		return nil, err
+	}
+	resp, err := transport.Transport.GetWithUnidentifiedAccessKey(fmt.Sprintf(PROFILE_PATH, UUID), unidentifiedAccess.UnidentifiedAccessKey)
+	if err != nil {
+		return nil, err
+	}
+	profile := &Profile{}
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytes, profile)
+
+	if err != nil {
+		log.Debugln("[textsecure] GetProfile decode error", err)
 		return nil, err
 	} else {
 		err = decryptProfile(profileKey, profile)
 		if err != nil {
 			log.Errorln("[textsecure] decrypt profile error", err)
+			// return nil, err
+		}
+		resp, err = transport.Transport.GetWithUnidentifiedAccessKey(fmt.Sprintf(PROFILE_PATH, UUID), []byte(profile.UnidentifiedAccess))
+		if err != nil {
+			return profile, err
+		}
+		bytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(bytes, profile)
+		if err != nil {
+			log.Debugln("[textsecure] GetProfile decode error", err)
 			return nil, err
 		}
 	}
@@ -167,7 +194,7 @@ func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
 
 }
 func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
-	log.Infoln("[textsecure] GetProfileAndCredential")
+	log.Infoln("[textsecure] GetProfileAndCredential for " + UUID)
 	uuid, err := uuidUtil.FromString(UUID)
 	if err != nil {
 		log.Debugln("[textsecure] GetProfileAndCredential", err)
@@ -198,10 +225,14 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 		return nil, err
 	}
 	profile := &Profile{}
-	dec := json.NewDecoder(resp.Body)
-	err = dec.Decode(&profile)
+	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Debugln("[textsecure] GetProfileAndCredential", err)
+		return nil, err
+	}
+	// fmt.Printf("%s\n", string(bytes))
+	err = json.Unmarshal(bytes, profile)
+	if err != nil {
+		log.Debugln("[textsecure] GetProfileAndCredential json unmarshall", err)
 		return nil, err
 	} else {
 		err = decryptProfile(profileKey, profile)
