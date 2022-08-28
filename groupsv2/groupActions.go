@@ -42,7 +42,9 @@ func (g *GroupV2) decryptGroupChangeActions(groupActions *signalservice.GroupCha
 	if err != nil {
 		return nil
 	}
-	decryptedGroupChange := &signalservice.DecryptedGroupChange{}
+	decryptedGroupChange := &signalservice.DecryptedGroupChange{
+		Revision: groupActions.GetRevision(),
+	}
 	if groupActions.SourceUuid != nil {
 		uuid, err := g.cipher.DecryptUUID(groupActions.SourceUuid)
 		log.Debugln("[textsecure][groupsv2] SourceUuid", idToHex(uuid), err)
@@ -50,13 +52,41 @@ func (g *GroupV2) decryptGroupChangeActions(groupActions *signalservice.GroupCha
 	log.Debugln("[textsecure][groupsv2] Revision", groupActions.Revision)
 	if groupActions.AddMembers != nil {
 		log.Debugln("[textsecure][groupsv2] AddMembers")
+		decryptedAddMembers := []*signalservice.DecryptedMember{}
+		for _, member := range groupActions.AddMembers {
+			decryptedMember, err := g.decryptMember(member.Added)
+			if err == nil {
+				decryptedAddMembers = append(decryptedAddMembers, decryptedMember)
+			}
+		}
+		decryptedGroupChange.NewMembers = decryptedAddMembers
 	}
 	if groupActions.DeleteMembers != nil {
 		log.Debugln("[textsecure][groupsv2] DeleteMembers")
-		g.decryptDeletePendingMembers(groupActions.DeletePendingMembers)
+		decryptedDeleteMembers := [][]byte{}
+		for _, member := range groupActions.DeleteMembers {
+			decryptedMember, err := g.decryptUUID(member.DeletedUserId)
+			if err == nil {
+				decryptedDeleteMembers = append(decryptedDeleteMembers, decryptedMember)
+			}
+		}
+		decryptedGroupChange.DeleteMembers = decryptedDeleteMembers
 	}
 	if groupActions.ModifyMemberRoles != nil {
 		log.Debugln("[textsecure][groupsv2] ModifyMemberRoles")
+		decryptedModifyMemberRoles := []*signalservice.DecryptedModifyMemberRole{}
+		for _, member := range groupActions.ModifyMemberRoles {
+			decryptedMember, err := g.decryptUUID(member.UserId)
+
+			if err == nil {
+				decryptedModifyMemberRole := signalservice.DecryptedModifyMemberRole{
+					Uuid: decryptedMember,
+					Role: member.Role,
+				}
+				decryptedModifyMemberRoles = append(decryptedModifyMemberRoles, &decryptedModifyMemberRole)
+			}
+		}
+		decryptedGroupChange.ModifyMemberRoles = decryptedModifyMemberRoles
 	}
 	if groupActions.ModifyMemberProfileKeys != nil {
 		log.Debugln("[textsecure][groupsv2] ModifyMemberProfileKeys")

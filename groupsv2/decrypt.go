@@ -104,7 +104,6 @@ func (g *GroupV2) decryptMember(member *signalservice.Member) (*signalservice.De
 		if err != nil {
 			return nil, err
 		}
-
 	}
 
 	return decryptedMember, nil
@@ -150,7 +149,8 @@ func (g *GroupV2) decryptPendingMembers(pendingMembers []*signalservice.GroupCha
 	return decryptedPendingMembers
 }
 func (g *GroupV2) decryptDeletePendingMembers(deletedPendingMembers []*signalservice.GroupChange_Actions_DeletePendingMemberAction,
-) []*signalservice.DecryptedPendingMember {
+) []*signalservice.DecryptedPendingMemberRemoval {
+	pendingMembersRemoval := []*signalservice.DecryptedPendingMemberRemoval{}
 	for _, deletedPendingMember := range deletedPendingMembers {
 
 		uuid, err := g.cipher.DecryptUUID(deletedPendingMember.DeletedUserId)
@@ -158,7 +158,9 @@ func (g *GroupV2) decryptDeletePendingMembers(deletedPendingMembers []*signalser
 			log.Errorln(err)
 		}
 		log.Debugln("[textsecure][groupsv2] deletePendingMember", idToHex(uuid))
-
+		pendingMembersRemoval = append(pendingMembersRemoval, &signalservice.DecryptedPendingMemberRemoval{
+			Uuid: uuid,
+		})
 	}
-	return nil
+	return pendingMembersRemoval
 }
