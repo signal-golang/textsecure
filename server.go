@@ -339,8 +339,6 @@ func SetAccountCapabilities(capabilities config.AccountCapabilities) error {
 
 // SetAccountAttributes updates the account attributes
 func setAccountAttributes(attributes *UpdateAccountAttributes) error {
-	attributes.Capabilities.Gv2_2 = true
-	attributes.Capabilities.Gv2_3 = true
 	body, err := json.Marshal(attributes)
 	if err != nil {
 		return err
@@ -363,6 +361,22 @@ func setAccountAttributes(attributes *UpdateAccountAttributes) error {
 
 type whoAmIResponse struct {
 	UUID string `json:"uuid"`
+}
+
+func GetProfile(uuid string, profileKey []byte) (*profiles.Profile, error) {
+	profile, err := profiles.GetProfile(uuid, profileKey)
+	if err != nil {
+		return nil, err
+	}
+	return profile, nil
+}
+
+func GetProfileAndCredential(uuid string, profileKey []byte) (*profiles.Profile, error) {
+	profile, err := profiles.GetProfileAndCredential(uuid, profileKey)
+	if err != nil {
+		return nil, err
+	}
+	return profile, nil
 }
 
 // GetMyUUID returns the uid from the current user
