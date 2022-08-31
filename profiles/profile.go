@@ -194,6 +194,10 @@ func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
 
 }
 func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
+	if len(profileKey) == 0 {
+		return nil, errors.New("profileKey is empty")
+	}
+
 	log.Infoln("[textsecure] GetProfileAndCredential for " + UUID)
 	uuid, err := uuidUtil.FromString(UUID)
 	if err != nil {
@@ -229,7 +233,6 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("%s\n", string(bytes))
 	err = json.Unmarshal(bytes, profile)
 	if err != nil {
 		log.Debugln("[textsecure] GetProfileAndCredential json unmarshall", err)
@@ -240,6 +243,10 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 			log.Debugln("[textsecure] GetProfileAndCredential", err)
 			return nil, err
 		}
+	}
+	if profile.Credential == nil {
+		log.Debugf("[textsecure] GetProfileAndCredential profile %+v", profile)
+		return nil, errors.New("profile credential is empty")
 	}
 	response := zkgroup.ProfileKeyCredentialResponse(profile.Credential)
 	if err != nil {
@@ -261,6 +268,9 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 
 }
 func decryptProfile(profileKey []byte, profile *Profile) error {
+	if len(profileKey) == 0 {
+		return fmt.Errorf("[textsecure] decryptProfile: no profile key")
+	}
 	log.Println("[textsecure] decryptProfile")
 	if profile.Name != "" {
 		name, err := decryptString(profileKey, profile.Name)
