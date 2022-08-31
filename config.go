@@ -5,6 +5,7 @@ package textsecure
 
 import (
 	"io/ioutil"
+	"os"
 
 	"github.com/go-yaml/yaml"
 	"github.com/signal-golang/textsecure/config"
@@ -36,7 +37,7 @@ func checkUUID(cfg *config.Config) *config.Config {
 
 // ReadConfig reads a YAML config file
 func ReadConfig(fileName string) (*config.Config, error) {
-	b, err := ioutil.ReadFile(fileName)
+	b, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, err
 	}

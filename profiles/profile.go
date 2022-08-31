@@ -244,6 +244,7 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 			return nil, err
 		}
 	}
+	log.Debugf("[textsecure] GetProfileAndCredential profile %+v", profile)
 	if profile.Credential == nil {
 		log.Debugf("[textsecure] GetProfileAndCredential profile %+v", profile)
 		return nil, errors.New("profile credential is empty")

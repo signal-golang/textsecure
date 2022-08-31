@@ -344,7 +344,7 @@ func saveGroupV2(hexid string) error {
 
 // loadGroup loads a group's state from a file.
 func loadGroupV2(hexid string) (*GroupV2, error) {
-	b, err := ioutil.ReadFile(idToPath(hexid))
+	b, err := os.ReadFile(idToPath(hexid))
 	if err != nil {
 		return nil, err
 	}

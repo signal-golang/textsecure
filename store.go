@@ -78,7 +78,7 @@ func newStore(password, path string) (*store, error) {
 				return nil, err
 			}
 		} else {
-			salt, err = ioutil.ReadFile(saltFile)
+			salt, err = os.ReadFile(saltFile)
 			if err != nil {
 				return nil, err
 			}
@@ -161,7 +161,7 @@ func (s *store) decrypt(ciphertext []byte) ([]byte, error) {
 }
 
 func (s *store) readFile(path string) ([]byte, error) {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,7 @@ package groupsv2
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"time"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -88,7 +88,7 @@ func GetGroupExternalCredential(credential *GroupCredential) (*signalservice.Gro
 	if resp.IsError() {
 		return nil, resp
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
