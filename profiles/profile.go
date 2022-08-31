@@ -256,35 +256,37 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 		log.Debugln("[textsecure] GetProfileAndCredential", err)
 		return nil, err
 	}
-	log.Debugln("[textsecure] GetProfileAndCredential credential length", len(credential))
 	profile.Credential = credential
 	return profile, err
 
 }
 func decryptProfile(profileKey []byte, profile *Profile) error {
 	log.Println("[textsecure] decryptProfile")
-	name, err := decryptString(profileKey, profile.Name)
-	if err != nil {
-		log.Debugln("[textsecure] decryptProfile name", profile.Name, err)
-		return err
-	}
-	profile.Name = name
-	if profile.About != "" {
-		about, err := decryptString(profileKey, profile.About)
+	if profile.Name != "" {
+		name, err := decryptString(profileKey, profile.Name)
 		if err != nil {
-			log.Debugln("[textsecure] decryptProfile about", err)
+			log.Debugln("[textsecure] decryptProfile name", profile.Name, err)
 			return err
 		}
-		profile.About = about
-	}
-	if profile.AboutEmoji != "" {
+		profile.Name = name
 
-		emoji, err := decryptString(profileKey, profile.AboutEmoji)
-		if err != nil {
-			log.Debugln("[textsecure] decryptProfile aboutEmoji", err)
-			return err
+		if profile.About != "" {
+			about, err := decryptString(profileKey, profile.About)
+			if err != nil {
+				log.Debugln("[textsecure] decryptProfile about", err)
+				return err
+			}
+			profile.About = about
 		}
-		profile.AboutEmoji = emoji
+		if profile.AboutEmoji != "" {
+
+			emoji, err := decryptString(profileKey, profile.AboutEmoji)
+			if err != nil {
+				log.Debugln("[textsecure] decryptProfile aboutEmoji", err)
+				return err
+			}
+			profile.AboutEmoji = emoji
+		}
 	}
 	identityKey, err := base64.StdEncoding.DecodeString(profile.IdentityKey)
 	if err != nil {

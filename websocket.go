@@ -198,6 +198,7 @@ func StartListening() error {
 				}
 				err = handleReceivedMessage(env)
 				if err != nil {
+					log.Debugf("[textsecure] Failed to handle received message: %+v", env)
 					log.WithFields(log.Fields{
 						"error": err,
 					}).Error("[textsecure] Failed to handle received message")

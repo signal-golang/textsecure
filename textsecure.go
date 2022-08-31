@@ -633,7 +633,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 		}
 
 		p, _ := proto.Marshal(env)
-		log.Debugf("[textsecure] Incoming UnidentifiedSenderMessage %s.\n", env)
+		log.Debugf("[textsecure] Incoming UnidentifiedSenderMessage %s.\n", *env.DestinationUuid)
 		data, err := crayfish.Instance.HandleEnvelope(p)
 		if err != nil {
 			return err
