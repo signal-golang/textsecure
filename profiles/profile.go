@@ -361,6 +361,7 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 
 // GetProfileUUID get a profile by a phone number
 func GetProfileUUID(uuid string) (*Profile, error) {
+	log.Debug("[textsecure] GetProfileUUID", uuid)
 	c := contacts.Contacts[uuid]
 	profile := &Profile{}
 	var err error

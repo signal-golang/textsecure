@@ -458,7 +458,7 @@ func registerDevice() error {
 
 func handleReceipt(env *signalservice.Envelope) {
 	if client.ReceiptHandler != nil {
-		client.ReceiptHandler(env.GetSourceUuid(), env.GetSourceDevice(), env.GetTimestamp())
+		client.ReceiptHandler(env.GetSourceUuid(), env.GetSourceDevice(), env.GetServerTimestamp())
 	}
 }
 
@@ -594,7 +594,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			return err
 		}
 		b = stripPadding(b)
-		err = handleMessage(env.GetSourceUuid(), env.GetSourceUuid(), env.GetTimestamp(), b)
+		err = handleMessage(env.GetSourceUuid(), env.GetSourceUuid(), env.GetServerTimestamp(), b)
 		if err != nil {
 			return err
 		}
@@ -622,7 +622,7 @@ func handleReceivedMessage(env *signalservice.Envelope) error {
 			return err
 		}
 		b = stripPadding(b)
-		err = handleMessage(env.GetSourceUuid(), env.GetSourceUuid(), env.GetTimestamp(), b)
+		err = handleMessage(env.GetSourceUuid(), env.GetSourceUuid(), env.GetServerTimestamp(), b)
 		if err != nil {
 			return err
 		}
