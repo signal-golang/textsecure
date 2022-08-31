@@ -380,6 +380,9 @@ func GetProfileByUUID(uuid string) (*profiles.Profile, error) {
 func GetAvatar(uuid string) (io.ReadCloser, error) {
 	return profiles.GetLocalAvatar(uuid)
 }
+func GetAvatarPath(uuid string) (string, error) {
+	return profiles.GetLocalAvatarPath(uuid)
+}
 
 func GetProfileAndCredential(uuid string, profileKey []byte) (*profiles.Profile, error) {
 	if uuid == "" || len(profileKey) == 0 {
