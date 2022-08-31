@@ -360,7 +360,7 @@ func GetProfileE164(tel string) (contacts.Contact, error) {
 }
 
 // GetProfileUUID get a profile by a phone number
-func GetProfileUUID(uuid string) (*contacts.Contact, error) {
+func GetProfileUUID(uuid string) (*Profile, error) {
 	c := contacts.Contacts[uuid]
 	profile := &Profile{}
 	var err error
@@ -440,5 +440,5 @@ func GetProfileUUID(uuid string) (*contacts.Contact, error) {
 	}
 	contacts.Contacts[c.UUID] = c
 	contacts.WriteContactsToPath()
-	return &c, nil
+	return profile, nil
 }

@@ -370,8 +370,18 @@ func GetProfile(uuid string, profileKey []byte) (*profiles.Profile, error) {
 	}
 	return profile, nil
 }
+func GetProfileByUUID(uuid string) (*profiles.Profile, error) {
+	profile, err := profiles.GetProfileUUID(uuid)
+	if err != nil {
+		return nil, err
+	}
+	return profile, nil
+}
 
 func GetProfileAndCredential(uuid string, profileKey []byte) (*profiles.Profile, error) {
+	if uuid == "" || len(profileKey) == 0 {
+		return nil, fmt.Errorf("uuid or profileKey is empty")
+	}
 	profile, err := profiles.GetProfileAndCredential(uuid, profileKey)
 	if err != nil {
 		return nil, err
