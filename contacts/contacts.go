@@ -4,7 +4,6 @@
 package contacts
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -168,7 +167,14 @@ func UpdateProfileKey(src string, profileKey []byte) error {
 		Contacts[src] = contact
 		return WriteContactsToPath()
 	}
-	return fmt.Errorf("Contact to update not found %s", src)
+	// create new contact
+	Contacts[src] = Contact{
+		UUID:       src,
+		Name:       src,
+		ProfileKey: profileKey,
+	}
+	return WriteContactsToPath()
+
 }
 
 func GetContact(uuid string) Contact {
