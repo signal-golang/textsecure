@@ -2,7 +2,7 @@ package rootCa
 
 import (
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 
 	"github.com/signal-golang/textsecure/utils"
 
@@ -70,7 +70,7 @@ var DirectoryCA *x509.CertPool
 func SetupCA(rootca string) {
 	pem := []byte(rootPEM)
 	if rootca != "" && utils.Exists(rootca) {
-		b, err := ioutil.ReadFile(rootca)
+		b, err := os.ReadFile(rootca)
 		if err != nil {
 			log.Error(err)
 			return

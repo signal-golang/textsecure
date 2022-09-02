@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"mime/quotedprintable"
 	"regexp"
 	"strconv"
@@ -377,6 +377,12 @@ func GetProfileByUUID(uuid string) (*profiles.Profile, error) {
 	}
 	return profile, nil
 }
+func GetAvatar(uuid string) (io.ReadCloser, error) {
+	return profiles.GetLocalAvatar(uuid)
+}
+func GetAvatarPath(uuid string) (string, error) {
+	return profiles.GetLocalAvatarPath(uuid)
+}
 
 func GetProfileAndCredential(uuid string, profileKey []byte) (*profiles.Profile, error) {
 	if uuid == "" || len(profileKey) == 0 {
@@ -678,7 +684,7 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 		UUID := idToHexUUID(responseData[ind*uuidlength : (ind+1)*uuidlength])
 		index := findIndexByE147(phone, localContacts)
 		if strings.Count(localContacts[index].Name, "=") > 2 {
-			decodedName, err := ioutil.ReadAll(quotedprintable.NewReader(strings.NewReader(localContacts[index].Name)))
+			decodedName, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(localContacts[index].Name)))
 			if err != nil {
 				log.Debug("[textsecure] GetRegisteredContacts update name from quoted printable error:", err)
 			} else {

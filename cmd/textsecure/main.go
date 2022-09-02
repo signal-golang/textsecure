@@ -332,7 +332,7 @@ func GroupsHandler(w http.ResponseWriter, r *http.Request) {
 
 	filepath.Walk(".storage/groups", func(path string, info os.FileInfo, e error) error {
 		if info.Mode().IsRegular() {
-			b, err := ioutil.ReadFile(path)
+			b, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
@@ -414,7 +414,7 @@ func JSONHandler(w http.ResponseWriter, r *http.Request) {
 	if messageField == "" {
 		messageField = "message"
 	}
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Error("Error: ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)

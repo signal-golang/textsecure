@@ -2,7 +2,6 @@ package textsecure
 
 import (
 	"github.com/golang/protobuf/proto"
-	"github.com/signal-golang/textsecure/config"
 	"github.com/signal-golang/textsecure/groupsv2"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +19,7 @@ func handleMessage(srcE164 string, srcUUID string, timestamp uint64, b []byte) e
 
 	if dm := content.GetDataMessage(); dm != nil {
 		return handleDataMessage(srcE164, srcUUID, timestamp, dm)
-	} else if sm := content.GetSyncMessage(); sm != nil && config.ConfigFile.Tel == srcE164 {
+	} else if sm := content.GetSyncMessage(); sm != nil {
 		return handleSyncMessage(srcE164, srcUUID, timestamp, sm)
 	} else if cm := content.GetCallMessage(); cm != nil {
 		return handleCallMessage(srcE164, srcUUID, timestamp, cm)

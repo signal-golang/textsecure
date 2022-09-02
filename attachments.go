@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -70,7 +69,7 @@ func uploadAttachment(r io.Reader, ct string) (*att, error) {
 	keys := make([]byte, 64)
 	randBytes(keys)
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
 	keys := make([]byte, 64)
 	randBytes(keys)
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +140,7 @@ func handleSingleAttachment(a *textsecure.AttachmentPointer) (*Attachment, error
 	}
 	defer r.Close()
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +171,7 @@ func handleProfileAvatar(profileAvatar *signalservice.ContactDetails_Avatar, key
 	}
 	defer r.Close()
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

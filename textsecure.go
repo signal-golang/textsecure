@@ -356,7 +356,8 @@ func Setup(c *Client) error {
 			}
 		}
 	}
-	if len(config.ConfigFile.ProfileKeyCredential) == 0 || true {
+	if len(config.ConfigFile.ProfileKeyCredential) == 0 {
+		log.Infoln("[textsecure] Generating profile key credential")
 		profiles.UpdateProfile(config.ConfigFile.ProfileKey, config.ConfigFile.UUID, config.ConfigFile.Name)
 		profile, err := profiles.GetProfileAndCredential(config.ConfigFile.UUID, config.ConfigFile.ProfileKey)
 		if err != nil {
@@ -365,6 +366,8 @@ func Setup(c *Client) error {
 		config.ConfigFile.ProfileKeyCredential = []byte(profile.Credential)
 		saveConfig(config.ConfigFile)
 
+	} else {
+		log.Infoln("[textsecure] Using existing profile key credential", len(config.ConfigFile.ProfileKeyCredential))
 	}
 
 	return err

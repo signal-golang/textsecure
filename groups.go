@@ -66,7 +66,7 @@ func saveGroup(hexid string) error {
 // loadGroup loads a group's state from a file.
 func loadGroup(path string) error {
 	_, hexid := filepath.Split(path)
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}

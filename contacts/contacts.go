@@ -4,8 +4,8 @@
 package contacts
 
 import (
-	"fmt"
 	"io/ioutil"
+	"os"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	log "github.com/sirupsen/logrus"
@@ -67,7 +67,7 @@ var filePath string
 // ReadContacts loads the contacts yaml file and pareses it
 func ReadContacts(fileName string) ([]Contact, error) {
 	log.Debug("[textsecure] read contacts from ", fileName)
-	b, err := ioutil.ReadFile(fileName)
+	b, err := os.ReadFile(fileName)
 	filePath = fileName
 	contactsYaml := &yamlContacts{}
 	if err != nil {
@@ -127,7 +127,7 @@ func updateContact(c *signalservice.ContactDetails) error {
 	// 	r = att.R
 	// 	buf.ReadFrom(r)
 	// }
-	// avatar, _ := ioutil.ReadAll(buf)
+	// avatar, _ := io.ReadAll(buf)
 
 	Contacts[c.GetUuid()] = Contact{
 		Tel:  c.GetNumber(),
@@ -167,7 +167,14 @@ func UpdateProfileKey(src string, profileKey []byte) error {
 		Contacts[src] = contact
 		return WriteContactsToPath()
 	}
-	return fmt.Errorf("Contact to update not found %s", src)
+	// create new contact
+	Contacts[src] = Contact{
+		UUID:       src,
+		Name:       src,
+		ProfileKey: profileKey,
+	}
+	return WriteContactsToPath()
+
 }
 
 func GetContact(uuid string) Contact {

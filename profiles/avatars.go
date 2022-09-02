@@ -37,8 +37,21 @@ func GetRemoteAvatar(avatarURL string) (io.ReadCloser, error) {
 
 	return resp.Body, nil
 }
-
-func getLocalAvatar(uuid string) (io.ReadCloser, error) {
+func GetLocalAvatarPath(uuid string) (string, error) {
+	log.Debugln("[textsecure] get local avatar for ", uuid)
+	if uuid == "" {
+		return "", fmt.Errorf("empty uuid")
+	}
+	if avatarsPath == "" {
+		err := setupAvatarsPath()
+		if err != nil {
+			return "", err
+		}
+	}
+	avatarFile := filepath.Join(avatarsPath, uuid)
+	return avatarFile, nil
+}
+func GetLocalAvatar(uuid string) (io.ReadCloser, error) {
 	log.Debugln("[textsecure] get local avatar for ", uuid)
 	if uuid == "" {
 		return nil, fmt.Errorf("empty uuid")
@@ -101,7 +114,6 @@ func setupAvatarsPath() error {
 	if err := os.MkdirAll(avatarsPath, 0700); err != nil {
 		return err
 	}
-	log.Debugln("[textsecure] setup avatars path ", avatarsPath)
 	return nil
 }
 

@@ -17,41 +17,24 @@ import (
 // handleSyncMessage handles an incoming SyncMessage.
 func handleSyncMessage(src string, srcUUID string, timestamp uint64, sm *signalservice.SyncMessage) error {
 	log.Debugf("[textsecure] SyncMessage recieved at %d", timestamp)
-
-	if sm.GetContacts() != nil {
+	if sm.GetSent() != nil {
+		log.Debugln("[textsecure] SyncMessage getSent")
+		return handleSyncSent(sm.GetSent(), timestamp)
+	} else if sm.GetContacts() != nil {
 		log.Debugln("[textsecure] SyncMessage unhandled contacts")
 		return nil
 	} else if sm.GetGroups() != nil {
 		log.Debugln("[textsecure] SyncMessage groups")
 		return nil
-	} else if sm.GetRead() != nil {
-		log.Debugln("[textsecure] SyncMessage getRead")
-		return handleSyncRead(sm.GetRead())
-	} else if sm.GetViewed() != nil {
-		log.Debugln("[textsecure] SyncMessage unhandled getViewed")
-		return nil
-	} else if sm.GetViewOnceOpen() != nil {
-		log.Debugln("[textsecure] SyncMessage unhandled GetViewOnceOpen")
-		return nil
-	} else if sm.GetViewOnceOpen() != nil {
-		log.Debugln("[textsecure] SyncMessage unhandled GetBlockedList")
-		return nil
-	} else if sm.GetBlocked() != nil {
-		log.Debugln("[textsecure] SyncMessage blocked")
-		return nil
-	} else if sm.GetConfiguration() != nil {
-		log.Debugln("[textsecure] SyncMessage unahndled configuration")
-		return nil
-	} else if sm.GetSent() != nil {
-		log.Debugln("[textsecure] SyncMessage getSent")
-		return handleSyncSent(sm.GetSent(), timestamp)
-	} else if sm.GetStickerPackOperation() != nil {
-		log.Debugln("[textsecure] SyncMessage unhandled GetStickerPackOperation")
-		return nil
 	} else if sm.GetRequest() != nil {
 		log.Debugln("[textsecure] SyncMessage getRequest")
 		return handleSyncRequest(sm.GetRequest())
-
+	} else if sm.GetRead() != nil {
+		log.Debugln("[textsecure] SyncMessage getRead")
+		return handleSyncRead(sm.GetRead())
+	} else if sm.GetBlocked() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled getBlocked")
+		return nil
 	} else if sm.GetVerified() != nil {
 		log.Debugln("[textsecure] SyncMessage verified")
 		unidentifiedAccess, err := unidentifiedAccess.GetAccessForSync(config.ConfigFile.ProfileKey, config.ConfigFile.Certificate)
@@ -59,13 +42,38 @@ func handleSyncMessage(src string, srcUUID string, timestamp uint64, sm *signals
 			return err
 		}
 		return sendVerifiedMessage(sm.GetVerified(), unidentifiedAccess)
-
-	} else if sm.GetPadding() != nil {
-		log.Debugln("[textsecure] SyncMessage padding")
+	} else if sm.GetConfiguration() != nil {
+		log.Debugln("[textsecure] SyncMessage unahndled configuration")
 		return nil
-
+	} else if sm.GetPadding() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled padding")
+		return nil
+	} else if sm.GetStickerPackOperation() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetStickerPackOperation")
+		return nil
+	} else if sm.GetViewOnceOpen() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetViewOnceOpen")
+		return nil
 	} else if sm.GetFetchLatest() != nil {
-		log.Debugln("[textsecure] SyncMessage GetFetchLatest")
+		log.Debugln("[textsecure] SyncMessage unhandled GetFetchLatest")
+		return nil
+	} else if sm.GetKeys() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetKeys")
+		return nil
+	} else if sm.GetMessageRequestResponse() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetMessageRequestResponse")
+		return nil
+	} else if sm.GetOutgoingPayment() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled GetOutgoing payment")
+		return nil
+	} else if sm.GetViewed() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled getViewed")
+		return nil
+	} else if sm.GetPniIdentity() != nil {
+		log.Debug("[textsecure] SyncMessage unhandled getPniIdentity")
+		return nil
+	} else if sm.GetPniChangeNumber() != nil {
+		log.Debugln("[textsecure] SyncMessage unhandled getPniChangeNumber")
 		return nil
 	} else {
 		log.Errorf("[textsecure] SyncMessage contains no known sync types")
