@@ -177,8 +177,7 @@ func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {
 		if n > 0 {
 			d := buf[:n]
 			out = append(out, d...)
-			log.Println("[crayfish]", string(d))
-			// _, err := w.Write(d)
+			log.Debugln("[crayfish]", string(d))
 			if err != nil {
 				return out, err
 			}
