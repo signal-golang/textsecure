@@ -206,6 +206,9 @@ func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, 
 	var ts uint64
 	var err error
 	g := groupsV2.FindGroup(hexid)
+	if g == nil {
+		return 0, fmt.Errorf("group not found %s", hexid)
+	}
 	g.CheckJoinStatus()
 	if g == nil {
 		log.Infoln("[textsecure] sendGroupv2Helper unknown group id")
