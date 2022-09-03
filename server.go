@@ -23,6 +23,7 @@ import (
 	"github.com/signal-golang/textsecure/contactDiscoveryCrypto"
 	"github.com/signal-golang/textsecure/contacts"
 	"github.com/signal-golang/textsecure/contactsDiscovery"
+	"github.com/signal-golang/textsecure/groupsv2"
 	"github.com/signal-golang/textsecure/profiles"
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/registration"
@@ -393,6 +394,11 @@ func GetProfileAndCredential(uuid string, profileKey []byte) (*profiles.Profile,
 		return nil, err
 	}
 	return profile, nil
+}
+
+// GetGroupV2MembersForGroup returns the members of a group
+func GetGroupV2MembersForGroup(group string) ([]*signalservice.DecryptedMember, error) {
+	return groupsv2.GetGroupV2MembersForGroup(group)
 }
 
 // GetMyUUID returns the uid from the current user

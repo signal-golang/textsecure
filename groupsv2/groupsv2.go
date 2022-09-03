@@ -224,7 +224,15 @@ func (g *GroupV2) UpdateGroupFromServer() error {
 
 	return nil
 }
+func GetGroupV2MembersForGroup(group string) ([]*signalservice.DecryptedMember, error) {
+	g := FindGroup(group)
+	if g == nil {
+		return nil, fmt.Errorf("Group not found")
+	}
+	g.UpdateGroupFromServer()
 
+	return g.DecryptedGroup.Members, nil
+}
 func HandleGroupsV2(src string, dm *signalservice.DataMessage) (*GroupV2, error) {
 	groupContext := dm.GetGroupV2()
 	if groupContext == nil {
