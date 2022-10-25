@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
@@ -231,7 +232,12 @@ func fetchSignedUploadLocation() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return a.SignedUploadLocation, nil
+	return relativeUrlPath(a.SignedUploadLocation), nil
+}
+
+func relativeUrlPath(location string) string {
+	parts := strings.Split(location, "/")
+	return strings.Join(parts[3:], "/")
 }
 
 func allocateAttachmentV3() (string, error) {
@@ -239,22 +245,12 @@ func allocateAttachmentV3() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequest("POST", signedUploadLocation, nil)
+	resp, err := transport.CdnTransport.Post(signedUploadLocation, []byte{}, "application/octet-stream")
 	if err != nil {
 		return "", err
 	}
-	req.Header.Add("Content-Type", "application/octet-stream")
-	req.Header.Add("Content-Length", "0")
-
-	client := transport.NewHTTPClient()
-	resp, err := client.Do(req)
-	if err != nil {
+	if resp.IsError() {
 		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("HTTP status %d\n", resp.StatusCode)
 	}
 	return resp.Header.Get("Location"), nil
 }
