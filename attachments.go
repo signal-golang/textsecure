@@ -13,7 +13,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
@@ -232,12 +231,7 @@ func fetchSignedUploadLocation() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return relativeUrlPath(a.SignedUploadLocation), nil
-}
-
-func relativeUrlPath(location string) string {
-	parts := strings.Split(location, "/")
-	return strings.Join(parts[2:], "/")
+	return a.SignedUploadLocation, nil
 }
 
 func allocateAttachmentV3() (string, error) {
@@ -245,7 +239,6 @@ func allocateAttachmentV3() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Debug("[textsecure] allocateAttacmentV3 signedUploadLocation ", signedUploadLocation)
 	req, err := http.NewRequest("POST", signedUploadLocation, nil)
 	if err != nil {
 		return "", err
