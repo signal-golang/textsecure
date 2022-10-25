@@ -237,7 +237,7 @@ func fetchSignedUploadLocation() (string, error) {
 
 func relativeUrlPath(location string) string {
 	parts := strings.Split(location, "/")
-	return strings.Join(parts[3:], "/")
+	return "/" + strings.Join(parts[3:], "/")
 }
 
 func allocateAttachmentV3() (string, error) {
