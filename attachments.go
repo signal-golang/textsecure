@@ -67,11 +67,11 @@ func putAttachment(url string, body []byte) ([]byte, error) {
 
 // uploadAttachment encrypts, authenticates and uploads a given attachment to a location requested from the server
 func uploadAttachment(r io.Reader, ct string) (*att, error) {
-	return uploadAttachmentV3(r, ct)
+	return uploadAttachmentV3(r, ct, false)
 }
 
 // uploadAttachmentV1 encrypts, authenticates and uploads a given attachment to a location requested from the server
-func uploadAttachmentV1(r io.Reader, ct string) (*att, error) {
+func uploadAttachmentV1(r io.Reader, ct string, isVoiceNote bool) (*att, error) {
 	//combined AES-256 and HMAC-SHA256 key
 	keys := make([]byte, 64)
 	randBytes(keys)
@@ -99,11 +99,11 @@ func uploadAttachmentV1(r io.Reader, ct string) (*att, error) {
 		return nil, err
 	}
 
-	return &att{id, ct, keys, digest, uint32(plaintextLength), false}, nil
+	return &att{id, ct, keys, digest, uint32(plaintextLength), isVoiceNote}, nil
 }
 
 // uploadAttachmentV3 encrypts, authenticates and uploads a given attachment to a location requested from the server
-func uploadAttachmentV3(r io.Reader, ct string) (*att, error) {
+func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*att, error) {
 	//combined AES-256 and HMAC-SHA256 key
 	keys := make([]byte, 64)
 	randBytes(keys)
@@ -132,39 +132,11 @@ func uploadAttachmentV3(r io.Reader, ct string) (*att, error) {
 		return nil, err
 	}
 	// FIXME I don't know yet how to get the attachment pointer id
-	return &att{0, ct, keys, digest, uint32(plaintextLength), false}, nil
+	return &att{0, ct, keys, digest, uint32(plaintextLength), isVoiceNote}, nil
 }
 
 func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
-	ct = "audio/mpeg"
-	//combined AES-256 and HMAC-SHA256 key
-	keys := make([]byte, 64)
-	randBytes(keys)
-
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	plaintextLength := len(b)
-
-	e, err := aesEncrypt(keys[:32], b)
-	if err != nil {
-		return nil, err
-	}
-
-	m := appendMAC(keys[32:], e)
-
-	id, location, err := allocateAttachment()
-	if err != nil {
-		return nil, err
-	}
-	digest, err := putAttachment(location, m)
-	if err != nil {
-		return nil, err
-	}
-
-	return &att{id, ct, keys, digest, uint32(plaintextLength), true}, nil
+	return uploadAttachmentV3(r, "audio/mpeg", true)
 }
 
 // ErrInvalidMACForAttachment signals that the downloaded attachment has an invalid MAC.
