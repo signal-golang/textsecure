@@ -245,13 +245,23 @@ func allocateAttachmentV3() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Debug("[textsecure] allocateAttacmentV3 signedUploadLocation", signedUploadLocation)
-	resp, err := transport.CdnTransport.Post(signedUploadLocation, []byte{}, "application/octet-stream")
+	log.Debug("[textsecure] allocateAttacmentV3 signedUploadLocation ", signedUploadLocation)
+	req, err := http.NewRequest("POST", signedUploadLocation, nil)
 	if err != nil {
 		return "", err
 	}
-	if resp.IsError() {
+	req.Header.Add("Content-Type", "application/octet-stream")
+	req.Header.Add("Content-Length", "0")
+
+	client := transport.NewHTTPClient()
+	resp, err := client.Do(req)
+	if err != nil {
 		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("HTTP status %d\n", resp.StatusCode)
 	}
 	return resp.Header.Get("Location"), nil
 }
