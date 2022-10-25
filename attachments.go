@@ -126,7 +126,7 @@ func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*att, error) 
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("[textsecure] uploadAttachmentV3 location", location)
+	log.Debug("[textsecure] uploadAttachmentV3 location ", location)
 	digest, err := putAttachment(location, m)
 	if err != nil {
 		return nil, err
@@ -250,7 +250,7 @@ func allocateAttachmentV3() (string, error) {
 		return "", err
 	}
 	if resp.IsError() {
-		return "", err
+		return "", resp
 	}
 	return resp.Header.Get("Location"), nil
 }
