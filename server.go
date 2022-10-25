@@ -36,6 +36,7 @@ import (
 
 var (
 	SERVICE_REFLECTOR_HOST = "europe-west1-signal-cdn-reflector.cloudfunctions.net"
+	SIGNAL_SERVICE_URL     = "https://chat.signal.org"
 	SIGNAL_CDN_URL         = "https://cdn.signal.org"
 	SIGNAL_CDN2_URL        = "https://cdn2.signal.org"
 	DIRECTORY_URL          = "https://api.directory.signal.org"
@@ -719,6 +720,9 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 }
 
 // Attachment handling
+type attachmentV3UploadAttributes struct {
+	SignedUploadLocation string "json: signedUploadLocation"
+}
 
 type jsonAllocation struct {
 	ID       uint64 `json:"id"`

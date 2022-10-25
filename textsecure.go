@@ -317,6 +317,7 @@ func Setup(c *Client) error {
 	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupServiceTransporter(SIGNAL_SERVICE_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	// config.ConfigFile = checkUUID(config.ConfigFile)

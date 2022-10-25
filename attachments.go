@@ -13,10 +13,12 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/transport"
+	log "github.com/sirupsen/logrus"
 )
 
 // getAttachment downloads an encrypted attachment blob from the given URL
@@ -65,6 +67,11 @@ func putAttachment(url string, body []byte) ([]byte, error) {
 
 // uploadAttachment encrypts, authenticates and uploads a given attachment to a location requested from the server
 func uploadAttachment(r io.Reader, ct string) (*att, error) {
+	return uploadAttachmentV3(r, ct)
+}
+
+// uploadAttachmentV1 encrypts, authenticates and uploads a given attachment to a location requested from the server
+func uploadAttachmentV1(r io.Reader, ct string) (*att, error) {
 	//combined AES-256 and HMAC-SHA256 key
 	keys := make([]byte, 64)
 	randBytes(keys)
@@ -94,6 +101,40 @@ func uploadAttachment(r io.Reader, ct string) (*att, error) {
 
 	return &att{id, ct, keys, digest, uint32(plaintextLength), false}, nil
 }
+
+// uploadAttachmentV3 encrypts, authenticates and uploads a given attachment to a location requested from the server
+func uploadAttachmentV3(r io.Reader, ct string) (*att, error) {
+	//combined AES-256 and HMAC-SHA256 key
+	keys := make([]byte, 64)
+	randBytes(keys)
+
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	plaintextLength := len(b)
+
+	e, err := aesEncrypt(keys[:32], b)
+	if err != nil {
+		return nil, err
+	}
+
+	m := appendMAC(keys[32:], e)
+
+	location, err := allocateAttachmentV3()
+	if err != nil {
+		return nil, err
+	}
+	log.Debug("[textsecure] uploadAttachmentV3 location", location)
+	digest, err := putAttachment(location, m)
+	if err != nil {
+		return nil, err
+	}
+	// FIXME I don't know yet how to get the attachment pointer id
+	return &att{0, ct, keys, digest, uint32(plaintextLength), false}, nil
+}
+
 func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
 	ct = "audio/mpeg"
 	//combined AES-256 and HMAC-SHA256 key
@@ -206,6 +247,41 @@ func handleAttachments(dm *textsecure.DataMessage) ([]*Attachment, error) {
 		}
 	}
 	return all, nil
+}
+
+func fetchSignedUploadLocation() (string, error) {
+	resp, err := transport.ServiceTransport.Get(ATTACHMENT_V3_PATH)
+	if err != nil {
+		return "", err
+	}
+	dec := json.NewDecoder(resp.Body)
+	var a attachmentV3UploadAttributes
+	err = dec.Decode(&a)
+	if err != nil {
+		return "", err
+	}
+	return relativeUrlPath(a.SignedUploadLocation), nil
+}
+
+func relativeUrlPath(location string) string {
+	parts := strings.Split(location, "/")
+	return strings.Join(parts[2:], "/")
+}
+
+func allocateAttachmentV3() (string, error) {
+	signedUploadLocation, err := fetchSignedUploadLocation()
+	if err != nil {
+		return "", err
+	}
+	log.Debug("[textsecure] allocateAttacmentV3 signedUploadLocation", signedUploadLocation)
+	resp, err := transport.CdnTransport.Post(signedUploadLocation, []byte{}, "application/octet-stream")
+	if err != nil {
+		return "", err
+	}
+	if resp.IsError() {
+		return "", err
+	}
+	return resp.Header.Get("Location"), nil
 }
 
 // GET /v1/attachments/
