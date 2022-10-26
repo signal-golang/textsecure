@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
@@ -35,6 +36,21 @@ func getAttachment(url string) (io.ReadCloser, error) {
 	}
 
 	return resp.Body, nil
+}
+
+// putAttachment uploads an encrypted attachment to the given relative URL using the CdnTransport
+func putAttachmentV3(url string, body []byte) ([]byte, error) {
+	response, err := transport.CdnTransport.Put(url, body, "application/octet-stream")
+	if err != nil {
+		return nil, err
+	}
+	if response.IsError() {
+		return nil, response
+	}
+	hasher := sha256.New()
+	hasher.Write(body)
+
+	return hasher.Sum(nil), nil
 }
 
 // putAttachment uploads an encrypted attachment to the given URL
@@ -125,8 +141,7 @@ func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*att, error) 
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("[textsecure] uploadAttachmentV3 location ", location)
-	digest, err := putAttachment(location, m)
+	digest, err := putAttachmentV3(location, m)
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +249,15 @@ func getAttachmentV3UploadAttributes() (*attachmentV3UploadAttributes, error) {
 	return &a, nil
 }
 
+func relativePath(url string) string {
+	parts := strings.Split(url, "/")
+	return "/" + strings.Join(parts[3:], "/")
+}
+
+func (a *attachmentV3UploadAttributes) relativeSignedUploadLocation() string {
+	return relativePath(a.SignedUploadLocation)
+}
+
 func allocateAttachmentV3() (string, error) {
 	uploadAttributes, err := getAttachmentV3UploadAttributes()
 	if err != nil {
@@ -251,7 +275,8 @@ func allocateAttachmentV3() (string, error) {
 		log.Debug("[textsecure] allocateAttachmentV3 error response ", resp.Body)
 		return "", resp
 	}
-	return resp.Header.Get("Location"), nil
+	location := resp.Header.Get("Location")
+	return relativePath(location), nil
 }
 
 // GET /v1/attachments/

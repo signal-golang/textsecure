@@ -727,11 +727,6 @@ type attachmentV3UploadAttributes struct {
 	SignedUploadLocation string            `json:"signedUploadLocation"`
 }
 
-func (a *attachmentV3UploadAttributes) relativeSignedUploadLocation() string {
-	parts := strings.Split(a.SignedUploadLocation, "/")
-	return "/" + strings.Join(parts[3:], "/")
-}
-
 type jsonAllocation struct {
 	ID       uint64 `json:"id"`
 	Location string `json:"location"`
