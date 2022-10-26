@@ -57,7 +57,6 @@ var (
 	DELETE_USERNAME_PATH      = "/v1/accounts/username"
 	DELETE_ACCOUNT_PATH       = "/v1/accounts/me"
 
-	allocateAttachmentPath   = "/v1/attachments/"
 	attachmentPath           = "/v2/attachments/form/upload"
 	ATTACHMENT_DOWNLOAD_PATH = "/v2/attachments/"
 

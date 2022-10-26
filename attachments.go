@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
@@ -53,68 +52,9 @@ func putAttachmentV3(url string, body []byte) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-// putAttachment uploads an encrypted attachment to the given URL
-func putAttachment(url string, body []byte) ([]byte, error) {
-	br := bytes.NewReader(body)
-	req, err := http.NewRequest("PUT", url, br)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Content-Type", "application/octet-stream")
-	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
-
-	client := transport.NewHTTPClient()
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("HTTP status %d\n", resp.StatusCode)
-	}
-
-	hasher := sha256.New()
-	hasher.Write(body)
-
-	return hasher.Sum(nil), nil
-}
-
 // uploadAttachment encrypts, authenticates and uploads a given attachment to a location requested from the server
 func uploadAttachment(r io.Reader, ct string) (*attachmentPointerV3, error) {
 	return uploadAttachmentV3(r, ct, false)
-}
-
-// uploadAttachmentV1 encrypts, authenticates and uploads a given attachment to a location requested from the server
-func uploadAttachmentV1(r io.Reader, ct string, isVoiceNote bool) (*att, error) {
-	//combined AES-256 and HMAC-SHA256 key
-	keys := make([]byte, 64)
-	randBytes(keys)
-
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	plaintextLength := len(b)
-
-	e, err := aesEncrypt(keys[:32], b)
-	if err != nil {
-		return nil, err
-	}
-
-	m := appendMAC(keys[32:], e)
-
-	id, location, err := allocateAttachment()
-	if err != nil {
-		return nil, err
-	}
-	digest, err := putAttachment(location, m)
-	if err != nil {
-		return nil, err
-	}
-
-	return &att{id, ct, keys, digest, uint32(plaintextLength), isVoiceNote}, nil
 }
 
 // uploadAttachmentV3 encrypts, authenticates and uploads a given attachment to a location requested from the server
@@ -145,7 +85,6 @@ func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*attachmentPo
 	if err != nil {
 		return nil, err
 	}
-	// FIXME I don't know yet how to get the attachment pointer id
 	return &attachmentPointerV3{uploadAttributes.Key, uploadAttributes.Cdn, ct, keys, digest, uint32(plaintextLength), isVoiceNote}, nil
 }
 
@@ -186,6 +125,7 @@ func handleSingleAttachment(a *textsecure.AttachmentPointer) (*Attachment, error
 
 	return &Attachment{bytes.NewReader(b), a.GetContentType(), a.GetFileName()}, nil
 }
+
 func handleProfileAvatar(profileAvatar *signalservice.ContactDetails_Avatar, key []byte) (*Attachment, error) {
 
 	loc, err := getProfileLocation(profileAvatar.String())
@@ -277,18 +217,6 @@ func allocateAttachmentV3() (string, *attachmentV3UploadAttributes, error) {
 	}
 	location := resp.Header.Get("Location")
 	return relativePath(location), uploadAttributes, nil
-}
-
-// GET /v1/attachments/
-func allocateAttachment() (uint64, string, error) {
-	resp, err := transport.Transport.Get(allocateAttachmentPath)
-	if err != nil {
-		return 0, "", err
-	}
-	dec := json.NewDecoder(resp.Body)
-	var a jsonAllocation
-	dec.Decode(&a)
-	return a.ID, a.Location, nil
 }
 
 func getAttachmentLocation(id uint64, key string, cdnNumber uint32) (string, error) {

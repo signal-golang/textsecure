@@ -90,15 +90,6 @@ func needsRegistration() bool {
 
 var identityKey *axolotl.IdentityKeyPair
 
-type att struct {
-	id        uint64
-	ct        string
-	keys      []byte
-	digest    []byte
-	size      uint32
-	voiceNote bool
-}
-
 type attachmentPointerV3 struct {
 	cdnKey    string
 	cdnNr     uint32
