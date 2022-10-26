@@ -75,7 +75,7 @@ type Transporter interface {
 	Get(url string) (*response, error)
 	Del(url string) (*response, error)
 	Put(url string, body []byte, ct string) (*response, error)
-	Post(url string, body []byte, contentType string) (*response, error)
+	PostWithHeaders(url string, body []byte, contentType string, headers map[string]string) (*response, error)
 	PutWithAuth(url string, body []byte, ct string, auth string) (*response, error)
 	PatchWithAuth(url string, body []byte, ct string, auth string) (*response, error)
 
@@ -201,11 +201,14 @@ func (ht *httpTransporter) Del(url string) (*response, error) {
 	return r, err
 }
 
-func (ht *httpTransporter) Post(url string, body []byte, ct string) (*response, error) {
+func (ht *httpTransporter) PostWithHeaders(url string, body []byte, ct string, headers map[string]string) (*response, error) {
 	br := bytes.NewReader(body)
 	req, err := http.NewRequest("POST", ht.baseURL+url, br)
 	if err != nil {
 		return nil, err
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 	if ht.userAgent != "" {
 		req.Header.Set("X-Signal-Agent", ht.userAgent)

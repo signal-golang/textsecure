@@ -13,7 +13,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
@@ -221,31 +220,30 @@ func handleAttachments(dm *textsecure.DataMessage) ([]*Attachment, error) {
 	return all, nil
 }
 
-func fetchSignedUploadLocation() (string, error) {
+func getAttachmentV3UploadAttributes() (*attachmentV3UploadAttributes, error) {
 	resp, err := transport.ServiceTransport.Get(ATTACHMENT_V3_PATH)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	dec := json.NewDecoder(resp.Body)
 	var a attachmentV3UploadAttributes
 	err = dec.Decode(&a)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return relativeUrlPath(a.SignedUploadLocation), nil
-}
-
-func relativeUrlPath(location string) string {
-	parts := strings.Split(location, "/")
-	return "/" + strings.Join(parts[3:], "/")
+	return &a, nil
 }
 
 func allocateAttachmentV3() (string, error) {
-	signedUploadLocation, err := fetchSignedUploadLocation()
+	uploadAttributes, err := getAttachmentV3UploadAttributes()
 	if err != nil {
 		return "", err
 	}
-	resp, err := transport.CdnTransport.Post(signedUploadLocation, []byte{}, "application/octet-stream")
+	resp, err := transport.CdnTransport.PostWithHeaders(
+		uploadAttributes.relativeSignedUploadLocation(),
+		[]byte{},
+		"application/octet-stream",
+		uploadAttributes.Headers)
 	if err != nil {
 		return "", err
 	}

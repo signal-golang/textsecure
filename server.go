@@ -721,7 +721,15 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 
 // Attachment handling
 type attachmentV3UploadAttributes struct {
-	SignedUploadLocation string `json:"signedUploadLocation"`
+	Cdn                  string            `json:"cdn"`
+	Key                  string            `json:"key"`
+	Headers              map[string]string `json:"headers"`
+	SignedUploadLocation string            `json:"signedUploadLocation"`
+}
+
+func (a *attachmentV3UploadAttributes) relativeSignedUploadLocation() string {
+	parts := strings.Split(a.SignedUploadLocation, "/")
+	return "/" + strings.Join(parts[3:], "/")
 }
 
 type jsonAllocation struct {
