@@ -81,7 +81,7 @@ func putAttachment(url string, body []byte) ([]byte, error) {
 }
 
 // uploadAttachment encrypts, authenticates and uploads a given attachment to a location requested from the server
-func uploadAttachment(r io.Reader, ct string) (*att, error) {
+func uploadAttachment(r io.Reader, ct string) (*attachmentPointerV3, error) {
 	return uploadAttachmentV3(r, ct, false)
 }
 
@@ -118,7 +118,7 @@ func uploadAttachmentV1(r io.Reader, ct string, isVoiceNote bool) (*att, error) 
 }
 
 // uploadAttachmentV3 encrypts, authenticates and uploads a given attachment to a location requested from the server
-func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*att, error) {
+func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*attachmentPointerV3, error) {
 	//combined AES-256 and HMAC-SHA256 key
 	keys := make([]byte, 64)
 	randBytes(keys)
@@ -137,7 +137,7 @@ func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*att, error) 
 
 	m := appendMAC(keys[32:], e)
 
-	location, err := allocateAttachmentV3()
+	location, uploadAttributes, err := allocateAttachmentV3()
 	if err != nil {
 		return nil, err
 	}
@@ -146,10 +146,10 @@ func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*att, error) 
 		return nil, err
 	}
 	// FIXME I don't know yet how to get the attachment pointer id
-	return &att{0, ct, keys, digest, uint32(plaintextLength), isVoiceNote}, nil
+	return &attachmentPointerV3{uploadAttributes.Key, uploadAttributes.Cdn, ct, keys, digest, uint32(plaintextLength), isVoiceNote}, nil
 }
 
-func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
+func uploadVoiceNote(r io.Reader, ct string) (*attachmentPointerV3, error) {
 	return uploadAttachmentV3(r, "audio/mpeg", true)
 }
 
@@ -258,10 +258,10 @@ func (a *attachmentV3UploadAttributes) relativeSignedUploadLocation() string {
 	return relativePath(a.SignedUploadLocation)
 }
 
-func allocateAttachmentV3() (string, error) {
+func allocateAttachmentV3() (string, *attachmentV3UploadAttributes, error) {
 	uploadAttributes, err := getAttachmentV3UploadAttributes()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	resp, err := transport.CdnTransport.PostWithHeaders(
 		uploadAttributes.relativeSignedUploadLocation(),
@@ -269,14 +269,14 @@ func allocateAttachmentV3() (string, error) {
 		"application/octet-stream",
 		uploadAttributes.Headers)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if resp.IsError() {
 		log.Debug("[textsecure] allocateAttachmentV3 error response ", resp.Body)
-		return "", resp
+		return "", nil, resp
 	}
 	location := resp.Header.Get("Location")
-	return relativePath(location), nil
+	return relativePath(location), uploadAttributes, nil
 }
 
 // GET /v1/attachments/

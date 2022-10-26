@@ -721,7 +721,7 @@ func GetRegisteredContacts() ([]contacts.Contact, error) {
 
 // Attachment handling
 type attachmentV3UploadAttributes struct {
-	Cdn                  int               `json:"cdn"`
+	Cdn                  uint32            `json:"cdn"`
 	Key                  string            `json:"key"`
 	Headers              map[string]string `json:"headers"`
 	SignedUploadLocation string            `json:"signedUploadLocation"`
@@ -760,8 +760,8 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 	}
 	dm.ExpireTimer = &msg.expireTimer
 	if msg.attachment != nil {
-		id := signalservice.AttachmentPointer_CdnId{
-			CdnId: msg.attachment.id,
+		id := signalservice.AttachmentPointer_CdnKey{
+			CdnKey: msg.attachment.cdnKey,
 		}
 		// todo send file names
 		filename := ""
@@ -771,6 +771,7 @@ func createMessage(msg *outgoingMessage) *signalservice.DataMessage {
 		dm.Attachments = []*signalservice.AttachmentPointer{
 			{
 				AttachmentIdentifier: &id,
+				CdnNumber:            &msg.attachment.cdnNr,
 				ContentType:          &msg.attachment.ct,
 				Key:                  msg.attachment.keys[:],
 				Digest:               msg.attachment.digest[:],

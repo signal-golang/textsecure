@@ -99,12 +99,22 @@ type att struct {
 	voiceNote bool
 }
 
+type attachmentPointerV3 struct {
+	cdnKey    string
+	cdnNr     uint32
+	ct        string
+	keys      []byte
+	digest    []byte
+	size      uint32
+	voiceNote bool
+}
+
 type outgoingMessage struct {
 	destination string
 	msg         string
 	group       *groupMessage
 	groupV2     *signalservice.GroupContextV2
-	attachment  *att
+	attachment  *attachmentPointerV3
 	flags       uint32
 	expireTimer uint32
 	timestamp   *uint64
