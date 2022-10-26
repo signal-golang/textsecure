@@ -39,21 +39,6 @@ func getAttachment(url string) (io.ReadCloser, error) {
 }
 
 // putAttachment uploads an encrypted attachment to the given URL
-func putAttachmentV3(url string, body []byte) ([]byte, error) {
-	resp, err := transport.CdnTransport.Put(url, body, "application/octet-stream")
-	if err != nil {
-		return nil, err
-	}
-	if resp.IsError() {
-		return nil, resp
-	}
-	hasher := sha256.New()
-	hasher.Write(body)
-
-	return hasher.Sum(nil), nil
-}
-
-// putAttachment uploads an encrypted attachment to the given URL
 func putAttachment(url string, body []byte) ([]byte, error) {
 	br := bytes.NewReader(body)
 	req, err := http.NewRequest("PUT", url, br)
@@ -142,7 +127,7 @@ func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*att, error) 
 		return nil, err
 	}
 	log.Debug("[textsecure] uploadAttachmentV3 location ", location)
-	digest, err := putAttachmentV3(location, m)
+	digest, err := putAttachment(location, m)
 	if err != nil {
 		return nil, err
 	}
@@ -260,15 +245,15 @@ func allocateAttachmentV3() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	/*resp, err := transport.CdnTransport.Post(signedUploadLocation, []byte{}, "application/octet-stream")
+	resp, err := transport.CdnTransport.Post(signedUploadLocation, []byte{}, "application/octet-stream")
 	if err != nil {
 		return "", err
 	}
 	if resp.IsError() {
+		log.Debug("[textsecure] allocateAttachmentV3 error response ", resp.Body)
 		return "", resp
 	}
-	return resp.Header.Get("Location"), nil*/
-	return signedUploadLocation, nil
+	return resp.Header.Get("Location"), nil
 }
 
 // GET /v1/attachments/
