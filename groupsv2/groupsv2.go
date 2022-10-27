@@ -227,7 +227,7 @@ func (g *GroupV2) UpdateGroupFromServer() error {
 func GetGroupV2MembersForGroup(group string) ([]*signalservice.DecryptedMember, error) {
 	g := FindGroup(group)
 	if g == nil {
-		return nil, fmt.Errorf("Group not found")
+		return nil, fmt.Errorf("group not found")
 	}
 	err := g.UpdateGroupFromServer()
 	if err != nil {
@@ -355,9 +355,10 @@ func saveGroupV2(hexid string) error {
 
 // loadGroup loads a group's state from a file.
 func loadGroupV2(hexid string) (*GroupV2, error) {
-	b, err := os.ReadFile(idToPath(hexid))
+	path := idToPath(hexid)
+	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("group not found %s %s", err.Error(), path)
 	}
 
 	group := &GroupV2{}

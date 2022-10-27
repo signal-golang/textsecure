@@ -91,7 +91,13 @@ func writeOwnProfile(profile ProfileSettings) error {
 	if err != nil {
 		return err
 	}
-	transport.Transport.PutJSON(fmt.Sprintf(PROFILE_PATH, ""), body)
+	response, err := transport.Transport.PutJSON(fmt.Sprintf(PROFILE_PATH, ""), body)
+	if err != nil {
+		return err
+	}
+	if response.IsError() {
+		return response
+	}
 	return nil
 }
 
@@ -386,13 +392,15 @@ func GetProfileUUID(uuid string) (*Profile, error) {
 	} else {
 		resp, err := transport.Transport.Get(fmt.Sprintf(PROFILE_PATH, uuid))
 		if err != nil {
-			log.Errorln("[textsecure] GetProfileUuid ", err)
+			log.Errorln("[textsecure] GetProfileUuid fetch profile:", err)
+			return nil, err
 		}
 
 		dec := json.NewDecoder(resp.Body)
 		err = dec.Decode(&profile)
 		if err != nil {
-			log.Errorln("[textsecure] GetProfileUuid ", err)
+			log.Errorln("[textsecure] GetProfileUuid decode", err)
+			return nil, err
 		}
 	}
 	var avatarDecrypted []byte

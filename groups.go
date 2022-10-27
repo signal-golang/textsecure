@@ -202,10 +202,13 @@ func GetContactForTel(tel string) *contacts.Contact {
 	}
 	return nil
 }
-func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
+func sendGroupV2Helper(hexid string, msg string, attachmentPointer *attachmentPointerV3, timer uint32) (uint64, error) {
 	var ts uint64
 	var err error
 	g := groupsV2.FindGroup(hexid)
+	if g == nil {
+		return 0, fmt.Errorf("group not found %s", hexid)
+	}
 	g.CheckJoinStatus()
 	if g == nil {
 		log.Infoln("[textsecure] sendGroupv2Helper unknown group id")
@@ -232,7 +235,7 @@ func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, 
 		omsg := &outgoingMessage{
 			destination: idToHexUUID(m.Uuid),
 			msg:         msg,
-			attachment:  a,
+			attachment:  attachmentPointer,
 			expireTimer: timer,
 			timestamp:   &timestamp,
 			groupV2:     groupsV2Context,
@@ -247,13 +250,13 @@ func sendGroupV2Helper(hexid string, msg string, a *att, timer uint32) (uint64, 
 	return ts, nil
 }
 
-func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, error) {
+func sendGroupHelper(hexid string, msg string, attachmentPointer *attachmentPointerV3, timer uint32) (uint64, error) {
 	var ts uint64
 	var err error
 	g, ok := groups[hexid]
 	if !ok {
 		log.Infoln("[textsecure] sendGroupHelper unknown group id")
-		ts, err = sendGroupV2Helper(hexid, msg, a, timer)
+		ts, err = sendGroupV2Helper(hexid, msg, attachmentPointer, timer)
 		if err != nil {
 			return 0, UnknownGroupIDError{hexid}
 		}
@@ -281,7 +284,7 @@ func sendGroupHelper(hexid string, msg string, a *att, timer uint32) (uint64, er
 			omsg := &outgoingMessage{
 				destination: m,
 				msg:         msg,
-				attachment:  a,
+				attachment:  attachmentPointer,
 				expireTimer: timer,
 				timestamp:   &timestamp,
 				group: &groupMessage{
@@ -309,21 +312,21 @@ func SendGroupMessage(hexid string, msg string, timer uint32) (uint64, error) {
 // SendGroupAttachment sends an attachment to a given group.
 func SendGroupAttachment(hexid string, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
-	a, err := uploadAttachment(r, ct)
+	attachmentPointer, err := uploadAttachment(r, ct)
 	if err != nil {
 		return 0, err
 	}
-	return sendGroupHelper(hexid, msg, a, timer)
+	return sendGroupHelper(hexid, msg, attachmentPointer, timer)
 }
 
 // SendGroupVoiceNote sends an voice note to a group
 func SendGroupVoiceNote(hexid string, msg string, r io.Reader, timer uint32) (uint64, error) {
 	ct, r := MIMETypeFromReader(r)
-	a, err := uploadVoiceNote(r, ct)
+	attachmentPointer, err := uploadVoiceNote(r, ct)
 	if err != nil {
 		return 0, err
 	}
-	return sendGroupHelper(hexid, msg, a, timer)
+	return sendGroupHelper(hexid, msg, attachmentPointer, timer)
 }
 func newGroupID() []byte {
 	id := make([]byte, 16)
