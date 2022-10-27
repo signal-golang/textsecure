@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/signal-golang/textsecure/helpers"
@@ -49,10 +50,17 @@ func SetupStorageTransporter(Url string, uuid string, password string, userAgent
 	StorageTransport = newHTTPTransporter(Url, uuid, password, userAgent, proxyServer, rootCa.DirectoryCA)
 }
 
+var ServiceTransport *httpTransporter
+
+func SetupServiceTransporter(Url string, uuid string, password string, userAgent string, proxyServer string) {
+	ServiceTransport = newHTTPTransporter(Url, uuid, password, userAgent, proxyServer, rootCa.DirectoryCA)
+}
+
 type response struct {
 	Status  int
 	Body    io.ReadCloser
 	Cookies string
+	Header  *http.Header
 }
 
 func (r *response) IsError() bool {
@@ -67,6 +75,7 @@ type Transporter interface {
 	Get(url string) (*response, error)
 	Del(url string) (*response, error)
 	Put(url string, body []byte, ct string) (*response, error)
+	PostWithHeaders(url string, body []byte, contentType string, headers map[string]string) (*response, error)
 	PutWithAuth(url string, body []byte, ct string, auth string) (*response, error)
 	PatchWithAuth(url string, body []byte, ct string, auth string) (*response, error)
 
@@ -188,6 +197,37 @@ func (ht *httpTransporter) Del(url string) (*response, error) {
 	}
 
 	log.Debugf("DELETE %s %d\n", url, r.Status)
+
+	return r, err
+}
+
+func (ht *httpTransporter) PostWithHeaders(url string, body []byte, ct string, headers map[string]string) (*response, error) {
+	br := bytes.NewReader(body)
+	req, err := http.NewRequest("POST", ht.baseURL+url, br)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	if ht.userAgent != "" {
+		req.Header.Set("X-Signal-Agent", ht.userAgent)
+	}
+	req.Header.Add("Content-Type", ct)
+	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
+	req.SetBasicAuth(ht.user, ht.pass)
+	resp, err := ht.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	r := &response{}
+	if resp != nil {
+		r.Status = resp.StatusCode
+		r.Body = resp.Body
+		r.Header = &resp.Header
+	}
+
+	log.Debugf("[textsecure] POST %s %d\n", url, r.Status)
 
 	return r, err
 }

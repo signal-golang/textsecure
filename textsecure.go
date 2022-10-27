@@ -90,8 +90,9 @@ func needsRegistration() bool {
 
 var identityKey *axolotl.IdentityKeyPair
 
-type att struct {
-	id        uint64
+type attachmentPointerV3 struct {
+	cdnKey    string
+	cdnNr     uint32
 	ct        string
 	keys      []byte
 	digest    []byte
@@ -104,7 +105,7 @@ type outgoingMessage struct {
 	msg         string
 	group       *groupMessage
 	groupV2     *signalservice.GroupContextV2
-	attachment  *att
+	attachment  *attachmentPointerV3
 	flags       uint32
 	expireTimer uint32
 	timestamp   *uint64
@@ -314,9 +315,10 @@ func Setup(c *Client) error {
 	client.RegistrationDone()
 	rootCa.SetupCA(config.ConfigFile.RootCA)
 	transport.SetupTransporter(config.ConfigFile.Server, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
-	transport.SetupCDNTransporter(SIGNAL_CDN_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupCDNTransporter(SIGNAL_CDN2_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	transport.SetupDirectoryTransporter(DIRECTORY_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	transport.SetupStorageTransporter(STORAGE_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
+	transport.SetupServiceTransporter(SIGNAL_SERVICE_URL, config.ConfigFile.UUID, registration.Registration.Password, config.ConfigFile.UserAgent, config.ConfigFile.ProxyServer)
 	identityKey, err = textSecureStore.GetIdentityKeyPair()
 	// check if we have a uuid and if not get it
 	// config.ConfigFile = checkUUID(config.ConfigFile)
@@ -461,7 +463,7 @@ func registerDevice() error {
 
 func handleReceipt(env *signalservice.Envelope) {
 	if client.ReceiptHandler != nil {
-		client.ReceiptHandler(env.GetSourceUuid(), env.GetSourceDevice(), env.GetServerTimestamp())
+		client.ReceiptHandler(env.GetSourceUuid(), env.GetSourceDevice(), env.GetTimestamp())
 	}
 }
 

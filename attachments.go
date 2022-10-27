@@ -12,11 +12,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
+	"strings"
 
 	signalservice "github.com/signal-golang/textsecure/protobuf"
 	textsecure "github.com/signal-golang/textsecure/protobuf"
 	"github.com/signal-golang/textsecure/transport"
+	log "github.com/sirupsen/logrus"
 )
 
 // getAttachment downloads an encrypted attachment blob from the given URL
@@ -36,27 +37,15 @@ func getAttachment(url string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-// putAttachment uploads an encrypted attachment to the given URL
-func putAttachment(url string, body []byte) ([]byte, error) {
-	br := bytes.NewReader(body)
-	req, err := http.NewRequest("PUT", url, br)
+// putAttachment uploads an encrypted attachment to the given relative URL using the CdnTransport
+func putAttachmentV3(url string, body []byte) ([]byte, error) {
+	response, err := transport.CdnTransport.Put(url, body, "application/octet-stream")
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Content-Type", "application/octet-stream")
-	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
-
-	client := transport.NewHTTPClient()
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+	if response.IsError() {
+		return nil, response
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("HTTP status %d\n", resp.StatusCode)
-	}
-
 	hasher := sha256.New()
 	hasher.Write(body)
 
@@ -64,38 +53,12 @@ func putAttachment(url string, body []byte) ([]byte, error) {
 }
 
 // uploadAttachment encrypts, authenticates and uploads a given attachment to a location requested from the server
-func uploadAttachment(r io.Reader, ct string) (*att, error) {
-	//combined AES-256 and HMAC-SHA256 key
-	keys := make([]byte, 64)
-	randBytes(keys)
-
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	plaintextLength := len(b)
-
-	e, err := aesEncrypt(keys[:32], b)
-	if err != nil {
-		return nil, err
-	}
-
-	m := appendMAC(keys[32:], e)
-
-	id, location, err := allocateAttachment()
-	if err != nil {
-		return nil, err
-	}
-	digest, err := putAttachment(location, m)
-	if err != nil {
-		return nil, err
-	}
-
-	return &att{id, ct, keys, digest, uint32(plaintextLength), false}, nil
+func uploadAttachment(r io.Reader, ct string) (*attachmentPointerV3, error) {
+	return uploadAttachmentV3(r, ct, false)
 }
-func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
-	ct = "audio/mpeg"
+
+// uploadAttachmentV3 encrypts, authenticates and uploads a given attachment to a location requested from the server
+func uploadAttachmentV3(r io.Reader, ct string, isVoiceNote bool) (*attachmentPointerV3, error) {
 	//combined AES-256 and HMAC-SHA256 key
 	keys := make([]byte, 64)
 	randBytes(keys)
@@ -114,16 +77,19 @@ func uploadVoiceNote(r io.Reader, ct string) (*att, error) {
 
 	m := appendMAC(keys[32:], e)
 
-	id, location, err := allocateAttachment()
+	location, uploadAttributes, err := allocateAttachmentV3()
 	if err != nil {
 		return nil, err
 	}
-	digest, err := putAttachment(location, m)
+	digest, err := putAttachmentV3(location, m)
 	if err != nil {
 		return nil, err
 	}
+	return &attachmentPointerV3{uploadAttributes.Key, uploadAttributes.Cdn, ct, keys, digest, uint32(plaintextLength), isVoiceNote}, nil
+}
 
-	return &att{id, ct, keys, digest, uint32(plaintextLength), true}, nil
+func uploadVoiceNote(r io.Reader, ct string) (*attachmentPointerV3, error) {
+	return uploadAttachmentV3(r, "audio/mpeg", true)
 }
 
 // ErrInvalidMACForAttachment signals that the downloaded attachment has an invalid MAC.
@@ -159,6 +125,7 @@ func handleSingleAttachment(a *textsecure.AttachmentPointer) (*Attachment, error
 
 	return &Attachment{bytes.NewReader(b), a.GetContentType(), a.GetFileName()}, nil
 }
+
 func handleProfileAvatar(profileAvatar *signalservice.ContactDetails_Avatar, key []byte) (*Attachment, error) {
 
 	loc, err := getProfileLocation(profileAvatar.String())
@@ -208,16 +175,48 @@ func handleAttachments(dm *textsecure.DataMessage) ([]*Attachment, error) {
 	return all, nil
 }
 
-// GET /v1/attachments/
-func allocateAttachment() (uint64, string, error) {
-	resp, err := transport.Transport.Get(allocateAttachmentPath)
+func getAttachmentV3UploadAttributes() (*attachmentV3UploadAttributes, error) {
+	resp, err := transport.ServiceTransport.Get(ATTACHMENT_V3_PATH)
 	if err != nil {
-		return 0, "", err
+		return nil, err
 	}
 	dec := json.NewDecoder(resp.Body)
-	var a jsonAllocation
-	dec.Decode(&a)
-	return a.ID, a.Location, nil
+	var a attachmentV3UploadAttributes
+	err = dec.Decode(&a)
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+func relativePath(url string) string {
+	parts := strings.Split(url, "/")
+	return "/" + strings.Join(parts[3:], "/")
+}
+
+func (a *attachmentV3UploadAttributes) relativeSignedUploadLocation() string {
+	return relativePath(a.SignedUploadLocation)
+}
+
+func allocateAttachmentV3() (string, *attachmentV3UploadAttributes, error) {
+	uploadAttributes, err := getAttachmentV3UploadAttributes()
+	if err != nil {
+		return "", nil, err
+	}
+	resp, err := transport.CdnTransport.PostWithHeaders(
+		uploadAttributes.relativeSignedUploadLocation(),
+		[]byte{},
+		"application/octet-stream",
+		uploadAttributes.Headers)
+	if err != nil {
+		return "", nil, err
+	}
+	if resp.IsError() {
+		log.Debug("[textsecure] allocateAttachmentV3 error response ", resp.Body)
+		return "", nil, resp
+	}
+	location := resp.Header.Get("Location")
+	return relativePath(location), uploadAttributes, nil
 }
 
 func getAttachmentLocation(id uint64, key string, cdnNumber uint32) (string, error) {

@@ -231,7 +231,7 @@ func GetGroupV2MembersForGroup(group string) ([]*signalservice.DecryptedMember, 
 	}
 	err := g.UpdateGroupFromServer()
 	if err != nil {
-		log.Debugln("could not update group from server")
+		log.Debugln("[textsecure] could not update group from server")
 	}
 
 	return g.DecryptedGroup.Members, nil

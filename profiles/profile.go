@@ -91,7 +91,13 @@ func writeOwnProfile(profile ProfileSettings) error {
 	if err != nil {
 		return err
 	}
-	transport.Transport.PutJSON(fmt.Sprintf(PROFILE_PATH, ""), body)
+	response, err := transport.Transport.PutJSON(fmt.Sprintf(PROFILE_PATH, ""), body)
+	if err != nil {
+		return err
+	}
+	if response.IsError() {
+		return response
+	}
 	return nil
 }
 
