@@ -186,7 +186,7 @@ func sendContactUpdate() error {
 
 	}
 
-	a, err := uploadAttachment(&buf, "application/octet-stream")
+	attachmentPointer, err := uploadAttachment(&buf, "application/octet-stream")
 	if err != nil {
 		return err
 	}
@@ -194,13 +194,14 @@ func sendContactUpdate() error {
 	sm := &signalservice.SyncMessage{
 		Contacts: &signalservice.SyncMessage_Contacts{
 			Blob: &signalservice.AttachmentPointer{
-				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnId{
-					CdnId: a.id,
+				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnKey{
+					CdnKey: attachmentPointer.cdnKey,
 				},
-				ContentType: &a.ct,
-				Key:         a.keys[:],
-				Digest:      a.digest[:],
-				Size:        &a.size,
+				CdnNumber:   &attachmentPointer.cdnNr,
+				ContentType: &attachmentPointer.ct,
+				Key:         attachmentPointer.keys[:],
+				Digest:      attachmentPointer.digest[:],
+				Size:        &attachmentPointer.size,
 			},
 		},
 	}
@@ -233,7 +234,7 @@ func sendGroupUpdate() error {
 		buf.Write(b)
 	}
 
-	a, err := uploadAttachment(&buf, "application/octet-stream")
+	attachmentPointer, err := uploadAttachment(&buf, "application/octet-stream")
 	if err != nil {
 		return err
 	}
@@ -241,13 +242,14 @@ func sendGroupUpdate() error {
 	sm := &signalservice.SyncMessage{
 		Groups: &signalservice.SyncMessage_Groups{
 			Blob: &signalservice.AttachmentPointer{
-				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnId{
-					CdnId: a.id,
+				AttachmentIdentifier: &signalservice.AttachmentPointer_CdnKey{
+					CdnKey: attachmentPointer.cdnKey,
 				},
-				ContentType: &a.ct,
-				Key:         a.keys[:],
-				Digest:      a.digest[:],
-				Size:        &a.size,
+				CdnNumber:   &attachmentPointer.cdnNr,
+				ContentType: &attachmentPointer.ct,
+				Key:         attachmentPointer.keys[:],
+				Digest:      attachmentPointer.digest[:],
+				Size:        &attachmentPointer.size,
 			},
 		},
 	}
