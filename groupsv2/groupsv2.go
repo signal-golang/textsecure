@@ -177,12 +177,12 @@ func (g *GroupV2) queryGroupChangeFromServer() (*signalservice.Group, error) {
 	}
 	if resp.IsError() {
 		if resp.Status == 403 {
-			return nil, fmt.Errorf(fmt.Sprintf("Not in group %s", resp.Status))
+			return nil, fmt.Errorf(fmt.Sprintf("Not in group %d", resp.Status))
 		}
 		if resp.Status == 404 {
-
-			return nil, fmt.Errorf(fmt.Sprintf("Group not found %s", resp.Status))
+			return nil, fmt.Errorf(fmt.Sprintf("Group not found %d", resp.Status))
 		}
+		return nil, resp
 	}
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(resp.Body)
