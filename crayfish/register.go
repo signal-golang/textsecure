@@ -53,6 +53,7 @@ func (c *CrayfishInstance) CrayfishRegisterWithCode(registrationInfo *registrati
 		Code:         codeInt,
 		SignalingKey: signalingKey,
 		Password:     registrationInfo.Password,
+		Name:         registrationInfo.Name,
 	}
 	requestVerifyType := CrayfishWebSocketRequestMessageTyp_VERIFY_REGISTRATION
 	verificationRequest := &CrayfishWebSocketRequestMessage{

@@ -203,8 +203,11 @@ func GetProfileAndCredential(UUID string, profileKey []byte) (*Profile, error) {
 	if len(profileKey) == 0 {
 		return nil, errors.New("profileKey is empty")
 	}
+	if (len(UUID) == 0) || (UUID == "00000000-0000-0000-0000-000000000000") {
+		return nil, errors.New("UUID is empty")
+	}
 
-	log.Infoln("[textsecure] GetProfileAndCredential for " + UUID)
+	log.Infoln("[textsecure] GetProfileAndCredential for" + UUID)
 	uuid, err := uuidUtil.FromString(UUID)
 	if err != nil {
 		log.Debugln("[textsecure] GetProfileAndCredential", err)

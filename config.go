@@ -90,7 +90,7 @@ func loadConfig() (*config.Config, error) {
 	}
 
 	if cfg.Server == "" {
-		cfg.Server = "https://textsecure-service.whispersystems.org:443"
+		cfg.Server = "https://chat.signal.org:443"
 	}
 
 	if cfg.VerificationType == "" {

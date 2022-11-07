@@ -12,6 +12,7 @@ type CrayfishWebSocketRequest_VERIFY_REGISTER_MESSAGE struct {
 	Number       string   `json:"number"`
 	Password     string   `json:"password"`
 	SignalingKey [52]byte `json:"signaling_key"`
+	Name         string   `json:"name"`
 }
 
 type CrayfishWebSocketRequestMessageTyp_SEALED_SESSION_DECRYPT_Message struct {

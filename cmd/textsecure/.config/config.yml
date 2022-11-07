@@ -2,7 +2,7 @@
 tel: "+1771111001"
 
 #Server URL
-server: https://textsecure-service.whispersystems.org:443
+server: https://chat.signal.org:443
 
 #Server's TLS root certificate path when using a non-default server
 #See https://github.com/janimo/textsecure-docker#using-https

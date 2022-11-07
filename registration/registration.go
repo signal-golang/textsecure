@@ -23,6 +23,7 @@ type RegistrationInfo struct {
 	RegistrationID uint32
 	SignalingKey   []byte
 	CaptchaToken   string
+	Name           string
 }
 
 var Registration RegistrationInfo
