@@ -157,44 +157,46 @@ type Profile struct {
 	Credential                     []byte                     `json:"credential"`
 }
 
+func getProfile(UUID string, unidentifiedAccessKey []byte) (*Profile, error) {
+	resp, err := transport.Transport.GetWithUnidentifiedAccessKey(fmt.Sprintf(PROFILE_PATH, UUID), unidentifiedAccessKey)
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		return nil, resp
+	}
+
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	profile := &Profile{}
+	err = json.Unmarshal(bytes, profile)
+	if err != nil {
+		return nil, err
+	}
+	return profile, nil
+}
+
 func GetProfile(UUID string, profileKey []byte) (*Profile, error) {
 	unidentifiedAccess, err := unidentifiedAccess.GetAccessForSync(config.ConfigFile.ProfileKey, config.ConfigFile.Certificate)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := transport.Transport.GetWithUnidentifiedAccessKey(fmt.Sprintf(PROFILE_PATH, UUID), unidentifiedAccess.UnidentifiedAccessKey)
-	if err != nil {
-		return nil, err
-	}
-	profile := &Profile{}
-	bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(bytes, profile)
-
+	profile, err := getProfile(UUID, unidentifiedAccess.UnidentifiedAccessKey)
 	if err != nil {
 		log.Debugln("[textsecure] GetProfile decode error", err)
 		return nil, err
-	} else {
-		err = decryptProfile(profileKey, profile)
-		if err != nil {
-			log.Errorln("[textsecure] decrypt profile error", err)
-			// return nil, err
-		}
-		resp, err = transport.Transport.GetWithUnidentifiedAccessKey(fmt.Sprintf(PROFILE_PATH, UUID), []byte(profile.UnidentifiedAccess))
-		if err != nil {
-			return profile, err
-		}
-		bytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(bytes, profile)
-		if err != nil {
-			log.Debugln("[textsecure] GetProfile decode error", err)
-			return nil, err
-		}
+	}
+
+	err = decryptProfile(profileKey, profile)
+	if err != nil {
+		log.Errorln("[textsecure] decrypt profile error", err)
+		// return nil, err
+	}
+	profile, err = getProfile(UUID, []byte(profile.UnidentifiedAccess))
+	if err != nil {
+		return nil, err
 	}
 	return profile, nil
 
